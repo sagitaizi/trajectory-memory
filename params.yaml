@@ -1,0 +1,48 @@
+# Simulation + model parameters. Values are provisional starting points, tuned
+# in the sim-vs-real match (Sep 10-13) and the G-F bake-off.
+
+seed: 0
+
+sim:
+  resolution: [640, 480]        # DVXplorer, [width, height]
+  fps: 1000                     # blob render rate before v2e
+  duration_s: 20.0
+  blob:
+    radius_px: 12
+    bg_intensity: 20            # 8-bit grey background
+    fg_intensity: 180           # blob brightness
+  # main-repo calibration, path relative to the Thesis repo root
+  calibration: "calibration/3 - 22_08/calibration_camera_DVXplorer_DXA00126-refit-k1k2-2026_08_23.json"
+  v2e:
+    device: cpu
+    pos_thres: 0.2
+    neg_thres: 0.2
+    sigma_thres: 0.03
+    cutoff_hz: 200
+    leak_rate_hz: 0.0
+    shot_noise_rate_hz: 0.1
+    refractory_period_s: 0.0
+  # per-clip domain randomisation ranges (make_sim_dataset)
+  randomise:
+    pos_thres: [0.15, 0.30]
+    sigma_thres: [0.01, 0.06]
+    shot_noise_rate_hz: [0.0, 1.0]
+    fg_intensity: [120, 220]
+    affine_jitter: 0.03          # fraction of frame
+
+frontend:
+  frame_window_us: 5000
+  raw_bin_us: 1000
+
+model:
+  horizon_s: 0.1                 # short-horizon prediction target
+  reservoir:
+    n: 500
+    spectral_radius: 1.0
+    input_scaling: 0.5
+    leak_rate: 0.3
+    ridge_beta: 1.0e-4
+    washout: 200
+  lmu:
+    d: 8
+    theta_s: 2.0                 # memory window; set to ~one period at fit time
