@@ -31,6 +31,17 @@ Input: a frame sequence + its frame rate (upsampled internally). Output: DVS eve
    DVXplorer contrast-threshold constants) in the Thesis repo.
 4. **Ground truth** = the `TrajectorySpec` sample, exact, at every timestamp.
 
+## Practical constraints found wiring `trajmem/simulate.py` (2026-09-10)
+- Integrated via the **`v2ecore.emulator.EventEmulator` Python API**, not the CLI:
+  `EventEmulator(seed=, device="cpu", pos_thres=, ...)` then `generate_events(frame_f32,
+  t_seconds)` per frame (first call returns `None`); concatenate the `(M, 4)` `[t, x, y, pol]`
+  chunks. Output is converted to a structured array (`x, y, timestamp_us, polarity∈{0,1}`).
+- **`cutoff_hz` must sit well below the render `fps`** or v2e's photoreceptor IIR filter is
+  under-sampled ("large maximum update eps" warning). Rule of thumb: `fps >= ~15 * cutoff_hz`.
+- **Event count is very sensitive to blob/background contrast.** A 9x intensity ratio at
+  1000 fps gave ~3 M ev/s (v2e emits ~ln(ratio)/pos_thres events per edge pixel per frame).
+  Start with a modest ratio (~2x) and raise it only to match the measured real rate.
+
 ## Match to real (do this day one, while the camera is here)
 Record one real repetitive clip, simulate the same nominal path, and compare:
 - total event rate (events/s) and its time profile,

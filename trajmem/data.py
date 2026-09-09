@@ -9,7 +9,7 @@ import numpy as np
 
 @dataclass
 class Clip:
-    events: np.ndarray                                   # structured (x, y, t, polarity)
+    events: np.ndarray                                   # structured: x, y, timestamp (us), polarity
     duration_us: int
     gt: Callable[[float], tuple[float, float]] | None    # true position; None if unlabelled
     deviation_times: list[float] = field(default_factory=list)

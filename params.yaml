@@ -9,16 +9,17 @@ sim:
   duration_s: 20.0
   blob:
     radius_px: 12
-    bg_intensity: 20            # 8-bit grey background
-    fg_intensity: 180           # blob brightness
-  # main-repo calibration, path relative to the Thesis repo root
-  calibration: "calibration/3 - 22_08/calibration_camera_DVXplorer_DXA00126-refit-k1k2-2026_08_23.json"
+    bg_intensity: 64           # 8-bit grey background
+    fg_intensity: 128          # blob brightness; keep contrast modest until matched to real
+  # simulate.load_intrinsics() uses camera.calibration's own pinned DVXplorer file;
+  # set an absolute path here only to override it.
+  calibration: null
   v2e:
     device: cpu
     pos_thres: 0.2
     neg_thres: 0.2
     sigma_thres: 0.03
-    cutoff_hz: 200
+    cutoff_hz: 30              # must sit well below fps or v2e's IIR filter is under-sampled
     leak_rate_hz: 0.0
     shot_noise_rate_hz: 0.1
     refractory_period_s: 0.0
