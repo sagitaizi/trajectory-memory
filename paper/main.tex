@@ -1,0 +1,142 @@
+%% IEEE MCSoC 2026 submission.
+%% Class + style follow the IEEE Conference Proceedings convention (IEEE Xplore).
+%% Page limit: 8 pages including references (per supervisor). Two-column, 10pt, US letter.
+%% Build: latexmk -pdf main.tex   (needs IEEEtran.cls, IEEEtran.bst — present in MiKTeX)
+
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}          % load last
+
+\graphicspath{{figures/}}
+
+\begin{document}
+
+\title{Spiking Trajectory Memory: Online Learning and Deviation Detection\\
+of Repetitive Target Motion from an Event Camera}
+
+\author{\IEEEauthorblockN{Sagi Taizi}
+\IEEEauthorblockA{\textit{Dept.\ of Computer Science} \\
+\textit{The Open University of Israel}\\
+Ra'anana, Israel \\
+sagitaizi@example.com}
+\and
+\IEEEauthorblockN{Elishai Ezra Tsur}
+\IEEEauthorblockA{\textit{Neuro-Biomorphic Engineering Lab} \\
+\textit{The Open University of Israel}\\
+Ra'anana, Israel \\
+elishai@example.com}
+}
+
+\maketitle
+
+\begin{abstract}
+%% ~150--230 words, one paragraph, no citations, no custom macros.
+%% State: problem, gap, what we do, how it is evaluated, headline result, why it matters.
+Placeholder. Event cameras report per-pixel brightness changes with microsecond latency,
+making them a natural sensor for anticipating fast, repetitive target motion. We present a
+spiking network that observes a target moving in a repeating path, builds a memory of that
+path online, predicts its position a short horizon ahead, and signals when the motion stops
+matching the learned pattern. The network is pretrained on trajectories rendered through a
+calibrated event-camera simulator and evaluated, with frozen weights, on real recordings of
+fan-driven, pendulum, hand-moved, and motor-driven motion. We report prediction error,
+lock-on time, and deviation-detection latency against classical periodic baselines. The
+contribution is a spiking formulation of trajectory anticipation as predictive inference,
+positioned as a component of a low-latency neuromorphic tracking pipeline.
+\end{abstract}
+
+\begin{IEEEkeywords}
+event camera, spiking neural network, trajectory prediction, online learning,
+novelty detection, neuromorphic vision
+\end{IEEEkeywords}
+
+\section{Introduction}
+% Motivation: low-latency closed-loop tracking; anticipation beats reaction; event vision.
+% The specific problem: a target repeating a path; learn it, predict it, notice when it breaks.
+% Why spiking: event-native processing, dynamics-as-computation, path to on-chip deployment.
+% Contributions (bulleted):
+\begin{itemize}
+  \item A spiking trajectory-memory network that learns a repetitive target path online and
+        predicts it a short horizon ahead.
+  \item A deviation signal derived from prediction error that flags when motion leaves the
+        learned pattern.
+  \item An evaluation protocol: simulator pretraining with a calibrated camera model,
+        frozen-weight testing on real driven-motion recordings, against periodic baselines.
+\end{itemize}
+
+\section{Related Work}
+% Event-based SNN trajectory prediction (Debat et al.; recent event ping-pong; N-DriverMotion).
+% Sequence memory / dynamical prediction in spiking networks (LMU, FORCE, reservoirs, e-prop).
+% Deviation / novelty detection with spiking networks; habituation and inhibitory plasticity.
+% Classical repetitive-trajectory learning (rhythmic DMP) and trajectory-anomaly detection.
+% Gap: repetitive path, learned online from a freely moving real target, with a break signal.
+
+\section{Method}
+
+\subsection{Problem Setup}
+% Target position over time; repetition; prediction horizon; deviation definition.
+
+\subsection{Event Input}
+% The funnel: Stage 1 accumulated event frames; Stage 2 raw events end-to-end.
+% Representations used; time window; polarity handling.
+
+\subsection{Localiser}
+% Frame -> target position estimate. Spiking, topographic. Fallback: classical centroid.
+
+\subsection{Trajectory-Memory Network}
+% Position stream -> short-horizon prediction. Predictive-inference framing.
+% State carries the current pattern; weights carry general motion regularities.
+% Framework: see Sec.~\ref{sec:impl}.
+
+\subsection{Deviation Score}
+% s(t) = f(prediction error against the learned path); thresholding.
+
+\subsection{Training and Evaluation Protocol}
+% Pretrain on simulated trajectories; freeze; evaluate on held-out real recordings only.
+
+\section{Experimental Setup}
+
+\subsection{Event-Camera Simulator}
+% v2e configured with the DVXplorer intrinsics, lens distortion, contrast threshold, noise.
+% Trajectory families: circle, ellipse, figure-eight, Lissajous; scripted deviations.
+
+\subsection{Real Recordings}
+% Four regimes: ceiling-fan (circular), string pendulum, hand-moved, motor-driven on a blank
+% wall (exact encoder ground truth via calibration). Single high-contrast target; daylight.
+
+\subsection{Baselines}
+% Periodic Kalman filter; harmonic / Fourier fit; rhythmic dynamic movement primitive.
+
+\subsection{Metrics}
+% Prediction error at the horizon; lock-on time; deviation-detection ROC and median latency.
+
+\section{Results}
+% Table: baseline vs Stage 1 (vs Stage 2 if reached), prediction and deviation.
+% Lock-on curves; deviation-detection timing; one external-dataset generalisation check.
+
+\section{Discussion}
+% Where the spiking version wins / costs accuracy; event-native and latency arguments.
+% Neuromorphic-hardware energy/latency: cited, not measured (no Loihi/Lava access).
+% Limitations. Future work: online re-learning of a new pattern; attention across objects.
+
+\section{Conclusion}
+% One paragraph.
+
+\section*{Acknowledgment}
+% Supervision, lab, funding.
+
+\label{sec:impl}
+% If space allows, a short implementation-notes paragraph or move framework details here.
+
+\nocite{*}   % TEMP: lists every refs.bib entry while drafting. Delete once citations are real.
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+\end{document}

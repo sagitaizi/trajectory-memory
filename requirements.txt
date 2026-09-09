@@ -1,0 +1,8 @@
+# Runs in the shared `thesis` conda env (Python 3.14). Only the additions are pinned here.
+# numpy, scipy, opencv-python, pyyaml, nengo, dv_processing come from that env.
+
+snntorch
+v2e
+
+# dev
+pytest

@@ -1,0 +1,162 @@
+# Bibliography
+
+Every paper referenced anywhere in this project — to justify a design decision, a code change,
+or a section of the paper — gets an entry here, with a note on *why* and *where*. Update this
+file in the same change that leans on the paper.
+
+Author lists and venues from a 2026-09-09 literature scan; confirm each before citing in the
+manuscript.
+
+---
+
+## Closest prior art
+
+### Debat et al., 2021 — "Event-Based Trajectory Prediction Using Spiking Neural Networks"
+- Debat, Chauhan, Cottereau, Masquelier, Paindavoine, Baures. *Frontiers in Computational
+  Neuroscience* 15:658764.
+- **Why:** the nearest existing system — event camera + 3-layer LIF SNN + unsupervised STDP →
+  motion-selective neurons → polynomial readout predicts where a thrown ball lands. Static
+  camera, constrained ballistic motion, offline batch training, no deviation detection, no
+  attention.
+- **Where:** `PLAN.md` novelty framing; the baseline every result is positioned against.
+
+### "Egocentric Event-Based Vision for Ping Pong Ball Trajectory Prediction", 2025
+- arXiv:2506.07860. Authors unverified (RPG, University of Zurich). Public code.
+- **Why:** current-generation restatement of Debat — event camera → ball trajectory prediction
+  with 3-D ground truth, real-time. Sharpens the required delta: repetitive learned path +
+  deviation, not one-shot ballistic prediction.
+- **Where:** `PLAN.md` novelty framing.
+
+### N-DriverMotion, 2024
+- "Driver motion learning and prediction using an event-based camera and directly trained
+  spiking neural networks on Loihi 2." arXiv:2408.13379.
+- **Why:** evidence the full stack (event camera → directly-trained SNN → motion prediction →
+  neuromorphic hardware) is a current, publishable combination.
+- **Where:** paper related-work; motivation for the event-native goal (Stage 2).
+
+## Sequence memory and dynamical prediction in spiking networks
+
+### Voelker, Kajić & Eliasmith, 2019 — "Legendre Memory Units"
+- *NeurIPS 2019*.
+- **Why:** NEF-derived, provably optimal rolling memory of a time signal; beats LSTM on chaotic
+  time-series prediction; runs on Loihi. Candidate for the memory core.
+- **Where:** `model.py` (LMU implementation, if G-F picks it); decision gate G-F.
+
+### Sussillo & Abbott, 2009 — "Generating Coherent Patterns of Activity from Chaotic Neural Networks"
+- *Neuron* 63(4):544–557. FORCE learning.
+- **Why:** foundational method for training a fixed recurrent network to generate/predict
+  arbitrary periodic patterns; basis for the reservoir approach with an online-trained readout.
+- **Where:** `model.py` (`ReservoirMemory`); `PLAN.md` G-F.
+
+### Nicola & Clopath, 2017 — "Supervised learning in spiking neural networks with FORCE training"
+- *Nature Communications* 8:2208.
+- **Why:** FORCE carried into spiking networks — the spiking reservoir route for pattern
+  learning and prediction.
+- **Where:** `model.py`; G-F.
+
+### Bellec et al., 2020 — "A solution to the learning dilemma for recurrent networks of spiking neurons"
+- Bellec, Scherr, Subramoney, Hajek, Salaj, Legenstein, Maass. *Nature Communications* 11:3625.
+  e-prop.
+- **Why:** online, local approximation to BPTT for recurrent SNNs; the option if genuine
+  online weight updates are wanted instead of pretrain-then-freeze.
+- **Where:** G-F; noted in `PLAN.md` out-of-scope (online re-learning) as the tool that path
+  would need.
+
+### Gilra & Gerstner, 2017 — "Predicting non-linear dynamics by stable local learning in a recurrent spiking neural network"
+- *eLife* 6:e28295.
+- **Why:** local-plasticity learning of arbitrary dynamical systems in an RSNN — directly
+  relevant to representing a trajectory as network dynamics.
+- **Where:** G-F background.
+
+### Kim & Chow, 2018 — "Learning recurrent dynamics in spiking networks"
+- *eLife* 7:e37124.
+- **Why:** RLS-trained recurrent spiking networks that reproduce target dynamics stably;
+  method reference for the reservoir readout.
+- **Where:** `model.py`.
+
+## Deviation / novelty detection
+
+### Schulz et al., 2021 — "The generation of cortical novelty responses through inhibitory plasticity"
+- Schulz, Miehl, Berry, Gjorgjieva. *eLife* 10:e65309.
+- **Why:** biological mechanism for "familiar → suppressed, novel → salient" via inhibitory
+  plasticity — grounding for the deviation signal and for the out-of-scope attention work.
+- **Where:** Phase D framing; paper discussion.
+
+### "Vacuum Spiker: A Spiking Neural Network-Based Model for Efficient Anomaly Detection in Time Series", 2025
+- arXiv:2510.06910.
+- **Why:** recent, concrete SNN time-series anomaly detection — comparison point for the
+  deviation-detection method.
+- **Where:** Phase D; paper related-work.
+
+## Attention — future-work context
+
+### Itti & Koch, 2001 — "Computational modelling of visual attention"
+- *Nature Reviews Neuroscience* 2(3):194–203.
+- **Why:** canonical saliency + winner-take-all + inhibition-of-return model; "habituate to
+  repetitive motion" is a temporal generalisation of IOR.
+- **Where:** paper future-work section.
+
+### "Look twice: A generalist computational model predicts return fixations across tasks and species", 2022
+- *PLOS Computational Biology*.
+- **Why:** model of gaze return/switching; benchmark target if the eye-tracking comparison is
+  ever run.
+- **Where:** paper future-work section.
+
+## Non-neuromorphic baselines and surveys
+
+### Ijspeert, Nakanishi & Schaal, 2002 — rhythmic dynamic movement primitives
+- "Learning rhythmic movements by demonstration using nonlinear oscillators." *IROS 2002*.
+- **Why:** the classical way to learn and reproduce a repetitive trajectory from demonstration
+  — a baseline to compare against.
+- **Where:** `baseline.py`; results table.
+
+### Saveriano et al., 2023 — "Dynamic movement primitives in robotics: A tutorial survey"
+- Saveriano, Abu-Dakka, Kramberger, Peternel. *International Journal of Robotics Research*.
+- **Why:** survey grounding for the DMP baseline and the periodic-DMP formulation.
+- **Where:** `baseline.py`; paper related-work.
+
+### "A Survey on Deep Learning Models for Anomaly Trajectory Detection", 2025
+- **Why:** situates the deviation-detection contribution against the (mostly GPS-scale,
+  non-real-time, non-event) trajectory-anomaly literature.
+- **Where:** paper related-work.
+
+## Event-camera simulation
+
+### Rebecq, Gehrig & Scaramuzza, 2018 — "ESIM: an Open Event Camera Simulator"
+- *CoRL 2018*.
+- **Why:** renders a 3-D scene to events with configurable intrinsics/distortion/threshold —
+  fallback simulator if a textured 3-D scene is needed.
+- **Where:** `simulate.py`.
+
+### Hu, Liu & Delbruck, 2021 — "v2e: From Video Frames to Realistic DVS Events"
+- *CVPR Workshops 2021*.
+- **Why:** video → events with realistic non-idealities (threshold jitter, refractory period,
+  shot noise, photoreceptor bandwidth), transfer function fittable to a real sensor. Primary
+  simulator.
+- **Where:** `simulate.py`.
+
+### "Event Camera Simulator Improvements via Characterized Parameters", 2021
+- *Frontiers in Neuroscience*.
+- **Why:** procedure for matching simulator parameters to a measured real camera — the recipe
+  for configuring v2e to the DVXplorer.
+- **Where:** `simulate.py`; Phase A sim-vs-real check.
+
+## Event datasets — external generalisation check only
+
+### Mitrokhin et al., 2019 — "EV-IMO: Motion Segmentation Dataset and Learning Pipeline for Event Cameras"
+- *IROS 2019*.
+- **Why:** indoor, multiple fast-moving objects, Vicon trajectory ground truth — candidate
+  external test for generalisation beyond the rig.
+- **Where:** Phase F external check.
+
+### "Event Stream-based Visual Object Tracking: A High-Resolution Benchmark" (EventVOT), 2024
+- *CVPR 2024*. Authors unverified (Xiao Wang et al.).
+- **Why:** 1280×720 single-object tracking benchmark — resolution closest to the DVXplorer;
+  external generalisation test.
+- **Where:** Phase F external check.
+
+### "Object Tracking by Jointly Exploiting Frame and Event Domain" (FE108), 2021
+- *ICCV 2021*. Authors unverified.
+- **Why:** single-object event tracking benchmark (DAVIS346); noted as a lower-resolution
+  alternative external test.
+- **Where:** Phase F external check (secondary).
