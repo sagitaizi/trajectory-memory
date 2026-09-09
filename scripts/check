@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Verify a clip in corpus/real/: print stats and dump a few frames to runs/check/.
+# Verify a clip: print stats and dump a few frames to runs/check/.
+# Takes the same <group>/<slug>.aedat4 name as scripts/rec.
 #
-#   bash scripts/check fan_brush_slow_01.aedat4
+#   bash scripts/check fan/fan_brush_slow_01.aedat4
 #
 # Overridable: THESIS_REPO, THESIS_PY.
 set -u -o pipefail
@@ -11,12 +12,14 @@ PY="${THESIS_PY:-D:/Programs/Anaconda/envs/thesis/python.exe}"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [ $# -lt 1 ]; then
-  echo "usage: bash scripts/check <name>.aedat4" >&2
+  echo "usage: bash scripts/check <group>/<slug>.aedat4" >&2
   exit 2
 fi
 name="$1"
-clip="$REPO/corpus/real/$name"
-out="$REPO/runs/check/${name%.aedat4}"
+slug="$(basename "$name")"; slug="${slug%.aedat4}"
+group="$(dirname "$name")"
+clip="$REPO/corpus/real/$group/$slug/$slug.aedat4"
+out="$REPO/runs/check/$group/$slug"
 
 if [ ! -f "$clip" ]; then
   echo "not found: $clip" >&2

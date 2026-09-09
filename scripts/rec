@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Record a clip with the Thesis-repo recorder, writing into corpus/real/.
+# Record a clip with the Thesis-repo recorder. Each clip gets its own directory:
+#   corpus/real/<group>/<slug>/<slug>.aedat4  (+ .params.yaml, motors.csv, labels)
 #
-#   bash scripts/rec fan_brush_slow_01.aedat4 --preview --no-motors --duration 30
+#   bash scripts/rec fan/fan_brush_slow_01.aedat4 --preview --no-motors --duration 30
+#   bash scripts/rec fan/break/fan_brush_break_01.aedat4 --preview --no-motors --duration 40
 #
 # Overridable: THESIS_REPO, THESIS_PY.
 set -u -o pipefail
@@ -11,11 +13,13 @@ PY="${THESIS_PY:-D:/Programs/Anaconda/envs/thesis/python.exe}"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [ $# -lt 1 ]; then
-  echo "usage: bash scripts/rec <name>.aedat4 [recorder flags...]" >&2
+  echo "usage: bash scripts/rec <group>/<slug>.aedat4 [recorder flags...]" >&2
   exit 2
 fi
 name="$1"; shift
 
-out="$REPO/corpus/real/$name"
-mkdir -p "$(dirname "$out")"
-PYTHONPATH="$THESIS" "$PY" -m recording.recorder --out "$out" "$@"
+slug="$(basename "$name")"; slug="${slug%.aedat4}"
+group="$(dirname "$name")"
+dir="$REPO/corpus/real/$group/$slug"
+mkdir -p "$dir"
+PYTHONPATH="$THESIS" "$PY" -m recording.recorder --out "$dir/$slug.aedat4" "$@"
