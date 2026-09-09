@@ -1,8 +1,31 @@
-# Runs in the shared `thesis` conda env (Python 3.14). Only the additions are pinned here.
-# numpy, scipy, opencv-python, pyyaml, nengo, dv_processing come from that env.
+# Runs in the shared `thesis` conda env (Python 3.14). Pins below are what was
+# installed 2026-09-10, the last online night before ~1 month offline.
+# numpy, pyyaml, nengo, dv_processing, opencv-python come from the base thesis env.
+#
+# Install:  python -m pip install -r requirements.txt
+# torch is the CPU-only wheel (no CUDA build for cp314 at install time).
 
-snntorch
-v2e
+# assumed present by the docs but were missing from the env
+scipy==1.18.1
+matplotlib==3.11.1
+
+# SNN training path (Stage 1 localiser, Stage 2)
+torch==2.14.0
+torchvision==0.29.0
+snntorch==1.0.0
+
+# v2e is NOT on PyPI. Source clone lives at D:\Projects\v2e (SensorsINI/v2e,
+# used via `sys.path` like the Thesis repo, not pip-installed). These are its
+# lean runtime deps for the EventEmulator Python API — NOT its requirements.txt,
+# which pins numpy<2 and drags in Jupyter/Gooey/wxPython.
+h5py==3.16.0
+numba==0.67.0
+llvmlite==0.49.0
+engineering-notation==0.13.3
+colored==2.3.2
+pandas==3.0.5
+screeninfo==0.8.1
+easygui==0.98.3
 
 # dev
-pytest
+pytest==9.1.1
