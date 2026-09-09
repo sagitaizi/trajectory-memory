@@ -16,5 +16,6 @@ if [ $# -lt 1 ]; then
 fi
 name="$1"; shift
 
-mkdir -p "$REPO/corpus/real"
-PYTHONPATH="$THESIS" "$PY" -m recording.recorder --out "$REPO/corpus/real/$name" "$@"
+out="$REPO/corpus/real/$name"
+mkdir -p "$(dirname "$out")"
+PYTHONPATH="$THESIS" "$PY" -m recording.recorder --out "$out" "$@"
