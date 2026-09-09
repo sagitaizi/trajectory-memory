@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Verify a clip in corpus/real/: print stats and dump a few frames to runs/check/.
+#
+#   bash scripts/check fan_brush_slow_01.aedat4
+#
+# Overridable: THESIS_REPO, THESIS_PY.
+set -u -o pipefail
+
+THESIS="${THESIS_REPO:-D:/Projects/Thesis}"
+PY="${THESIS_PY:-D:/Programs/Anaconda/envs/thesis/python.exe}"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [ $# -lt 1 ]; then
+  echo "usage: bash scripts/check <name>.aedat4" >&2
+  exit 2
+fi
+name="$1"
+clip="$REPO/corpus/real/$name"
+out="$REPO/runs/check/${name%.aedat4}"
+
+if [ ! -f "$clip" ]; then
+  echo "not found: $clip" >&2
+  exit 1
+fi
+
+"$PY" "$REPO/scripts/clip_stats.py" "$clip"
+echo
+mkdir -p "$out"
+# NOTE: do not add --no-flicker-detect; it crashes the Thesis player (stale
+# FlickerFilterPlan call). The default path runs detection (~1.5s) and works.
+PYTHONPATH="$THESIS" "$PY" -m recording.player "$clip" --dump "$out" --frames 6
+echo
+echo "frames -> $out"
