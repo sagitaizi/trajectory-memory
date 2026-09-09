@@ -21,7 +21,7 @@ sim:
     sigma_thres: 0.03
     cutoff_hz: 30              # must sit well below fps or v2e's IIR filter is under-sampled
     leak_rate_hz: 0.0
-    shot_noise_rate_hz: 0.1
+    shot_noise_rate_hz: 0.01   # per-pixel; provisional, pin against a real corner-of-frame rate
     refractory_period_s: 0.0
   # per-clip domain randomisation ranges (make_sim_dataset)
   randomise:

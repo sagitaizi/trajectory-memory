@@ -100,11 +100,15 @@ def main() -> None:
     p.add_argument("--duration", type=float, default=1.0, help="override clip length (s)")
     p.add_argument("--fps", type=int, default=600, help="override render fps")
     p.add_argument("--no-distortion", action="store_true", help="skip the lens model")
+    p.add_argument("--noise", type=float, default=None,
+                   help="override v2e shot_noise_rate_hz (per pixel)")
     args = p.parse_args()
 
     sim_cfg = yaml.safe_load(open(args.params))["sim"]
     sim_cfg["duration_s"] = args.duration
     sim_cfg["fps"] = args.fps
+    if args.noise is not None:
+        sim_cfg["v2e"]["shot_noise_rate_hz"] = args.noise
     camera_cfg = None if args.no_distortion else {}
 
     out_dir = pathlib.Path(args.out)
