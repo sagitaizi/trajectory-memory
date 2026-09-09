@@ -45,8 +45,9 @@ snnTorch/SpikingJelly or a custom reservoir, not Nengo. Provisional NumPy reserv
 decided. Resolve after a week-1 bake-off on simulated trajectories.
 
 ## Data
-- **Own corpus, recorded 2026-09-09:** fan-driven (circular), string pendulum, hand-moved,
-  motor-driven on a blank wall (exact encoder ground truth). Single high-contrast target.
+- **Own corpus, recorded 2026-09-09:** fan-mounted brush, string pendulum, hand-moved printed
+  square, and blank-wall clips (4a motor-swept camera = exact encoder ground truth; 4b
+  hand-moved square, clean background). Objects: brush, printed square, ball.
 - **Simulation (v2e):** unlimited labelled trajectories through the DVXplorer camera model,
   for pretraining. Stand it up before the camera leaves; validate sim-vs-real day one.
 - **Ground truth:** analytic where the motion is driven; sparse hand-labels + interpolation
