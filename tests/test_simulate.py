@@ -113,8 +113,14 @@ def test_simulate_returns_clip_with_exact_ground_truth():
 
 
 def test_simulate_with_camera_cfg_runs_the_distortion_branch():
-    cfg = {**SIM_CFG, "resolution": [128, 96]}
+    """Distortion is only meaningful at the resolution the calibration was fitted at."""
+    cfg = {**SIM_CFG, "resolution": [640, 480], "duration_s": 0.05}
     clip = simulate(a_circle(), camera_cfg={}, sim_cfg=cfg, seed=1)
     assert clip.source == "sim"
     assert len(clip.events) > 0
-    assert clip.events["x"].max() < 128 and clip.events["y"].max() < 96
+    assert clip.events["x"].max() < 640 and clip.events["y"].max() < 480
+
+
+def test_render_frames_rejects_a_resolution_the_calibration_does_not_cover():
+    with pytest.raises(ValueError, match="resolution"):
+        render_frames(a_circle(), SIM_CFG, intrinsics=load_intrinsics())

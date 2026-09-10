@@ -13,7 +13,8 @@ import numpy as np
 from .data import Clip
 from .trajectories import TrajectorySpec, sample
 
-# Matches dv.EventStore.numpy() so recorded and simulated clips share a dtype.
+# The one event dtype the rest of the package sees. dv.EventStore.numpy() orders its
+# fields differently, so data.load_recording restacks into this rather than reusing it.
 EVENT_DTYPE = np.dtype([("x", "<i2"), ("y", "<i2"), ("timestamp", "<i8"), ("polarity", "i1")])
 
 _V2E_REPO = Path(os.environ.get("V2E_REPO", Path(__file__).resolve().parents[2] / "v2e"))
@@ -29,6 +30,10 @@ def render_frames(spec: TrajectorySpec, cfg, intrinsics=None) -> np.ndarray:
     import cv2
 
     w, h = cfg["resolution"]
+    if intrinsics is not None and (w, h) != (intrinsics.width, intrinsics.height):
+        raise ValueError(
+            f"resolution {(w, h)} is not the calibration's {(intrinsics.width, intrinsics.height)}; "
+            "distorting into it would draw the blob off the ground-truth path")
     fps = cfg["fps"]
     n = int(round(cfg["duration_s"] * fps))
     times = np.arange(n) / fps

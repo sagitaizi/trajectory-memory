@@ -1,10 +1,24 @@
 """Load a clip (recorded .aedat4 or simulated) into a uniform Clip object."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import csv
+import json
+from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import Callable
 
 import numpy as np
+
+# Motors slew to the sweep's start position before the scan begins; measured across
+# all 24 side-cars the transient is confined to the first ~0.2 s.
+MOTOR_TRIM_S = 0.5
+
+# Encoder-to-camera axis signs. Unverified — pipeline.egomotion records the same
+# mapping as assumed. Flipping one inverts every 4a ground truth, so settle them by
+# measurement before trusting 4a numbers.
+PAN_SIGN, TILT_SIGN = 1.0, 1.0
+
+PARAMS_PATH = Path(__file__).resolve().parent.parent / "params.yaml"
 
 
 @dataclass
@@ -17,14 +31,299 @@ class Clip:
     meta: dict = field(default_factory=dict)
 
 
-def load_recording(path) -> Clip:
-    raise NotImplementedError
+# --- clip paths and side-cars ------------------------------------------------
+
+def describe_clip(path) -> dict:
+    """Group, slug and deviation flag for a clip, from its path alone.
+
+    Two break-clip conventions coexist in the corpus: a `break/` subdirectory
+    (fan, extra) and `_break` in the slug (wall, pendulum, wall_target).
+    """
+    p = Path(path)
+    clip_dir = p.parent if p.suffix == ".aedat4" else p
+    slug = p.stem if p.suffix == ".aedat4" else clip_dir.name
+
+    parts = clip_dir.parts
+    if "real" in parts:                          # the corpus root, not a "real" above it
+        i = len(parts) - 1 - parts[::-1].index("real")
+        group, below = parts[i + 1], parts[i + 1:]
+    else:
+        group, below = clip_dir.parent.name, parts[-2:]
+    return {
+        "slug": slug,
+        "group": group,
+        "is_break": "break" in below or "break" in slug,
+    }
 
 
-def load_sim(spec) -> Clip:
-    raise NotImplementedError
+def _clip_paths(path) -> tuple[Path, str]:
+    p = Path(path)
+    return (p.parent, p.stem) if p.suffix == ".aedat4" else (p, p.name)
+
+
+def read_anchor(path):
+    """The hand-marked pixel a 4a clip's ground truth is anchored on, or None."""
+    clip_dir, slug = _clip_paths(path)
+    sidecar = clip_dir / f"{slug}.anchor.json"
+    if not sidecar.exists():
+        return None
+    d = json.loads(sidecar.read_text())
+    return float(d["x"]), float(d["y"])
+
+
+def read_labels(path):
+    """Sparse hand-labels as (t_s, x, y) rows, or None if the clip has none."""
+    clip_dir, slug = _clip_paths(path)
+    sidecar = clip_dir / f"{slug}.labels.csv"
+    if not sidecar.exists():
+        return None
+    with open(sidecar, newline="", encoding="utf-8") as fh:
+        return [(float(r["t_s"]), float(r["x"]), float(r["y"])) for r in csv.DictReader(fh)]
+
+
+def read_deviation_times(path) -> list[float]:
+    """Break times in seconds from the trimmed start; empty until the label pass."""
+    clip_dir, slug = _clip_paths(path)
+    sidecar = clip_dir / f"{slug}.deviation.json"
+    if not sidecar.exists():
+        return []
+    return [float(t) for t in json.loads(sidecar.read_text())["times_s"]]
+
+
+def _ticks_per_radian(clip_dir: Path, slug: str) -> tuple[float, float]:
+    """Each clip carries the calibrated encoder scale in its own params side-car."""
+    import yaml
+
+    from recording.recorder import params_sidecar_path
+
+    params = yaml.safe_load(params_sidecar_path(clip_dir / f"{slug}.aedat4").read_text())
+    return float(params["ticks_per_radian_pan"]), float(params["ticks_per_radian_tilt"])
+
+
+# --- events ------------------------------------------------------------------
+
+def trim_and_rebase(events: np.ndarray, trim_us: int) -> tuple[np.ndarray, int]:
+    """Drop the first `trim_us` of events; restamp the rest from zero.
+
+    Returns the events and the device time that became t=0, which is what the
+    motor side-car still has to be queried in.
+    """
+    if len(events) == 0:
+        raise ValueError("no events")
+    keep = events[events["timestamp"] >= events["timestamp"][0] + trim_us]
+    if len(keep) == 0:
+        raise ValueError(f"trim of {trim_us} us leaves no events")
+
+    t0 = int(keep["timestamp"][0])
+    out = keep.copy()
+    out["timestamp"] -= t0
+    return out, t0
+
+
+def _read_events(player) -> np.ndarray:
+    """Drain a Player into one EVENT_DTYPE array.
+
+    dv hands back (timestamp, x, y, polarity) padded to 16 bytes; EVENT_DTYPE
+    orders the fields differently, so this restacks rather than reinterprets —
+    without it a recorded clip and a simulated one reach the frontend as
+    different dtypes.
+    """
+    from .simulate import EVENT_DTYPE
+
+    chunks = []
+    while player.isRunning():
+        batch = player.getNextEventBatch()
+        if batch is not None and len(batch):
+            chunks.append(batch.numpy())
+    if not chunks:
+        raise ValueError("recording has no events")
+
+    raw = np.concatenate(chunks)
+    out = np.empty(len(raw), dtype=EVENT_DTYPE)
+    for name in ("x", "y", "timestamp", "polarity"):
+        out[name] = raw[name]
+    return out
+
+
+# --- ground truth ------------------------------------------------------------
+
+def label_gt(points) -> Callable:
+    """Sparse (t_s, x, y) marks -> gt(t), linear between marks, held at the ends."""
+    marks = np.asarray(sorted(points, key=lambda p: p[0]), dtype=float)
+    if len(marks) == 0:
+        raise ValueError("no label points")
+    t_marks, x_marks, y_marks = marks[:, 0], marks[:, 1], marks[:, 2]
+
+    def gt(t):
+        t = np.asarray(t, dtype=float)
+        return np.stack([np.interp(t, t_marks, x_marks),
+                         np.interp(t, t_marks, y_marks)], axis=-1)
+
+    return gt
 
 
 def attach_labels(clip: Clip, points) -> Clip:
-    """Interpolate sparse (t, x, y) hand-labels into clip.gt."""
-    raise NotImplementedError
+    """Interpolate sparse (t_s, x, y) hand-labels into clip.gt. Returns a new Clip."""
+    gt = label_gt(points)
+    return replace(clip, gt=gt, meta={**clip.meta, "labels": [tuple(p) for p in points]})
+
+
+def ego_gt(anchor_px, motors, intrinsics, t0_us: int, ticks_per_radian) -> Callable:
+    """Where a *static* target appears as the camera pans and tilts (Setup 4a).
+
+    The target never moves; the rig does. So the anchor pixel becomes a ray, the
+    ray is carried into each later camera frame by the encoders' rotation, and is
+    reprojected through the lens — which is why this is not a linear pixel offset.
+
+    Axis mapping and sign follow `pipeline.egomotion`, where both are recorded as
+    assumed and unverified; `PAN_SIGN` / `TILT_SIGN` exist so one measurement
+    against a real clip can settle them without touching the geometry.
+    """
+    from camera.calibration import distort_normalized, undistort_normalized
+
+    tpr_pan, tpr_tilt = ticks_per_radian
+    start = motors.position_at(int(t0_us))
+    if start is None:
+        raise ValueError(f"no encoder sample at or before t0 ({t0_us})")
+    pan0, tilt0 = start
+
+    a = undistort_normalized(intrinsics, np.asarray([anchor_px], dtype=float))[0]
+    ray0 = np.array([a[0], a[1], 1.0])
+
+    def gt(t):
+        t = np.asarray(t, dtype=float)
+        times = np.atleast_1d(t)
+        ticks = np.array([motors.position_at(int(t0_us + ti * 1e6)) or (pan0, tilt0)
+                          for ti in times], dtype=float)
+        yaw = PAN_SIGN * (ticks[:, 0] - pan0) / tpr_pan
+        pitch = TILT_SIGN * (ticks[:, 1] - tilt0) / tpr_tilt
+
+        rays = np.einsum("nji,j->ni", _camera_rotation(yaw, pitch), ray0)
+        norm = rays[:, :2] / rays[:, 2:3]
+        px = distort_normalized(intrinsics, norm)
+        out = px / np.array([intrinsics.width, intrinsics.height], dtype=float)
+        return out[0] if t.ndim == 0 else out
+
+    return gt
+
+
+def _camera_rotation(yaw, pitch) -> np.ndarray:
+    """(N, 3, 3) camera rotations: pitch about x, then yaw about y."""
+    cy, sy = np.cos(yaw), np.sin(yaw)
+    cp, sp = np.cos(pitch), np.sin(pitch)
+    zero, one = np.zeros_like(cy), np.ones_like(cy)
+    r_y = np.stack([cy, zero, sy, zero, one, zero, -sy, zero, cy], axis=-1)
+    r_x = np.stack([one, zero, zero, zero, cp, -sp, zero, sp, cp], axis=-1)
+    return r_y.reshape(-1, 3, 3) @ r_x.reshape(-1, 3, 3)
+
+
+def _ego_gt_for_clip(clip_dir: Path, slug: str, anchor, t0_us: int) -> Callable:
+    """Encoder ground truth for a recorded 4a clip, rebuilt from its side-cars alone."""
+    from recording.player import MotorTrack
+    from recording.recorder import motor_sidecar_path
+
+    from .simulate import load_intrinsics
+
+    track = MotorTrack.from_csv(motor_sidecar_path(clip_dir / f"{slug}.aedat4"))
+    return ego_gt(anchor, track, load_intrinsics(), t0_us, _ticks_per_radian(clip_dir, slug))
+
+
+# --- loading -----------------------------------------------------------------
+
+def load_recording(path, anchor=None) -> Clip:
+    """Read a recorded clip into a Clip, trimmed, restamped from zero.
+
+    Ground truth comes from the encoders for motor-swept clips once an anchor is
+    marked (Setup 4a), from hand-labels where they exist, and is otherwise None.
+    """
+    from recording.player import Player
+
+    clip_dir, slug = _clip_paths(path)
+    aedat4 = clip_dir / f"{slug}.aedat4"
+    player = Player(aedat4)
+
+    events = _read_events(player)
+    has_motors = not player.motors.is_empty
+    events, t0 = trim_and_rebase(events, int(MOTOR_TRIM_S * 1e6) if has_motors else 0)
+
+    meta = describe_clip(aedat4)
+    meta["t0_device_us"] = t0
+    meta["has_motors"] = has_motors
+
+    gt = None
+    anchor = anchor or read_anchor(aedat4)
+    labels = read_labels(aedat4)
+    if has_motors and anchor is not None:
+        gt = _ego_gt_for_clip(clip_dir, slug, anchor, t0)
+        meta["anchor"] = tuple(anchor)
+    elif labels:
+        gt = label_gt(labels)
+        meta["labels"] = labels
+
+    return Clip(
+        events=events,
+        duration_us=int(events["timestamp"][-1]),
+        gt=gt,
+        deviation_times=read_deviation_times(aedat4),
+        source=str(clip_dir),
+        meta=meta,
+    )
+
+
+def sim_params(path=None) -> dict:
+    """The project's `sim` block from params.yaml."""
+    import yaml
+
+    return yaml.safe_load(Path(path or PARAMS_PATH).read_text())["sim"]
+
+
+def load_sim(spec, sim_cfg=None, seed: int = 0, distort: bool = True) -> Clip:
+    """Generate a simulated clip from a trajectory spec. See `load_clip` for cached ones.
+
+    `distort=False` renders an ideal pinhole image, which is the only way to use a
+    resolution the calibration was not fitted at.
+    """
+    from .simulate import simulate
+
+    sim_cfg = sim_cfg or sim_params()
+    camera_cfg = {"calibration": sim_cfg.get("calibration")} if distort else None
+    return simulate(spec, camera_cfg=camera_cfg, sim_cfg=sim_cfg, seed=seed)
+
+
+# --- caching -----------------------------------------------------------------
+
+def save_clip(clip: Clip, path) -> Path:
+    """Cache a clip to .npz. `gt` is stored as whatever generates it, not sampled."""
+    path = Path(path)
+    if path.suffix != ".npz":
+        path = path.with_name(path.name + ".npz")     # np.savez appends it; agree with it
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez(path, events=clip.events, duration_us=clip.duration_us,
+             deviation_times=np.asarray(clip.deviation_times, dtype=float),
+             source=clip.source, meta=np.array(clip.meta, dtype=object))
+    return path
+
+
+def load_clip(path) -> Clip:
+    """Read back a `save_clip` .npz, rebuilding `gt` from the spec or labels in meta."""
+    with np.load(path, allow_pickle=True) as z:
+        meta = z["meta"].item()
+        clip = Clip(
+            events=z["events"],
+            duration_us=int(z["duration_us"]),
+            gt=None,
+            deviation_times=[float(t) for t in z["deviation_times"]],
+            source=str(z["source"]),
+            meta=meta,
+        )
+    if "spec" in meta:
+        from .trajectories import sample
+
+        spec = meta["spec"]
+        clip.gt = lambda t: sample(spec, t)
+    elif "labels" in meta:
+        clip.gt = label_gt(meta["labels"])
+    elif "anchor" in meta:
+        clip.gt = _ego_gt_for_clip(Path(clip.source), meta["slug"], meta["anchor"],
+                                   meta["t0_device_us"])
+    return clip
