@@ -238,6 +238,21 @@ def test_ego_gt_displacement_matches_the_measured_pixels_per_tick():
     assert 0.85 * expected < moved_px < 1.15 * expected
 
 
+def test_ego_gt_pan_direction_follows_the_sign_convention():
+    """Locks which way +pan ticks move the target. Whether that matches the real rig is
+    the open PAN_SIGN question; this only makes a flip deliberate instead of silent."""
+    gt = ego_gt((320.0, 240.0), motors([2048, 2248], [1000, 1000]), intrinsics(),
+                t0_us=0, ticks_per_radian=TPR)
+    assert gt(0.03)[0] < gt(0.0)[0]                       # +pan ticks -> target moves left
+
+
+def test_ego_gt_tilt_direction_follows_the_sign_convention():
+    """The TILT_SIGN half of the same open question."""
+    gt = ego_gt((320.0, 240.0), motors([2048, 2048], [1000, 1200]), intrinsics(),
+                t0_us=0, ticks_per_radian=TPR)
+    assert gt(0.03)[1] > gt(0.0)[1]                       # +tilt ticks -> target moves down
+
+
 def test_ego_gt_is_vectorised_over_time():
     gt = ego_gt((320.0, 240.0), motors([2048, 2098, 2148], [1000, 1000, 1000]),
                 intrinsics(), t0_us=0, ticks_per_radian=TPR)
@@ -254,6 +269,17 @@ def test_ego_gt_queries_the_side_car_in_device_time():
     assert abs(gt(0.03)[0] - gt(0.0)[0]) > 0.05
 
 
+def test_ego_gt_anchors_on_the_instant_the_pixel_was_marked():
+    """The marker clicks the centre of a smeared window, not the clip's first instant."""
+    intr = intrinsics()
+    track = motors([2048, 2148, 2248], [1000, 1000, 1000])      # 0, 30ms, 60ms
+    gt = ego_gt((320.0, 240.0), track, intr, t0_us=0, ticks_per_radian=TPR,
+                anchor_t_s=0.03)
+    np.testing.assert_allclose(gt(0.03), [320.0 / intr.width, 240.0 / intr.height],
+                               atol=1e-6)
+    assert not np.allclose(gt(0.0), gt(0.03))                   # t=0 is elsewhere
+
+
 def test_read_anchor_returns_none_when_unmarked(tmp_path):
     assert read_anchor(tmp_path / "wide_01") is None
 
@@ -262,7 +288,7 @@ def test_read_anchor_reads_a_marked_pixel(tmp_path):
     clip_dir = tmp_path / "scan_pan_slow_01"
     clip_dir.mkdir()
     (clip_dir / "scan_pan_slow_01.anchor.json").write_text('{"x": 301.5, "y": 244.0}')
-    assert read_anchor(clip_dir) == (301.5, 244.0)
+    assert read_anchor(clip_dir) == (301.5, 244.0, 0.0)
 
 
 def test_read_anchor_keys_off_the_file_stem_not_the_folder(tmp_path):
@@ -270,7 +296,7 @@ def test_read_anchor_keys_off_the_file_stem_not_the_folder(tmp_path):
     clip_dir = tmp_path / "renamed_folder"
     clip_dir.mkdir()
     (clip_dir / "scan_pan_slow_01.anchor.json").write_text('{"x": 12.0, "y": 34.0}')
-    assert read_anchor(clip_dir / "scan_pan_slow_01.aedat4") == (12.0, 34.0)
+    assert read_anchor(clip_dir / "scan_pan_slow_01.aedat4") == (12.0, 34.0, 0.0)
 
 
 # --- integration against the real corpus (gitignored; skipped when absent) ---
@@ -292,6 +318,12 @@ def test_load_recording_trims_a_motor_clip_and_zeroes_its_clock():
     assert clip.meta["group"] == "wall"
     assert clip.meta["is_break"] is False
     assert clip.meta["t0_device_us"] > 0
+
+
+@needs_motor_clip
+def test_load_recording_records_the_sensor_resolution():
+    """The marking tool needs the sensor size; nothing else in the Clip carries it."""
+    assert load_recording(A_MOTOR_CLIP).meta["resolution"] == (640, 480)
 
 
 @needs_motor_clip
@@ -324,6 +356,20 @@ def test_save_and_load_keeps_encoder_ground_truth_through_the_cache(tmp_path):
     track = back.gt(np.linspace(0.0, 30.0, 300))
     assert np.ptp(track[:, 0]) > 0.05                # a real sweep, not a constant
     np.testing.assert_allclose(track, clip.gt(np.linspace(0.0, 30.0, 300)))
+
+
+@needs_motor_clip
+def test_load_recording_honours_the_instant_an_anchor_was_marked_at():
+    """An anchor carries the instant it was marked at, and gt returns it there."""
+    clip = load_recording(A_MOTOR_CLIP, anchor=(320.0, 240.0, 1.5))
+    np.testing.assert_allclose(clip.gt(1.5), [320.0 / 640, 240.0 / 480], atol=1e-6)
+    assert not np.allclose(clip.gt(0.0), clip.gt(1.5))
+
+
+@needs_motor_clip
+def test_load_recording_still_accepts_an_anchor_without_an_instant():
+    clip = load_recording(A_MOTOR_CLIP, anchor=(320.0, 240.0))
+    np.testing.assert_allclose(clip.gt(0.0), [320.0 / 640, 240.0 / 480], atol=1e-6)
 
 
 @needs_static_clip

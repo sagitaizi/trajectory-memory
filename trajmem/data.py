@@ -5,7 +5,7 @@ import csv
 import json
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Callable
+from typing import Callable, NamedTuple
 
 import numpy as np
 
@@ -19,6 +19,13 @@ MOTOR_TRIM_S = 0.5
 PAN_SIGN, TILT_SIGN = 1.0, 1.0
 
 PARAMS_PATH = Path(__file__).resolve().parent.parent / "params.yaml"
+
+
+class Anchor(NamedTuple):
+    """A marked target pixel and the instant, in seconds from the trimmed start, it holds at."""
+    x: float
+    y: float
+    t_s: float = 0.0
 
 
 @dataclass
@@ -62,13 +69,26 @@ def _clip_paths(path) -> tuple[Path, str]:
 
 
 def read_anchor(path):
-    """The hand-marked pixel a 4a clip's ground truth is anchored on, or None."""
+    """The hand-marked anchor a 4a clip's ground truth is built on, or None.
+
+    By convention the pixel is the **centre of the target**, and `t_s` is the instant
+    it holds at, measured from the trimmed start. A side-car without `t_s` predates
+    the field and means the trimmed start itself.
+    """
     clip_dir, slug = _clip_paths(path)
     sidecar = clip_dir / f"{slug}.anchor.json"
     if not sidecar.exists():
         return None
     d = json.loads(sidecar.read_text())
-    return float(d["x"]), float(d["y"])
+    return Anchor(float(d["x"]), float(d["y"]), float(d.get("t_s", 0.0)))
+
+
+def write_anchor(path, x: float, y: float, t_s: float = 0.0) -> Path:
+    """Record a marked anchor. See `read_anchor` for which pixel and which instant."""
+    clip_dir, slug = _clip_paths(path)
+    sidecar = clip_dir / f"{slug}.anchor.json"
+    sidecar.write_text(json.dumps({"x": float(x), "y": float(y), "t_s": float(t_s)}))
+    return sidecar
 
 
 def read_labels(path):
@@ -114,10 +134,9 @@ def trim_and_rebase(events: np.ndarray, trim_us: int) -> tuple[np.ndarray, int]:
     if len(keep) == 0:
         raise ValueError(f"trim of {trim_us} us leaves no events")
 
-    t0 = int(keep["timestamp"][0])
-    out = keep.copy()
-    out["timestamp"] -= t0
-    return out, t0
+    t0 = int(keep["timestamp"][0])         # boolean indexing above already copied
+    keep["timestamp"] -= t0
+    return keep, t0
 
 
 def _read_events(player) -> np.ndarray:
@@ -168,8 +187,12 @@ def attach_labels(clip: Clip, points) -> Clip:
     return replace(clip, gt=gt, meta={**clip.meta, "labels": [tuple(p) for p in points]})
 
 
-def ego_gt(anchor_px, motors, intrinsics, t0_us: int, ticks_per_radian) -> Callable:
+def ego_gt(anchor_px, motors, intrinsics, t0_us: int, ticks_per_radian,
+           anchor_t_s: float = 0.0) -> Callable:
     """Where a *static* target appears as the camera pans and tilts (Setup 4a).
+
+    The anchor pixel is the target at `anchor_t_s`, not necessarily at t=0: the marker
+    shows a window of accumulated events and a click means that window's centre.
 
     The target never moves; the rig does. So the anchor pixel becomes a ray, the
     ray is carried into each later camera frame by the encoders' rotation, and is
@@ -182,9 +205,10 @@ def ego_gt(anchor_px, motors, intrinsics, t0_us: int, ticks_per_radian) -> Calla
     from camera.calibration import distort_normalized, undistort_normalized
 
     tpr_pan, tpr_tilt = ticks_per_radian
-    start = motors.position_at(int(t0_us))
+    anchor_us = int(t0_us + anchor_t_s * 1e6)
+    start = motors.position_at(anchor_us)
     if start is None:
-        raise ValueError(f"no encoder sample at or before t0 ({t0_us})")
+        raise ValueError(f"no encoder sample at or before the anchor ({anchor_us})")
     pan0, tilt0 = start
 
     a = undistort_normalized(intrinsics, np.asarray([anchor_px], dtype=float))[0]
@@ -224,8 +248,10 @@ def _ego_gt_for_clip(clip_dir: Path, slug: str, anchor, t0_us: int) -> Callable:
 
     from .simulate import load_intrinsics
 
+    anchor = Anchor(*anchor)
     track = MotorTrack.from_csv(motor_sidecar_path(clip_dir / f"{slug}.aedat4"))
-    return ego_gt(anchor, track, load_intrinsics(), t0_us, _ticks_per_radian(clip_dir, slug))
+    return ego_gt((anchor.x, anchor.y), track, load_intrinsics(), t0_us,
+                  _ticks_per_radian(clip_dir, slug), anchor_t_s=anchor.t_s)
 
 
 # --- loading -----------------------------------------------------------------
@@ -249,9 +275,10 @@ def load_recording(path, anchor=None) -> Clip:
     meta = describe_clip(aedat4)
     meta["t0_device_us"] = t0
     meta["has_motors"] = has_motors
+    meta["resolution"] = tuple(player.getEventResolution())
 
     gt = None
-    anchor = anchor or read_anchor(aedat4)
+    anchor = Anchor(*anchor) if anchor is not None else read_anchor(aedat4)
     labels = read_labels(aedat4)
     if has_motors and anchor is not None:
         gt = _ego_gt_for_clip(clip_dir, slug, anchor, t0)
