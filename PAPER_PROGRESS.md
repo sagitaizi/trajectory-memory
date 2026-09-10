@@ -103,8 +103,10 @@ Writing early buys speed and costs staleness. Nothing is *final* until these are
 
 Things that need a connection, so they can't be done on the plane:
 
-- [ ] Register the paper on **EDAS** (`edas.info/N34632`) — title, abstract, authors. The PDF
-      can be uploaded and replaced later, up to Oct 10. Use the new title.
+- [ ] Register the paper on **EDAS** (`edas.info/N34632`) — title, abstract, authors.
+      *Deferred by choice: no point registering a template.* The CFP sets no separate abstract
+      deadline, so the only real date is Oct 10; do it once there is a real abstract, and
+      leave margin in case EDAS or the connection misbehaves.
 - [ ] Verify the 9 `refs.bib` entries marked `verify` — *deferred to post-flight by choice*.
 - [x] One clean LaTeX build (`latexmk -C && latexmk -pdf`) so MiKTeX fetches nothing lazily.
 - [x] Paper PDFs pulled into `materials/pdfs/` (gitignored) — 14 of 18. Missing: Sussillo
