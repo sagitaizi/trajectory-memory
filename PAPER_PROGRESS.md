@@ -15,27 +15,48 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 
 ## Section status
 
-| § | Section | Status | Blocked on | Material | Revisit after |
-|---|---|---|---|---|---|
-| — | Abstract | placeholder | everything | — | results; write last |
-| I | Introduction | writable | — | `PLAN.md` novelty framing, `materials/01-literature/` | results (the contribution claims) |
-| II | Related Work | writable | — | `materials/01-literature/*` (6 notes) | bib verification (post-flight) |
-| III-A | Problem Setup | writable | — | `docs/implementation-plan.md`, `trajmem/trajectories.py` | — |
-| III-B | Event Input | writable, holes | window/polarity values ← `frontend.py` | `materials/02-methods/event-representations.md` | Phase B |
-| III-C | Localiser | blocked | **G-F** framework decision | `docs/implementation-plan.md` | — |
-| III-D | Trajectory-Memory Network | blocked | **G-F**; Phase C | `materials/02-methods/{reservoir-computing,legendre-memory-unit}.md` | — |
-| III-E | Deviation Score | blocked | Phase D | `materials/01-literature/deviation-and-novelty.md` | — |
-| III-F | Training + Evaluation Protocol | writable | — | `PLAN.md` (pretrain on sim, freeze, test on real) | — |
-| IV-A | Event-Camera Simulator | writable, holes | contrast threshold + noise ← sim-vs-real check | `materials/02-methods/simulation-with-v2e.md`, `trajmem/simulate.py`, `params.yaml` | Phase A close |
-| IV-B | Real Recordings | writable | — | `RECORDING_LOG.md`, `corpus/real/`, `RECORDING_PLAN.md` | anchor marking (see caveat) |
-| IV-C | Baselines | writable, holes | tuned settings ← `baseline.py` | `materials/02-methods/{kalman-periodic,rhythmic-dmp}.md`, `classical-baselines.md` | Phase B |
-| IV-D | Metrics | writable | — | `materials/02-methods/metrics.md` | — |
-| V | Results | blocked | Phases C, D | — | — |
-| VI | Discussion | blocked | results | — | — |
-| VII | Conclusion | blocked | results | — | — |
-| — | Acknowledgment | writable | — | — | — |
-| Fig. 1 | System overview | writable | — | `docs/implementation-plan.md` | G-F (if it renames a block) |
-| Fig. 2 | Recording setups | writable | — | `RECORDING_LOG.md` | — |
+`writable*` means write it now, but some values are still missing; the "revisit after" column
+says which phase fills them.
+
+| §      | Section          | Status      | Blocked on   | Revisit after  |
+|--------|------------------|-------------|--------------|----------------|
+| —      | Abstract         | placeholder | everything   | write last     |
+| I      | Introduction     | writable    | —            | results        |
+| II     | Related Work     | writable    | —            | bib verify     |
+| III-A  | Problem Setup    | writable    | —            | —              |
+| III-B  | Event Input      | writable*   | —            | Phase B        |
+| III-C  | Localiser        | blocked     | G-F          | —              |
+| III-D  | Memory network   | blocked     | G-F, Phase C | —              |
+| III-E  | Deviation Score  | blocked     | Phase D      | —              |
+| III-F  | Protocol         | writable    | —            | —              |
+| IV-A   | Simulator        | writable*   | —            | Phase A        |
+| IV-B   | Real Recordings  | writable    | —            | anchor marking |
+| IV-C   | Baselines        | writable*   | —            | Phase B        |
+| IV-D   | Metrics          | writable    | —            | —              |
+| V      | Results          | blocked     | Phases C, D  | —              |
+| VI     | Discussion       | blocked     | results      | —              |
+| VII    | Conclusion       | blocked     | results      | —              |
+| —      | Acknowledgment   | writable    | —            | —              |
+| Fig. 1 | System overview  | writable    | —            | G-F            |
+| Fig. 2 | Recording setups | writable    | —            | —              |
+
+### Where each section's material lives
+
+- **I, II** — `materials/01-literature/` (six notes); `PLAN.md`'s novelty framing.
+- **III-A** — `docs/implementation-plan.md`; `trajmem/trajectories.py`.
+- **III-B** — `materials/02-methods/event-representations.md`.
+- **III-C, III-D** — `docs/implementation-plan.md`;
+  `materials/02-methods/{reservoir-computing,legendre-memory-unit}.md`.
+- **III-E** — `materials/01-literature/deviation-and-novelty.md`.
+- **III-F** — `PLAN.md`: pretrain on simulation, freeze, test on real.
+- **IV-A** — `materials/02-methods/simulation-with-v2e.md`; `trajmem/simulate.py`; `params.yaml`.
+- **IV-B, Fig. 2** — `RECORDING_LOG.md`; `RECORDING_PLAN.md`; `corpus/real/`.
+- **IV-C** — `materials/02-methods/{kalman-periodic,rhythmic-dmp}.md`;
+  `materials/01-literature/classical-baselines.md`.
+- **IV-D** — `materials/02-methods/metrics.md`.
+- **Fig. 1** — `docs/implementation-plan.md`.
+
+Every paper cited needs an entry in `BIBLIOGRAPHY.md` and `paper/refs.bib` in the same change.
 
 ## Writable right now
 
