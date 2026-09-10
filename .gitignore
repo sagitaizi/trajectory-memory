@@ -14,3 +14,6 @@ corpus/sim/*
 runs/
 *.aedat4
 *.npz
+
+# Fetched paper PDFs (offline reading; large, not ours to redistribute)
+materials/pdfs/

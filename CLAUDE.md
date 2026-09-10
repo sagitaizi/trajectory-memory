@@ -33,6 +33,7 @@ Read `PLAN.md` first for what's next. `TIMELINE.md` has the dated milestones.
 |---|---|
 | `PLAN.md` | Phased plan + current status. Start here. |
 | `TIMELINE.md` | Dated milestones with checkmarks. |
+| `PAPER_PROGRESS.md` | Which paper sections are writable, blocked, drafted. The paper is written as we go. |
 | `docs/implementation-plan.md` | Architecture, modules, data flow, frameworks. |
 | `RECORDING_PLAN.md` | The one-night recording session (camera leaves 2026-09-10). |
 | `BIBLIOGRAPHY.md` | Every paper referenced, with why/where. Update in the same change that uses it. |
