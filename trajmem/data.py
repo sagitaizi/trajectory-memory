@@ -13,10 +13,11 @@ import numpy as np
 # all 24 side-cars the transient is confined to the first ~0.2 s.
 MOTOR_TRIM_S = 0.5
 
-# Encoder-to-camera axis signs. Unverified — pipeline.egomotion records the same
-# mapping as assumed. Flipping one inverts every 4a ground truth, so settle them by
-# measurement before trusting 4a numbers.
-PAN_SIGN, TILT_SIGN = 1.0, 1.0
+# Encoder-to-camera axis signs, both measured 2026-09-10 by cross-correlating the target's
+# marginal against a reference frame and regressing on the encoder track: r >= +0.95 over
+# ten clip/axis pairs, including both diagonals, which move on both axes at once. PAN_SIGN
+# was +1.0 and predicted the exact mirror image (r=-0.97); TILT_SIGN was already right.
+PAN_SIGN, TILT_SIGN = -1.0, 1.0
 
 PARAMS_PATH = Path(__file__).resolve().parent.parent / "params.yaml"
 

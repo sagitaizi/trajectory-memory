@@ -239,15 +239,15 @@ def test_ego_gt_displacement_matches_the_measured_pixels_per_tick():
 
 
 def test_ego_gt_pan_direction_follows_the_sign_convention():
-    """Locks which way +pan ticks move the target. Whether that matches the real rig is
-    the open PAN_SIGN question; this only makes a flip deliberate instead of silent."""
+    """Measured on scan_pan_slow_01: the target tracks +pan ticks, r=+0.97 over two sweeps."""
     gt = ego_gt((320.0, 240.0), motors([2048, 2248], [1000, 1000]), intrinsics(),
                 t0_us=0, ticks_per_radian=TPR)
-    assert gt(0.03)[0] < gt(0.0)[0]                       # +pan ticks -> target moves left
+    assert gt(0.03)[0] > gt(0.0)[0]                       # +pan ticks -> target moves right
 
 
 def test_ego_gt_tilt_direction_follows_the_sign_convention():
-    """The TILT_SIGN half of the same open question."""
+    """Measured on four tilt clips and both diagonals: the target tracks +tilt ticks,
+    r=+0.95..+1.00."""
     gt = ego_gt((320.0, 240.0), motors([2048, 2048], [1000, 1200]), intrinsics(),
                 t0_us=0, ticks_per_radian=TPR)
     assert gt(0.03)[1] > gt(0.0)[1]                       # +tilt ticks -> target moves down
@@ -332,9 +332,21 @@ def test_load_recording_yields_the_same_dtype_as_a_simulated_clip():
     assert load_recording(A_MOTOR_CLIP).events.dtype == EVENT_DTYPE
 
 
-@needs_motor_clip
+AN_UNMARKED_CLIP = next((p for p in sorted(CORPUS.glob("wall/*/*.aedat4"))
+                         if read_anchor(p) is None), None)
+
+
+@pytest.mark.skipif(AN_UNMARKED_CLIP is None, reason="every wall clip is marked")
 def test_load_recording_leaves_ground_truth_absent_until_the_anchor_is_marked():
-    assert load_recording(A_MOTOR_CLIP).gt is None
+    assert load_recording(AN_UNMARKED_CLIP).gt is None
+
+
+@needs_motor_clip
+def test_load_recording_builds_ground_truth_once_the_anchor_is_marked():
+    """scan_pan_slow_01 was marked on 2026-09-10, so its gt comes from the encoders."""
+    clip = load_recording(A_MOTOR_CLIP)
+    assert clip.gt is not None
+    assert clip.meta["anchor"] == (220.0, 40.0, 0.01)
 
 
 @needs_motor_clip
