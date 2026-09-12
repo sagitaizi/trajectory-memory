@@ -65,6 +65,14 @@ def existing_marks(clip) -> dict:
     return {round(t, 4): (x, y) for t, x, y in (labels or [])}
 
 
+def resume_at(times, marks, view_window_s: float) -> int:
+    """First instant with no mark yet, so a part-done clip picks up where it stopped."""
+    for i, t in enumerate(times):
+        if round(marked_instant(t, view_window_s), 4) not in marks:
+            return i
+    return 0                                    # all done: start over to review
+
+
 def coverage(marks: dict, duration_s: float) -> str:
     if not marks:
         return "0 marks"
@@ -122,7 +130,7 @@ def mark(clip, label: str, every_s: float, view_window_s: float, view_zoom: floa
 
     cv2.namedWindow(_WINDOW, cv2.WINDOW_AUTOSIZE)
     cv2.setMouseCallback(_WINDOW, on_mouse)
-    i = 0
+    i = resume_at(times, marks, view_window_s)
     try:
         while i < len(times):
             t = times[i]

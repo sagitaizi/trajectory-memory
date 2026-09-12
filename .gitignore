@@ -7,8 +7,15 @@ __pycache__/
 corpus/*
 !corpus/real
 !corpus/sim
-corpus/real/*
+# Hand-marked ground truth is kept: small, slow to produce, impossible to reproduce
+# exactly. The clips it describes are not. Directories are re-included so git can
+# descend far enough to see the side-cars at all.
+corpus/real/**
+!corpus/real/**/
 !corpus/real/.gitkeep
+!corpus/real/**/*.labels.csv
+!corpus/real/**/*.anchor.json
+!corpus/real/**/*.deviation.json
 corpus/sim/*
 !corpus/sim/.gitkeep
 runs/

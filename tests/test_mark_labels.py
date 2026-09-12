@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from scripts.mark_labels import (coverage, label_times, marked_instant, to_normalised,
-                                 to_pixels)
+from scripts.mark_labels import (coverage, label_times, marked_instant, resume_at,
+                                 to_normalised, to_pixels)
 from trajmem.data import read_labels, write_labels
 
 
@@ -81,3 +81,29 @@ def test_coverage_reports_the_largest_hole_between_marks():
 
 def test_coverage_of_nothing_says_so():
     assert coverage({}, 3.0) == "0 marks"
+
+
+# --- resuming a part-done clip -----------------------------------------------
+
+def test_resume_skips_to_the_first_unmarked_instant():
+    times = label_times(2.0, 0.5)                       # 0.0 0.5 1.0 1.5
+    marks = {marked_instant(0.0, 0.02): (0.1, 0.1),
+             marked_instant(0.5, 0.02): (0.2, 0.2)}
+    assert resume_at(times, marks, 0.02) == 2
+
+
+def test_resume_on_an_untouched_clip_starts_at_the_beginning():
+    assert resume_at(label_times(2.0, 0.5), {}, 0.02) == 0
+
+
+def test_resume_on_a_finished_clip_starts_over_for_review():
+    times = label_times(2.0, 0.5)
+    marks = {marked_instant(t, 0.02): (0.1, 0.1) for t in times}
+    assert resume_at(times, marks, 0.02) == 0
+
+
+def test_resume_stops_at_a_hole_left_by_a_skip():
+    times = label_times(2.0, 0.5)
+    marks = {marked_instant(0.0, 0.02): (0.1, 0.1),
+             marked_instant(1.0, 0.02): (0.2, 0.2)}
+    assert resume_at(times, marks, 0.02) == 1
