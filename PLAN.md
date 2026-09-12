@@ -43,11 +43,28 @@ inference.
   `scripts/mark_breaks.py` → `.deviation.json` (break times),
   `scripts/mark_anchors.py` → `.anchor.json` (4a only, now unused by default).
   `scripts/replay_gt.py` draws a clip's ground truth over it to check the result.
-- **Open:** 0 of 54 clips labelled, 0 of 14 break times marked. This is now the
-  critical path — nothing in B, C or D can be evaluated until enough clips are labelled.
-  Interval matters per group: the pendulum at T ≈ 1.2 s needs ~0.1 s, the 4a triangle
-  sweeps are fine at 0.5 s. Labelling all 49 in-scope clips is probably unnecessary;
-  decide how many Phase C actually needs before starting.
+- **Open:** labelling is the critical path — nothing in B, C or D can be evaluated until
+  the development set below carries ground truth. Interval per group, measured on
+  `small_01` by subsampling its dense marks: the pendulum needs **0.1 s** (0.2 s already
+  costs 18 px at the 95th percentile on a 281 px swing); the 4a triangle sweeps are exact
+  along each leg at 0.5 s; 4b loops ~0.25 s; fan ~0.15 s.
+- **Real-clip split (decided 2026-09-13).** Real clips are never trained on. The split is
+  between clips used *while building* and clips scored *once, after the freeze*:
+
+  | Set | Pendulum | Fan | 4b | 4a |
+  |---|---|---|---|---|
+  | **Development** — label first, look freely | `small_01` ✅ `wide_02` `wide_break` | `fan_brush_slow_02` | `loop_01` `loop_break_01` | — |
+  | **Held-out** — label last, run once | `small_03` `wide_01` `small_break` | `fan_brush_fast_01` `fan_string_01` `fan_brush_break_01` | `loop_03` `loop_break_02` (frame check pending) | `scan_pan_slow_01` `scan_both_slow_01` `scan_diag_break_01` |
+
+  Six development, eleven held-out, ~2,900 marks in all. 4b sits in development because
+  its marginal SNR is where the localiser will be stressed. 4a is kept as a *different*
+  condition — the whole scene moves, not just the target — worth one row in §V.
+  Everything else in the corpus is spare. Excluded on purpose: `fan_brush_slow_01`
+  (10× rate ramp), `fan_blade_01` (extended object), `fan_two_strings_01` (two targets —
+  out of scope), `updown_02` (singleton), `loop_02` (leaves frame), `scan_pan_fast_02`
+  (motor could not track), `scan_pan_slow_break_02` (scan params unrecorded),
+  `scan_tilt_fast_break_01` (19.5 s). Promoting a spare clip later is fine; promoting a
+  held-out clip to development after seeing a result on it is not.
 - **Done when:** a simulated clip and a real clip load through the same path; sim events
   visually resemble the real DVXplorer stream on a matched trajectory; enough real clips
   carry ground truth to evaluate on.

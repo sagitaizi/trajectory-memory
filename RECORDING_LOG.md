@@ -132,9 +132,15 @@ pendulum, T ≈ 1.2 s). No motors (`--no-motors`). All 25 s, no drops.
 | pendulum/small_break | 25.0 s | 603 k/s | deviation — re-push / out-of-plane nudge mid-swing |
 | pendulum/wide_break | 25.0 s | 1021 k/s | deviation — re-push / out-of-plane nudge mid-swing |
 
-GT: fit a damped-pendulum model to hand-labelled bob positions; the natural
-amplitude decay over each clip is itself a slow deviation. Break clips: hand-label
-the break time for detection scoring.
+GT: dense hand-labels at 0.1 s, linearly interpolated — model-free by choice, so the
+ground truth assumes nothing a deviation detector is later judged on. `small_01`
+(251 marks, 2026-09-12) gives T = 1.181 s against ~1.2 s predicted, and **no net
+amplitude decay** over 21 swings (135 → 136 px) — so the decay is *not* a slow
+deviation here. What it does show is amplitude *beating*: peaks ~432 px, sagging to
+~405 px around t = 15–17 s, back to ~435 px by t = 24 s — a brush on a string is a
+double pendulum, not a simple one. About one beat cycle fits in 25 s. Expect a
+detector to flag this if its idea of "the path" is a single cycle. Break clips:
+hand-mark the break time (`scripts/mark_breaks.py`) for detection scoring.
 
 ## Clips — Setup 4b (static camera, printed square hand-moved on blank wall)
 
