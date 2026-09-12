@@ -165,7 +165,7 @@ centroid + interpolation; photograph the loop shape (measurement pending). All 2
 
 | Clip | Dur | Mean rate (mostly noise) | Notes |
 |---|---|---|---|
-| wall_target/loop_01 | 25.0 s | 311 k/s | cleanest rate of the batch |
+| wall_target/loop_01 | 25.0 s | 311 k/s | cleanest rate of the batch. **Labelled** — **not a loop**: a horizontal sweep, x 250–410 px at T = 1.80 s, y flat within 37 px. Amplitude grows ~90 → 160 px over the clip. Target sits high in frame (y ≈ 70) |
 | wall_target/loop_02 | 25.0 s | 776 k/s | square clips out top-left — reframe if retaken |
 | wall_target/loop_03 | 25.0 s | 687 k/s | frame check pending |
 | wall_target/loop_break_01 | 25.0 s | 1047 k/s | deviation clip; highest rate, 26M events; framed OK |
