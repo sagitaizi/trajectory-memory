@@ -49,8 +49,12 @@ predict than a clean circle. GT = hand-labels + interpolation, not analytic.
 ## Clips — Setup 4a (motor-swept camera, printed square on blank wall)
 
 Ego-motion clips: the SNN target is the apparent motion of the *static* square as the
-pan-tilt rig sweeps a repeating path. GT = encoder ticks (`.motors.csv`, ~1270 rows /
-~32 Hz) through the calibration — exact. **Scan params are not in `.params.yaml`** —
+pan-tilt rig sweeps a repeating path. GT was to be encoder ticks (`.motors.csv`, ~1270
+rows / ~32 Hz) through the calibration, and that was the reason to over-record this
+setup. **It did not hold** — the calibration understates the sweep by ~1.27x (pan) and
+~1.29x (tilt), measured 2026-09-12 by `scripts/measure_px_per_tick.py`; see
+`PAPER_PROGRESS.md`. GT for 4a is now hand-labels + interpolation, like every other
+setup. **Scan params are not in `.params.yaml`** —
 recorded here per clip (`axis / period s / range`). `--scan` triangle-wave geometry:
 pan over `period`, tilt over `1.6×period` for `both`, tilt phase-locked at `period`
 for `diag`/`antidiag` (the `diag` axis mode was added this session). All clips 40 s
@@ -203,7 +207,11 @@ Not verified beyond stats; GT would be per-target hand-labels.
 - Tripod position and the 4b wall photographed (files with Sagi).
 
 ### Setup 4a — motor sweep
-- (encoders + calibration are the ground truth — nothing extra)
+- Encoders + calibration were meant to be the ground truth, so nothing else was
+  measured. That turned out to be the gap: the surviving explanation for the scale
+  error is parallax from the camera sitting off the rotation axes, which depends on
+  scene distance — and **the wall distance was never recorded**, so it cannot be
+  tested after the fact. Record camera-to-scene distance in any future session.
 - Scan params used per clip: see the Setup 4a clip tables above (axis / period / range).
 - Safe travel: pan [1024, 3072], tilt [700, 1300] ticks; speed cap 44 (10.1 rpm), accel cap 70.
 - Rig centre: pan ~2048, tilt ~1000 ticks.

@@ -30,7 +30,7 @@ says which phase fills them.
 | III-E  | Deviation Score  | blocked     | Phase D      | —              |
 | III-F  | Protocol         | writable    | —            | —              |
 | IV-A   | Simulator        | writable*   | —            | Phase A        |
-| IV-B   | Real Recordings  | writable    | —            | anchor marking |
+| IV-B   | Real Recordings  | writable    | —            | labelling      |
 | IV-C   | Baselines        | writable*   | —            | Phase B        |
 | IV-D   | Metrics          | writable    | —            | —              |
 | V      | Results          | blocked     | Phases C, D  | —              |
@@ -65,9 +65,9 @@ In suggested order — biggest and most independent first:
 1. **§II Related Work.** The largest chunk that results can never change. The six notes in
    `materials/01-literature/` carry the pipelines, the numbers, and the gap statement.
 2. **§IV-B Real Recordings.** The session already happened; `RECORDING_LOG.md` has the setups,
-   clip counts and durations. **Caveat:** do not yet claim exact encoder ground truth for the
-   `wall/` clips — anchors are not marked and the pan/tilt sign convention is unconfirmed
-   (`PAN_SIGN`/`TILT_SIGN` in `trajmem/data.py` are pinned by test, not by measurement).
+   clip counts and durations. **Caveat:** every clip's ground truth is hand-labels plus
+   interpolation, including the `wall/` (4a) clips — do not claim exact encoder ground truth
+   for them. See "The 4a encoder ground truth was abandoned" below.
 3. **§III-A Problem Setup.** Definitions only: position over time, what counts as repetition,
    the prediction horizon, what "deviation" means formally.
 4. **§IV-D Metrics.** Definitions, not values: prediction error at the horizon, lock-on time,
@@ -79,6 +79,34 @@ In suggested order — biggest and most independent first:
    Won't change unless G-F renames a block.
 
 Rough page budget (8 pages including references): the above is ~3.5–4 pages.
+
+## The 4a encoder ground truth was abandoned (2026-09-12)
+
+Setup 4a was recorded on the premise that the encoders give exact ground truth for free,
+which is why 23 clips were captured against a planned 8. That premise did not hold, and
+**all clips now get ground truth the same way: hand-labels plus interpolation.**
+
+What happened, in case §IV-B or a reviewer needs it. `scripts/replay_gt.py` drew the
+encoder ground truth over the clip it describes and the marker sat left of the target by up
+to 42 px, worst furthest from the anchor. `scripts/measure_px_per_tick.py` measured the real
+image shift against the encoder track across the 4a set: the calibration understates the
+sweep by **1.268x on pan** (sd 0.013, 8 clips) and **1.295x on tilt** (sd 0.009, 9 clips),
+both at r > 0.98. The shape and the axis signs are right; only the scale is wrong.
+
+Both axes being off by nearly the same factor rules out a per-axis encoder error. The gap is
+the main thesis repo's open `ticks_per_radian` anomaly (`D:\Projects\Thesis\params.yaml`,
+which states in capitals that it is narrowed, not resolved). Its surviving candidate is the
+camera sitting offset from the rotation axes, making part of the image motion parallax —
+which depends on scene distance. Every 4a clip is one wall at one distance, so they agree
+tightly with each other and not with a calibration measured under other geometry, and the
+corpus contains no distance variation to settle it with. The 4a wall distance was not
+recorded.
+
+Consequences for the paper: 4a is ego-motion data with hand-labelled ground truth, no better
+founded than the other setups, so **do not present it as the exact-ground-truth condition**.
+The encoder path still exists in `trajmem/data.py` (`ego_gt`, reached by passing `anchor=`)
+and `scan_pan_slow_01` still carries an anchor side-car, but hand-labels take precedence.
+Nothing in the calibration was changed.
 
 ## Blocked, and on what
 
@@ -95,7 +123,7 @@ Writing early buys speed and costs staleness. Nothing is *final* until these are
 - [ ] §II citations verified — 9 of 18 `refs.bib` entries are marked `note = {verify}`,
       including both closest-prior-art papers. Needs internet; deferred to post-flight.
 - [ ] §III-B, §IV-A, §IV-C holes filled with real values.
-- [ ] §IV-B encoder ground-truth claim settled after anchor marking.
+- [ ] §IV-B describes ground truth as hand-labelled and interpolated, for every setup.
 - [ ] Abstract written last, matching the results.
 - [ ] `\nocite{*}` removed from `main.tex` (it currently lists every bib entry).
 

@@ -21,7 +21,7 @@ inference.
 
 | Phase | Status |
 |---|---|
-| A — Data | ⬜ Recording session tonight; sim pipeline next |
+| A — Data | 🟨 Corpus recorded (54 clips) and code in place; **labelling is the open work** |
 | B — Frontend + baseline | ⬜ |
 | C — Trajectory memory (Stage 1, frames) | ⬜ The goal |
 | D — Deviation detection | ⬜ In scope |
@@ -34,10 +34,23 @@ inference.
 - `trajectories.py`: analytic path specs + scripted deviations.
 - `simulate.py`: v2e wrapper using the main repo's calibration + measured contrast thresholds.
 - `data.py`: uniform `Clip` loader for recorded and simulated clips.
-- Real corpus from tonight (`RECORDING_PLAN.md`): fan-driven, string/pendulum, hand-moved,
-  motor-driven-on-blank-wall.
+- Real corpus recorded 2026-09-10 (`RECORDING_LOG.md`): 54 clips over fan, pendulum,
+  motor-swept wall (4a) and hand-moved wall (4b). 14 carry a deviation.
+- **Ground truth is hand-labels + interpolation for every setup**, 4a included. The
+  encoder ground truth 4a was recorded for does not hold — see `PAPER_PROGRESS.md`,
+  "The 4a encoder ground truth was abandoned".
+- Marking tools, one per side-car: `scripts/mark_labels.py` → `.labels.csv` (the path),
+  `scripts/mark_breaks.py` → `.deviation.json` (break times),
+  `scripts/mark_anchors.py` → `.anchor.json` (4a only, now unused by default).
+  `scripts/replay_gt.py` draws a clip's ground truth over it to check the result.
+- **Open:** 0 of 54 clips labelled, 0 of 14 break times marked. This is now the
+  critical path — nothing in B, C or D can be evaluated until enough clips are labelled.
+  Interval matters per group: the pendulum at T ≈ 1.2 s needs ~0.1 s, the 4a triangle
+  sweeps are fine at 0.5 s. Labelling all 49 in-scope clips is probably unnecessary;
+  decide how many Phase C actually needs before starting.
 - **Done when:** a simulated clip and a real clip load through the same path; sim events
-  visually resemble the real DVXplorer stream on a matched trajectory.
+  visually resemble the real DVXplorer stream on a matched trajectory; enough real clips
+  carry ground truth to evaluate on.
 - **Unlocks:** §IV-A's contrast-threshold and noise holes; clears the §IV-B ground-truth caveat.
 
 ### B — Frontend + baseline
