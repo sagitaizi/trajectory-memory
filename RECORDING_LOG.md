@@ -130,7 +130,7 @@ pendulum, T ≈ 1.2 s). No motors (`--no-motors`). All 25 s, no drops.
 | pendulum/wide_03 | 25.0 s | 1429 k/s | large amplitude (recorded as `wide_break`, no real break — renamed) |
 | pendulum/updown_02 | 25.0 s | 428 k/s | toward/away or vertical variation; only one such clip (no `updown_01`) |
 | pendulum/small_break | 25.0 s | 603 k/s | deviation — re-push / out-of-plane nudge mid-swing |
-| pendulum/wide_break | 25.0 s | 1021 k/s | deviation — re-push / out-of-plane nudge mid-swing |
+| pendulum/wide_break | 25.0 s | 1021 k/s | deviation. **Labelled** — steady swing to 12.9 s (T = 1.27 s, as wide_02), push at ~13.0 s overshoots to x = 600, out of frame 13.9–14.1 s, wild to 17 s, then caught and held ~110 px lower and near-static from 18 s. Two things to detect: the path departing (13 s) and the path ceasing (18 s) |
 
 GT: dense hand-labels at 0.1 s, linearly interpolated — model-free by choice, so the
 ground truth assumes nothing a deviation detector is later judged on. `small_01`
