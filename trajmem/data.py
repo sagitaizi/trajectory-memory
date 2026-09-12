@@ -93,13 +93,30 @@ def write_anchor(path, x: float, y: float, t_s: float = 0.0) -> Path:
 
 
 def read_labels(path):
-    """Sparse hand-labels as (t_s, x, y) rows, or None if the clip has none."""
+    """Sparse hand-labels as (t_s, x, y) rows, or None if the clip has none.
+
+    x and y are **normalised** to the sensor, matching what every `gt` returns.
+    """
     clip_dir, slug = _clip_paths(path)
     sidecar = clip_dir / f"{slug}.labels.csv"
     if not sidecar.exists():
         return None
     with open(sidecar, newline="", encoding="utf-8") as fh:
         return [(float(r["t_s"]), float(r["x"]), float(r["y"])) for r in csv.DictReader(fh)]
+
+
+def write_labels(path, points) -> Path:
+    """Record hand-labels, sorted by time. See `read_labels` for units."""
+    points = sorted((float(t), float(x), float(y)) for t, x, y in points)
+    if not points:
+        raise ValueError("no label points")
+    clip_dir, slug = _clip_paths(path)
+    sidecar = clip_dir / f"{slug}.labels.csv"
+    with open(sidecar, "w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerow(["t_s", "x", "y"])
+        w.writerows(points)
+    return sidecar
 
 
 def read_deviation_times(path) -> list[float]:
@@ -109,6 +126,15 @@ def read_deviation_times(path) -> list[float]:
     if not sidecar.exists():
         return []
     return [float(t) for t in json.loads(sidecar.read_text())["times_s"]]
+
+
+def write_deviation_times(path, times) -> Path:
+    """Record break times, sorted. See `read_deviation_times` for the clock they use."""
+    times = sorted(float(t) for t in times)
+    clip_dir, slug = _clip_paths(path)
+    sidecar = clip_dir / f"{slug}.deviation.json"
+    sidecar.write_text(json.dumps({"times_s": times}))
+    return sidecar
 
 
 def _ticks_per_radian(clip_dir: Path, slug: str) -> tuple[float, float]:
@@ -279,9 +305,12 @@ def load_recording(path, anchor=None) -> Clip:
     meta["resolution"] = tuple(player.getEventResolution())
 
     gt = None
-    anchor = Anchor(*anchor) if anchor is not None else read_anchor(aedat4)
+    forced_anchor = anchor is not None
+    anchor = Anchor(*anchor) if forced_anchor else read_anchor(aedat4)
     labels = read_labels(aedat4)
-    if has_motors and anchor is not None:
+    # Hand-labels win over a side-car anchor: they are where the target was seen to be,
+    # while the anchor is that plus a model of the rig. Pass anchor= to force the model.
+    if has_motors and anchor is not None and (forced_anchor or not labels):
         gt = _ego_gt_for_clip(clip_dir, slug, anchor, t0)
         meta["anchor"] = tuple(anchor)
     elif labels:

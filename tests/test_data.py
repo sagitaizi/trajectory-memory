@@ -442,3 +442,40 @@ def test_load_sim_survives_a_save_and_load_round_trip(tmp_path):
     back = load_clip(save_clip(clip, tmp_path / "s.npz"))
     np.testing.assert_array_equal(back.events, clip.events)
     np.testing.assert_allclose(back.gt(0.037), clip.gt(0.037))
+
+
+# --- hand-labels win over a side-car anchor ----------------------------------
+
+@needs_motor_clip
+def test_hand_labels_take_precedence_over_a_marked_anchor():
+    """A 4a clip labelled by hand uses the labels: they are observation, not a model."""
+    from trajmem.data import write_labels
+
+    sidecar = A_MOTOR_CLIP / f"{A_MOTOR_CLIP.name}.labels.csv"
+    if sidecar.exists():
+        pytest.skip("clip already labelled; not clobbering real labels")
+    try:
+        write_labels(A_MOTOR_CLIP, [(0.0, 0.25, 0.5), (1.0, 0.75, 0.5)])
+        clip = load_recording(A_MOTOR_CLIP)
+        assert "labels" in clip.meta
+        assert "anchor" not in clip.meta
+        np.testing.assert_allclose(clip.gt(0.5), (0.5, 0.5))
+    finally:
+        sidecar.unlink(missing_ok=True)
+
+
+@needs_motor_clip
+def test_an_explicitly_given_anchor_still_forces_the_encoder_ground_truth():
+    """Passing anchor= asks for the rig model by name, so labels must not override it."""
+    from trajmem.data import write_labels
+
+    sidecar = A_MOTOR_CLIP / f"{A_MOTOR_CLIP.name}.labels.csv"
+    if sidecar.exists():
+        pytest.skip("clip already labelled; not clobbering real labels")
+    try:
+        write_labels(A_MOTOR_CLIP, [(0.0, 0.25, 0.5), (1.0, 0.75, 0.5)])
+        clip = load_recording(A_MOTOR_CLIP, anchor=(320.0, 240.0))
+        assert clip.meta["anchor"] == (320.0, 240.0, 0.0)
+        assert "labels" not in clip.meta
+    finally:
+        sidecar.unlink(missing_ok=True)
