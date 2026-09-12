@@ -122,11 +122,11 @@ pendulum, T ≈ 1.2 s). No motors (`--no-motors`). All 25 s, no drops.
 
 | Clip | Dur | Mean rate | Notes |
 |---|---|---|---|
-| pendulum/small_01 | 25.0 s | 1331 k/s | small amplitude |
+| pendulum/small_01 | 25.0 s | 1331 k/s | small amplitude. **Labelled** — T = 1.181 s, settled from t = 0, no net decay, amplitude beating (see GT note below) |
 | pendulum/small_02 | 25.0 s | 734 k/s | small amplitude |
 | pendulum/small_03 | 25.0 s | 821 k/s | small amplitude |
 | pendulum/wide_01 | 25.0 s | 1218 k/s | large amplitude |
-| pendulum/wide_02 | 25.1 s | 1529 k/s | large amplitude |
+| pendulum/wide_02 | 25.1 s | 1529 k/s | large amplitude. **Labelled** — T = 1.274 s, 7.9% longer than small_01 (anharmonic, real). First ~5 s is the push settling; steady from t ≈ 6 s |
 | pendulum/wide_03 | 25.0 s | 1429 k/s | large amplitude (recorded as `wide_break`, no real break — renamed) |
 | pendulum/updown_02 | 25.0 s | 428 k/s | toward/away or vertical variation; only one such clip (no `updown_01`) |
 | pendulum/small_break | 25.0 s | 603 k/s | deviation — re-push / out-of-plane nudge mid-swing |
