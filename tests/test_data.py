@@ -99,10 +99,53 @@ def test_attach_labels_interpolates_between_marks():
     np.testing.assert_allclose(clip.gt(0.5), [0.3, 0.4])
 
 
-def test_attach_labels_holds_the_end_marks_outside_the_labelled_span():
+def test_attach_labels_holds_the_end_marks_just_outside_the_labelled_span():
+    """A clip's first mark sits a few ms in; before it the target is where it was."""
     clip = attach_labels(an_unlabelled_clip(), [(1.0, 0.1, 0.2), (2.0, 0.5, 0.6)])
     np.testing.assert_allclose(clip.gt(0.0), [0.1, 0.2])
-    np.testing.assert_allclose(clip.gt(9.0), [0.5, 0.6])
+    np.testing.assert_allclose(clip.gt(4.0), [0.5, 0.6])
+
+
+def test_attach_labels_is_unknown_far_beyond_the_last_mark():
+    """A target that left the frame at 2 s did not sit still for the next seven."""
+    clip = attach_labels(an_unlabelled_clip(), [(1.0, 0.1, 0.2), (2.0, 0.5, 0.6)])
+    assert np.isnan(clip.gt(9.0)).all()
+
+
+def test_attach_labels_is_unknown_inside_a_gap_where_the_target_was_not_seen():
+    """Skipped instants in the marking tool must not become a straight line."""
+    marks = [(t, 0.1 * t, 0.5) for t in (0.0, 0.1, 0.2, 0.3)] + \
+            [(t, 0.1 * t, 0.5) for t in (5.0, 5.1, 5.2)]
+    clip = attach_labels(an_unlabelled_clip(), marks)
+    np.testing.assert_allclose(clip.gt(0.15), [0.015, 0.5])
+    assert np.isnan(clip.gt(2.5)).all()
+    np.testing.assert_allclose(clip.gt(5.05), [0.505, 0.5])
+
+
+def test_attach_labels_knows_the_marks_either_side_of_a_gap():
+    marks = [(0.0, 0.0, 0.5), (0.1, 0.01, 0.5), (5.0, 0.5, 0.5), (5.1, 0.51, 0.5)]
+    clip = attach_labels(an_unlabelled_clip(), marks)
+    np.testing.assert_allclose(clip.gt(0.1), [0.01, 0.5])
+    np.testing.assert_allclose(clip.gt(5.0), [0.5, 0.5])
+
+
+def test_attach_labels_gap_tolerance_can_be_set_explicitly():
+    marks = [(0.0, 0.0, 0.5), (1.0, 0.1, 0.5), (3.0, 0.3, 0.5)]
+    wide = attach_labels(an_unlabelled_clip(), marks)             # default: 3 x 1 s
+    np.testing.assert_allclose(wide.gt(2.0), [0.2, 0.5])
+    from trajmem.data import label_gt
+    strict = label_gt(marks, max_gap_s=1.5)
+    assert np.isnan(strict(2.0)).all()
+
+
+def test_attach_labels_vectorised_query_marks_only_the_unknown_instants():
+    marks = [(0.0, 0.0, 0.5), (0.1, 0.01, 0.5), (5.0, 0.5, 0.5), (5.1, 0.51, 0.5)]
+    clip = attach_labels(an_unlabelled_clip(), marks)
+    out = clip.gt(np.array([0.05, 2.5, 5.05]))
+    assert out.shape == (3, 2)
+    assert not np.isnan(out[0]).any()
+    assert np.isnan(out[1]).all()
+    assert not np.isnan(out[2]).any()
 
 
 def test_attach_labels_gt_is_vectorised_like_the_sim_ground_truth():

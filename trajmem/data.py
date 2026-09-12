@@ -193,17 +193,37 @@ def _read_events(player) -> np.ndarray:
 
 # --- ground truth ------------------------------------------------------------
 
-def label_gt(points) -> Callable:
-    """Sparse (t_s, x, y) marks -> gt(t), linear between marks, held at the ends."""
+def label_gt(points, max_gap_s: float | None = None) -> Callable:
+    """Sparse (t_s, x, y) marks -> gt(t): linear between marks, NaN where unseen.
+
+    A gap wider than `max_gap_s` means the target was not visible there -- the
+    instants skipped in the marking tool -- so gt returns NaN inside it rather than
+    a straight line through where the target was not. The same holds beyond the
+    first and last marks. Default: three labelling intervals, the interval being the
+    median spacing between marks. Within that tolerance the end marks are held.
+    """
     marks = np.asarray(sorted(points, key=lambda p: p[0]), dtype=float)
     if len(marks) == 0:
         raise ValueError("no label points")
     t_marks, x_marks, y_marks = marks[:, 0], marks[:, 1], marks[:, 2]
+    if max_gap_s is None:
+        spacing = np.diff(t_marks)
+        max_gap_s = 3 * float(np.median(spacing)) if len(spacing) else np.inf
 
     def gt(t):
         t = np.asarray(t, dtype=float)
-        return np.stack([np.interp(t, t_marks, x_marks),
-                         np.interp(t, t_marks, y_marks)], axis=-1)
+        tt = np.atleast_1d(t)
+        out = np.stack([np.interp(tt, t_marks, x_marks),
+                        np.interp(tt, t_marks, y_marks)], axis=-1)
+
+        i = np.searchsorted(t_marks, tt, side="right")   # t_marks[i-1] <= t < t_marks[i]
+        prev = np.where(i > 0, t_marks[np.clip(i - 1, 0, None)], -np.inf)
+        nxt = np.where(i < len(t_marks), t_marks[np.clip(i, None, len(t_marks) - 1)], np.inf)
+        on_a_mark = (tt == prev) | (tt == nxt)
+        gap = np.where(np.isfinite(prev) & np.isfinite(nxt), nxt - prev,
+                       np.minimum(tt - prev, nxt - tt))      # distance past an end
+        out[(gap > max_gap_s) & ~on_a_mark] = np.nan
+        return out[0] if t.ndim == 0 else out
 
     return gt
 

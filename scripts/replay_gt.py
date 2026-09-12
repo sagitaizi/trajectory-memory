@@ -110,6 +110,8 @@ def _draw(img, gt_px, trail_px, anchor, view_zoom, label, t, view_window_s,
     view = cv2.resize(view, None, fx=z, fy=z, interpolation=cv2.INTER_NEAREST)
 
     for i, (x, y) in enumerate(trail_px):
+        if np.isnan(x) or np.isnan(y):
+            continue
         fade = (i + 1) / len(trail_px)          # oldest dimmest
         cv2.circle(view, (int(round(x * z)), int(round(y * z))), 2,
                    (0, int(90 + 130 * fade), int(200 * fade)), -1)
@@ -118,12 +120,16 @@ def _draw(img, gt_px, trail_px, anchor, view_zoom, label, t, view_window_s,
         ax, ay = int(round(anchor[0] * z)), int(round(anchor[1] * z))
         cv2.drawMarker(view, (ax, ay), (200, 120, 255), cv2.MARKER_TILTED_CROSS, 14, 1)
 
-    x, y = int(round(gt_px[0] * z)), int(round(gt_px[1] * z))
-    cv2.line(view, (x - 14, y), (x + 14, y), (0, 255, 0), 1)
-    cv2.line(view, (x, y - 14), (x, y + 14), (0, 255, 0), 1)
-    cv2.circle(view, (x, y), 16, (0, 255, 0), 1)
-    cv2.putText(view, f"{gt_px[0]:.1f}, {gt_px[1]:.1f}", (x + 20, y - 10),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1, cv2.LINE_AA)
+    if np.isnan(gt_px).any():                   # target not seen here: say so, draw nothing
+        cv2.putText(view, "TARGET NOT VISIBLE (no ground truth)", (8, 42),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2, cv2.LINE_AA)
+    else:
+        x, y = int(round(gt_px[0] * z)), int(round(gt_px[1] * z))
+        cv2.line(view, (x - 14, y), (x + 14, y), (0, 255, 0), 1)
+        cv2.line(view, (x, y - 14), (x, y + 14), (0, 255, 0), 1)
+        cv2.circle(view, (x, y), 16, (0, 255, 0), 1)
+        cv2.putText(view, f"{gt_px[0]:.1f}, {gt_px[1]:.1f}", (x + 20, y - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1, cv2.LINE_AA)
 
     hud = (f"{label}   t={t:6.2f}s  view: {view_window_s * 1000:.0f}ms "
            f"bright {view_brightness}")
