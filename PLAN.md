@@ -70,9 +70,13 @@ inference.
   (motor could not track), `scan_pan_slow_break_02` (scan params unrecorded),
   `scan_tilt_fast_break_01` (19.5 s). Promoting a spare clip later is fine; promoting a
   held-out clip to development after seeing a result on it is not.
-- **Done when:** a simulated clip and a real clip load through the same path; sim events
-  visually resemble the real DVXplorer stream on a matched trajectory; enough real clips
-  carry ground truth to evaluate on.
+- **Sim matched to real (2026-09-15).** `scripts/match_sim_real.py` fits an ellipse to
+  `fan_brush_slow_02`'s labels, simulates it, and scores event rate, ON fraction, blob
+  footprint and noise floor against the real clip; all four now agree within 10 %
+  (`materials/02-methods/simulation-with-v2e.md`). `params.yaml` carries the matched values.
+- **Done when:** a simulated clip and a real clip load through the same path ✅; sim events
+  resemble the real DVXplorer stream on a matched trajectory ✅; enough real clips
+  carry ground truth to evaluate on (development set ✅, held-out pending).
 - **Unlocks:** §IV-A's contrast-threshold and noise holes; clears the §IV-B ground-truth caveat.
 
 ### B — Frontend + baseline

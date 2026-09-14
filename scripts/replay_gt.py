@@ -23,7 +23,7 @@ import _thesis_path  # noqa: F401,E402  (adds the thesis repo to sys.path)
 import numpy as np  # noqa: E402
 
 from scripts.mark_anchors import accumulate  # noqa: E402
-from trajmem.data import load_recording  # noqa: E402
+from trajmem.data import load_clip, load_recording  # noqa: E402
 
 # Everything prefixed `view_` is display only: it changes what you see, never the
 # events, the ground truth or anything written to disk. Only --gt-scale does that.
@@ -171,8 +171,17 @@ def render(clip, t: float, view_window_s: float, view_brightness: int, trail_s: 
     anchor = clip.meta.get("anchor")
     return _draw(img, gt_px, trail_px, anchor[:2] if anchor else None, view_zoom,
                  label, t, view_window_s, view_brightness,
-                 _ticks_at(track, clip.meta["t0_device_us"], mid),
+                 _ticks_at(track, clip.meta.get("t0_device_us", 0), mid),
                  clip.meta.get("gt_scale", 1.0))
+
+
+def open_clip(path):
+    """A recorded clip directory / .aedat4, or a saved simulated .npz; plus its label."""
+    path = pathlib.Path(path)
+    if path.suffix == ".npz":
+        return load_clip(path), path.stem
+    clip = load_recording(path)
+    return clip, clip.meta["slug"]
 
 
 def save(clip, path, fps: float, view_window_s: float, view_brightness: int,
@@ -250,7 +259,7 @@ def play(clip, fps: float, view_window_s: float, view_brightness: int, trail_s: 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("clip", help="a clip directory or .aedat4")
+    p.add_argument("clip", help="a clip directory, .aedat4, or a saved simulated .npz")
     p.add_argument("--fps", type=float, default=30.0, help="frames rendered per second")
     p.add_argument("--view-window", type=float, default=_VIEW_WINDOW_S, metavar="S",
                    help="display only: seconds of events summed into each shown "
@@ -270,14 +279,12 @@ def main() -> None:
                         "(default runs/replay/<slug>.mp4)")
     args = p.parse_args()
 
-    clip = load_recording(pathlib.Path(args.clip))
+    clip, label = open_clip(args.clip)
     if clip.gt is None:
-        raise SystemExit(f"{clip.meta['slug']}: no ground truth "
-                         "(mark an anchor or add hand-labels first)")
+        raise SystemExit(f"{label}: no ground truth (mark an anchor or add hand-labels first)")
     if args.gt_scale != 1.0:
         clip = rescale_gt(clip, args.gt_scale)
 
-    label = clip.meta["slug"]
     if args.save is None:
         play(clip, args.fps, args.view_window, args.view_brightness, args.trail,
              args.view_zoom, label)

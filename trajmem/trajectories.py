@@ -26,6 +26,7 @@ class TrajectorySpec:
     center: tuple[float, float] = (0.5, 0.5)   # normalised image coords
     phase0: float = 0.0
     lissajous: tuple[float, float, float] = (3.0, 2.0, np.pi / 2)  # (a, b, delta)
+    rotation: float = 0.0              # radians, turns the path about its centre
     deviations: list[Deviation] = field(default_factory=list)
 
 
@@ -39,7 +40,8 @@ def sample(spec: TrajectorySpec, t):
     sx, sy = _size(spec, t)
     cx, cy = _center(spec, t)
     ox, oy = _offset_with_switches(spec, sx, sy, phi, t)
-    return np.stack([cx + ox, cy + oy], axis=-1)
+    c, s = np.cos(spec.rotation), np.sin(spec.rotation)
+    return np.stack([cx + c * ox - s * oy, cy + s * ox + c * oy], axis=-1)
 
 
 def _phase(spec: TrajectorySpec, t):
@@ -106,3 +108,58 @@ def _shape_offset(shape: Shape, sx, sy, phi, lissajous):
         a, b, delta = lissajous
         return sx * np.sin(a * phi + delta), sy * np.sin(b * phi)
     raise ValueError(f"unknown shape: {shape!r}")
+
+
+def fit_ellipse(points, period_s: float | None = None) -> TrajectorySpec:
+    """Least-squares ellipse through sparse (t, x, y) marks, as a TrajectorySpec.
+
+    Any ellipse traced at constant angular rate is x, y = c + M [cos wt, sin wt];
+    the SVD of M splits it into semi-axes, a rotation and a phase. A negative
+    second semi-axis means the path runs the other way round. Marks with a NaN
+    position are skipped. Without `period_s` the period is searched for.
+    """
+    marks = np.asarray(points, dtype=float)
+    marks = marks[np.all(np.isfinite(marks), axis=1)]
+    if len(marks) < 5:
+        raise ValueError("need at least five marks with a known position")
+    t, xy = marks[:, 0], marks[:, 1:3]
+    if period_s is None:
+        period_s = _search_period(t, xy)
+
+    coef, _ = _harmonic_fit(t, xy, period_s)
+    center = coef[0]
+    m = coef[1:].T                                         # rows x, y; columns cos, sin
+    u, s, vt = np.linalg.svd(m)
+    s = s.copy()
+    if np.linalg.det(vt) < 0:
+        vt[1] *= -1
+        s[1] *= -1
+    if np.linalg.det(u) < 0:
+        u[:, 1] *= -1
+        s[1] *= -1
+    return TrajectorySpec(
+        shape="ellipse", size=(float(s[0]), float(s[1])), period_s=float(period_s),
+        center=(float(center[0]), float(center[1])),
+        phase0=float(np.arctan2(vt[1, 0], vt[0, 0])),
+        rotation=float(np.arctan2(u[1, 0], u[0, 0])),
+    )
+
+
+def _harmonic_fit(t, xy, period_s):
+    """Fit xy(t) = c + A cos wt + B sin wt; returns the (3, 2) coefficients and residual."""
+    w = 2.0 * np.pi / period_s
+    design = np.column_stack([np.ones_like(t), np.cos(w * t), np.sin(w * t)])
+    coef, *_ = np.linalg.lstsq(design, xy, rcond=None)
+    return coef, float(np.sum((design @ coef - xy) ** 2))
+
+
+def _search_period(t, xy) -> float:
+    """Period with the smallest harmonic-fit residual: a frequency grid, then a fine pass."""
+    span = t.max() - t.min()
+    f_lo, f_hi = 1.0 / span, 0.5 / np.median(np.diff(np.sort(t)))
+    step = 1.0 / (8.0 * span)
+    coarse = np.arange(f_lo, f_hi, step)
+    best = coarse[np.argmin([_harmonic_fit(t, xy, 1.0 / f)[1] for f in coarse])]
+    fine = np.linspace(best - step, best + step, 201)
+    fine = fine[fine > 0]
+    return float(1.0 / fine[np.argmin([_harmonic_fit(t, xy, 1.0 / f)[1] for f in fine])])

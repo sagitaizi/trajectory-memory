@@ -8,9 +8,9 @@ sim:
   fps: 1000                     # blob render rate before v2e
   duration_s: 20.0
   blob:
-    radius_px: 12
-    bg_intensity: 64           # 8-bit grey background
-    fg_intensity: 128          # blob brightness; keep contrast modest until matched to real
+    radius_px: 18
+    bg_intensity: 30           # 8-bit grey background
+    fg_intensity: 170          # blob brightness; matched to fan_brush_slow_02 (scripts/match_sim_real.py)
   # simulate.load_intrinsics() uses camera.calibration's own pinned DVXplorer file;
   # set an absolute path here only to override it.
   calibration: null
@@ -21,7 +21,7 @@ sim:
     sigma_thres: 0.03
     cutoff_hz: 30              # must sit well below fps or v2e's IIR filter is under-sampled
     leak_rate_hz: 0.0
-    shot_noise_rate_hz: 0.01   # per-pixel; provisional, pin against a real corner-of-frame rate
+    shot_noise_rate_hz: 0.33   # per-pixel; matched to the real clip's far-from-target rate
     refractory_period_s: 0.0
   # per-clip domain randomisation ranges (make_sim_dataset)
   randomise:

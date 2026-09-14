@@ -153,3 +153,68 @@ def test_multiple_deviations_compose():
     ])
     p = sample(spec, 2.0)   # phi = 2*pi -> offset direction (1, 0); 1 s after both events
     assert np.allclose(p, [0.5 + 0.1 + 0.2, 0.5], atol=1e-6)
+
+
+# --- rotation ----------------------------------------------------------------
+
+def test_rotation_turns_a_flat_ellipse_into_a_tilted_sweep():
+    spec = TrajectorySpec(shape="ellipse", size=(0.3, 0.0), period_s=2.0,
+                          center=(0.5, 0.5), rotation=np.pi / 4)
+    t = np.linspace(0, spec.period_s, 200, endpoint=False)
+    off = sample(spec, t) - np.array([0.5, 0.5])
+    assert np.allclose(off[:, 0], off[:, 1], atol=1e-9)           # on the diagonal
+    assert np.isclose(np.hypot(*off.T).max(), 0.3, atol=1e-6)      # full semi-axis reached
+
+
+def test_rotation_by_quarter_turn_swaps_the_axes():
+    flat = TrajectorySpec(shape="ellipse", size=(0.4, 0.2), period_s=2.0)
+    turned = TrajectorySpec(shape="ellipse", size=(0.4, 0.2), period_s=2.0, rotation=np.pi / 2)
+    t = np.linspace(0, 2.0, 400, endpoint=False)
+    a, b = sample(flat, t) - 0.5, sample(turned, t) - 0.5
+    assert np.isclose(np.abs(b[:, 1]).max(), 0.4, atol=1e-6)
+    assert np.isclose(np.abs(b[:, 0]).max(), 0.2, atol=1e-6)
+    assert np.allclose(np.hypot(*a.T), np.hypot(*b.T), atol=1e-9)  # a rigid turn
+
+
+def test_rotation_leaves_a_circle_a_circle():
+    spec = circle(r=0.3)
+    spec.rotation = 1.1
+    t = np.linspace(0, 2.0, 100)
+    assert np.allclose(np.hypot(*(sample(spec, t) - 0.5).T), 0.3, atol=1e-9)
+
+
+# --- fitting an ellipse to marks ----------------------------------------------
+
+def test_fit_ellipse_recovers_a_tilted_ellipse_from_sparse_marks():
+    from trajmem.trajectories import fit_ellipse
+
+    truth = TrajectorySpec(shape="ellipse", size=(0.13, 0.07), period_s=1.2,
+                           center=(0.54, 0.52), phase0=0.8, rotation=0.4)
+    t = np.arange(0.025, 25.0, 0.15)
+    marks = [(ti, *sample(truth, ti)) for ti in t]
+
+    fitted = fit_ellipse(marks, period_s=1.2)
+    assert fitted.shape == "ellipse"
+    check = np.linspace(0, 25.0, 500)
+    assert np.allclose(sample(fitted, check), sample(truth, check), atol=1e-6)
+
+
+def test_fit_ellipse_finds_the_period_when_not_given():
+    from trajmem.trajectories import fit_ellipse
+
+    truth = TrajectorySpec(shape="ellipse", size=(0.13, 0.07), period_s=1.2,
+                           center=(0.54, 0.52), phase0=0.8)
+    t = np.arange(0.0, 25.0, 0.15)
+    marks = [(ti, *sample(truth, ti)) for ti in t]
+    fitted = fit_ellipse(marks)
+    assert np.isclose(fitted.period_s, 1.2, atol=0.005)
+
+
+def test_fit_ellipse_ignores_marks_with_unknown_position():
+    from trajmem.trajectories import fit_ellipse
+
+    truth = TrajectorySpec(shape="ellipse", size=(0.1, 0.05), period_s=1.0)
+    t = np.arange(0.0, 10.0, 0.1)
+    marks = [(ti, *sample(truth, ti)) for ti in t] + [(3.05, np.nan, np.nan)]
+    fitted = fit_ellipse(marks, period_s=1.0)
+    assert np.allclose(sample(fitted, t), sample(truth, t), atol=1e-6)

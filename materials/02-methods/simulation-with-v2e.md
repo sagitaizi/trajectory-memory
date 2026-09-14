@@ -42,13 +42,25 @@ Input: a frame sequence + its frame rate (upsampled internally). Output: DVS eve
   1000 fps gave ~3 M ev/s (v2e emits ~ln(ratio)/pos_thres events per edge pixel per frame).
   Start with a modest ratio (~2x) and raise it only to match the measured real rate.
 
-## Match to real (do this day one, while the camera is here)
-Record one real repetitive clip, simulate the same nominal path, and compare:
-- total event rate (events/s) and its time profile,
-- spatial event histogram (where events land),
-- polarity balance.
-Adjust threshold / noise until they're close. This is the "characterised parameters"
-procedure (Frontiers in Neuroscience 2021).
+## Match to real (done 2026-09-15, `scripts/match_sim_real.py`)
+Against `fan/fan_brush_slow_02`, the one labelled real clip on a clean analytic path: an
+ellipse fitted to its hand-labels (semi-axes 37 x 23 px, T = 1.189 s, residual median
+4.5 px) is simulated with the same timing at 500 fps and both streams are scored over
+the first 5 s, within 60 px of the ground truth and outside it:
+
+| | real | sim |
+|---|---|---|
+| target event rate (ev/s) | 82.0 k | 89.1 k |
+| ON fraction | 0.509 | 0.507 |
+| footprint: median event distance from gt (px) | 18.2 | 18.3 |
+| noise far from target (ev/px/s) | 0.291 | 0.292 |
+
+Reached with blob radius 18 px, background 30 / blob 170 (8-bit), thresholds 0.2,
+sigma 0.03, shot noise 0.33 Hz/px (`params.yaml`). Starting values (radius 12, 64/128,
+noise 0.01) were 4.5x short on target rate and 36x short on noise. What the match does
+not capture: the string above the brush, and the brush's bristle texture -- the sim blob
+is a disc. `runs/match/` keeps the montage, `stats.json`, and both clips as `.npz` for
+`scripts/replay_gt.py`.
 
 ## Domain randomisation
 For each generated clip, sample threshold, σ, noise rate, blob contrast, and a small random

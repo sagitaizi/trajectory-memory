@@ -124,3 +124,8 @@ def test_simulate_with_camera_cfg_runs_the_distortion_branch():
 def test_render_frames_rejects_a_resolution_the_calibration_does_not_cover():
     with pytest.raises(ValueError, match="resolution"):
         render_frames(a_circle(), SIM_CFG, intrinsics=load_intrinsics())
+
+
+def test_simulate_records_the_resolution_like_a_recording_does():
+    clip = simulate(a_circle(), camera_cfg=None, sim_cfg=SIM_CFG)
+    assert clip.meta["resolution"] == (64, 48)

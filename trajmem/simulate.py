@@ -122,5 +122,5 @@ def simulate(spec: TrajectorySpec, camera_cfg, sim_cfg, seed: int = 0) -> Clip:
         gt=lambda t: sample(spec, t),
         deviation_times=[d.at_t for d in spec.deviations],
         source="sim",
-        meta={"spec": spec, "seed": seed},
+        meta={"spec": spec, "seed": seed, "resolution": tuple(sim_cfg["resolution"])},
     )

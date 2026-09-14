@@ -84,3 +84,25 @@ def test_a_scale_of_one_leaves_the_calibration_alone():
 def test_a_non_positive_scale_is_rejected():
     with pytest.raises(ValueError):
         scaled_ticks_per_radian((740.0, 370.0), 0.0)
+
+
+# --- opening clips -------------------------------------------------------------
+
+def test_open_clip_reads_a_saved_simulated_clip(tmp_path):
+    from scripts.replay_gt import open_clip, render
+    from trajmem.data import save_clip
+    from trajmem.simulate import simulate
+    from trajmem.trajectories import TrajectorySpec
+
+    cfg = {"resolution": [64, 48], "fps": 200, "duration_s": 0.1,
+           "blob": {"radius_px": 4, "bg_intensity": 20, "fg_intensity": 180},
+           "v2e": {"pos_thres": 0.2, "neg_thres": 0.2, "sigma_thres": 0.0, "cutoff_hz": 0,
+                   "leak_rate_hz": 0.0, "shot_noise_rate_hz": 0.0, "refractory_period_s": 0.0}}
+    spec = TrajectorySpec(shape="circle", size=(0.25, 0.25), period_s=0.1)
+    path = save_clip(simulate(spec, camera_cfg=None, sim_cfg=cfg), tmp_path / "sim_01")
+
+    clip, label = open_clip(path)
+    assert label == "sim_01"
+    assert clip.gt is not None
+    frame = render(clip, 0.02, 0.01, 40, 0.05, 1.0, label)   # a sim clip has no motor HUD
+    assert frame.shape[0] > 0
