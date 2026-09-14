@@ -85,7 +85,7 @@ def main() -> None:
     p.add_argument("--params", default="params.yaml")
     p.add_argument("--out", default="runs/match")
     p.add_argument("--duration", type=float, default=5.0, help="seconds compared, from t=0")
-    p.add_argument("--fps", type=int, default=500)
+    p.add_argument("--fps", type=int, default=650, help="render rate; keep >= 21 x cutoff_hz")
     p.add_argument("--radius", type=float, default=60.0, help="px around gt that count as target")
     p.add_argument("--window", type=float, default=0.02, help="montage accumulation window (s)")
     p.add_argument("--seed", type=int, default=0)

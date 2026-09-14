@@ -5,7 +5,7 @@ seed: 0
 
 sim:
   resolution: [640, 480]        # DVXplorer, [width, height]
-  fps: 1000                     # blob render rate before v2e
+  fps: 650                      # blob render rate before v2e
   duration_s: 20.0
   blob:
     radius_px: 18
@@ -19,17 +19,24 @@ sim:
     pos_thres: 0.2
     neg_thres: 0.2
     sigma_thres: 0.03
-    cutoff_hz: 30              # must sit well below fps or v2e's IIR filter is under-sampled
+    cutoff_hz: 30              # needs fps >= 21 x cutoff or v2e's IIR filter is under-sampled
     leak_rate_hz: 0.0
     shot_noise_rate_hz: 0.33   # per-pixel; matched to the real clip's far-from-target rate
     refractory_period_s: 0.0
-  # per-clip domain randomisation ranges (make_sim_dataset)
+  # per-clip domain randomisation ranges (scripts/make_sim_dataset.py), centred on the
+  # matched values above; path sizes are normalised to the frame, periods in seconds
   randomise:
     pos_thres: [0.15, 0.30]
     sigma_thres: [0.01, 0.06]
-    shot_noise_rate_hz: [0.0, 1.0]
+    shot_noise_rate_hz: [0.1, 0.6]
     fg_intensity: [120, 220]
-    affine_jitter: 0.03          # fraction of frame
+    radius_px: [10, 26]
+    path:
+      shapes: [circle, ellipse, sweep, figure8, lissajous]   # sweep = a straight line
+      period_s: [0.8, 4.0]                                   # real clips: 1.0-4.0 s
+      semi_axis: [0.05, 0.35]                                # real: fan 0.06, pendulum 0.34
+      margin: 0.03                                           # the path never comes closer
+      deviation_fraction: 0.5
 
 frontend:
   frame_window_us: 5000

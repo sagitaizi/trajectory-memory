@@ -394,10 +394,14 @@ def load_clip(path) -> Clip:
             meta=meta,
         )
     if "spec" in meta:
+        from .simulate import apparent_gt, load_intrinsics
         from .trajectories import sample
 
         spec = meta["spec"]
-        clip.gt = lambda t: sample(spec, t)
+        if meta.get("distorted"):
+            clip.gt = apparent_gt(spec, meta["resolution"], load_intrinsics())
+        else:
+            clip.gt = lambda t: sample(spec, t)
     elif "labels" in meta:
         clip.gt = label_gt(meta["labels"])
     elif "anchor" in meta:

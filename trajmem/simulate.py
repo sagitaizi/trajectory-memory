@@ -25,7 +25,7 @@ def render_frames(spec: TrajectorySpec, cfg, intrinsics=None) -> np.ndarray:
 
     The analytic path lives in an ideal pinhole image of size cfg['resolution'];
     with `intrinsics` the blob is drawn at its lens-distorted pixel instead, so the
-    stack resembles the real camera while ground truth stays the undistorted spec.
+    stack resembles the real camera. Ground truth follows it (see `apparent_gt`).
     """
     import cv2
 
@@ -75,6 +75,23 @@ def _path_pixels(spec: TrajectorySpec, times, resolution, intrinsics=None) -> np
     return distort_normalized(intrinsics, norm)
 
 
+def apparent_gt(spec: TrajectorySpec, resolution, intrinsics):
+    """gt(t) as the target *appears* on the sensor: the spec, lens-distorted, normalised.
+
+    Hand-labels on real clips are apparent pixels, so simulated ground truth must be
+    too, or a model trained on sim learns a lens-shaped offset (up to ~50 px in the
+    DVXplorer's corners) that real labels then count as error.
+    """
+    scale = np.array(resolution, dtype=float)
+
+    def gt(t):
+        t = np.asarray(t, dtype=float)
+        out = _path_pixels(spec, np.atleast_1d(t), resolution, intrinsics) / scale
+        return out[0] if t.ndim == 0 else out
+
+    return gt
+
+
 _V2E_KEYS = ("pos_thres", "neg_thres", "sigma_thres", "cutoff_hz", "leak_rate_hz",
              "refractory_period_s", "shot_noise_rate_hz")
 
@@ -116,11 +133,13 @@ def simulate(spec: TrajectorySpec, camera_cfg, sim_cfg, seed: int = 0) -> Clip:
     frames = render_frames(spec, sim_cfg, intrinsics=intrinsics)
     times = np.arange(len(frames)) / sim_cfg["fps"]
     events = _run_v2e(frames, times, sim_cfg["v2e"], seed=seed)
+    resolution = tuple(sim_cfg["resolution"])
     return Clip(
         events=events,
         duration_us=int(round(sim_cfg["duration_s"] * 1e6)),
-        gt=lambda t: sample(spec, t),
+        gt=apparent_gt(spec, resolution, intrinsics) if intrinsics else lambda t: sample(spec, t),
         deviation_times=[d.at_t for d in spec.deviations],
         source="sim",
-        meta={"spec": spec, "seed": seed, "resolution": tuple(sim_cfg["resolution"])},
+        meta={"spec": spec, "seed": seed, "resolution": resolution,
+              "distorted": intrinsics is not None},
     )

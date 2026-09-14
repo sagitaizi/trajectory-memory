@@ -129,3 +129,28 @@ def test_render_frames_rejects_a_resolution_the_calibration_does_not_cover():
 def test_simulate_records_the_resolution_like_a_recording_does():
     clip = simulate(a_circle(), camera_cfg=None, sim_cfg=SIM_CFG)
     assert clip.meta["resolution"] == (64, 48)
+
+
+def test_simulated_ground_truth_is_the_apparent_position_under_the_lens():
+    """Hand-labels on real clips are where the target shows up on the sensor, so a
+    simulated clip's gt must be the lens-distorted pixel, not the ideal path."""
+    cfg = {**SIM_CFG, "resolution": [640, 480], "duration_s": 0.05}
+    spec = TrajectorySpec(shape="circle", size=(0.4, 0.4), period_s=1.0, center=(0.5, 0.5))
+    clip = simulate(spec, camera_cfg={}, sim_cfg=cfg)
+    intr = load_intrinsics()
+    t = np.array([0.0, 0.02])
+    want = _path_pixels(spec, t, (640, 480), intr) / np.array([640, 480])
+    assert np.allclose(clip.gt(t), want)
+    assert not np.allclose(clip.gt(t), sample(spec, t))
+    assert np.allclose(clip.gt(0.02), want[1])                  # scalar t too
+
+
+def test_saved_simulated_clip_keeps_the_apparent_ground_truth(tmp_path):
+    from trajmem.data import load_clip, save_clip
+
+    cfg = {**SIM_CFG, "resolution": [640, 480], "duration_s": 0.05}
+    spec = TrajectorySpec(shape="circle", size=(0.4, 0.4), period_s=1.0, center=(0.5, 0.5))
+    clip = simulate(spec, camera_cfg={}, sim_cfg=cfg)
+    back = load_clip(save_clip(clip, tmp_path / "c"))
+    t = np.linspace(0, 0.05, 5)
+    assert np.allclose(back.gt(t), clip.gt(t))

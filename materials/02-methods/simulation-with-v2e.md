@@ -45,7 +45,7 @@ Input: a frame sequence + its frame rate (upsampled internally). Output: DVS eve
 ## Match to real (done 2026-09-15, `scripts/match_sim_real.py`)
 Against `fan/fan_brush_slow_02`, the one labelled real clip on a clean analytic path: an
 ellipse fitted to its hand-labels (semi-axes 37 x 23 px, T = 1.189 s, residual median
-4.5 px) is simulated with the same timing at 500 fps and both streams are scored over
+4.5 px) is simulated with the same timing at 650 fps and both streams are scored over
 the first 5 s, within 60 px of the ground truth and outside it:
 
 | | real | sim |
