@@ -218,3 +218,56 @@ def test_fit_ellipse_ignores_marks_with_unknown_position():
     marks = [(ti, *sample(truth, ti)) for ti in t] + [(3.05, np.nan, np.nan)]
     fitted = fit_ellipse(marks, period_s=1.0)
     assert np.allclose(sample(fitted, t), sample(truth, t), atol=1e-6)
+
+
+# --- wobble: small smooth imperfections ----------------------------------------
+
+def test_zero_wobble_is_the_perfect_path():
+    from trajmem.trajectories import Wobble
+
+    plain = circle(r=0.3, period=1.5)
+    wobbly = circle(r=0.3, period=1.5)
+    wobbly.wobble = Wobble()
+    t = np.linspace(0, 6, 300)
+    assert np.allclose(sample(plain, t), sample(wobbly, t), atol=1e-12)
+
+
+def test_amplitude_modulation_breathes_the_radius_by_the_given_depth():
+    from trajmem.trajectories import Wobble
+
+    spec = circle(r=0.2, period=1.0)
+    spec.wobble = Wobble(amp_depth=0.1, amp_period_s=4.0)
+    t = np.linspace(0, 8, 4000)
+    r = np.hypot(*(sample(spec, t) - 0.5).T)
+    assert np.isclose(r.max(), 0.22, atol=1e-3) and np.isclose(r.min(), 0.18, atol=1e-3)
+    assert np.isclose(np.hypot(*(sample(spec, 1.0) - 0.5)), 0.22, atol=1e-6)   # a quarter in
+
+
+def test_growth_scales_the_radius_linearly_in_time():
+    from trajmem.trajectories import Wobble
+
+    spec = circle(r=0.2, period=1.0)
+    spec.wobble = Wobble(growth=0.05)
+    assert np.isclose(np.hypot(*(sample(spec, 10.0) - 0.5)), 0.2 * 1.5, atol=1e-9)
+
+
+def test_drift_wanders_the_centre_and_returns():
+    from trajmem.trajectories import Wobble
+
+    spec = circle(r=0.2, period=1.0)
+    spec.wobble = Wobble(drift=(0.03, 0.02), drift_period_s=5.0)
+    t = np.linspace(0, 5, 501)
+    centre = np.stack([sample(spec, t) - (sample(circle(r=0.2, period=1.0), t))]).reshape(-1, 2)
+    assert np.isclose(np.abs(centre[:, 0]).max(), 0.03, atol=1e-6)
+    assert np.isclose(np.abs(centre[:, 1]).max(), 0.02, atol=1e-6)
+    assert np.allclose(centre[0], centre[-1], atol=1e-9)         # back where it started
+
+
+def test_phase_jitter_averages_out_over_its_own_period():
+    from trajmem.trajectories import Wobble
+
+    plain = circle(r=0.2, period=1.0)
+    spec = circle(r=0.2, period=1.0)
+    spec.wobble = Wobble(phase_depth=0.2, phase_period_s=3.0)
+    assert not np.allclose(sample(spec, 0.7), sample(plain, 0.7))
+    assert np.allclose(sample(spec, 3.0), sample(plain, 3.0), atol=1e-9)

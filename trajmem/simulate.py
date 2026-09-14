@@ -26,6 +26,10 @@ def render_frames(spec: TrajectorySpec, cfg, intrinsics=None) -> np.ndarray:
     The analytic path lives in an ideal pinhole image of size cfg['resolution'];
     with `intrinsics` the blob is drawn at its lens-distorted pixel instead, so the
     stack resembles the real camera. Ground truth follows it (see `apparent_gt`).
+
+    The blob is an ellipse of semi-axes (radius * aspect, radius) at `angle`, and an
+    optional `string` is a line from a fixed pivot to it, drawn underneath; a target
+    on a string hangs along it, as the brush targets in the real corpus do.
     """
     import cv2
 
@@ -42,9 +46,18 @@ def render_frames(spec: TrajectorySpec, cfg, intrinsics=None) -> np.ndarray:
     px = _path_pixels(spec, times, (w, h), intrinsics)
     frames = np.full((n, h, w), float(blob["bg_intensity"]), dtype=np.float32)
     radius = int(blob["radius_px"])
+    axes = (max(1, round(radius * float(blob.get("aspect", 1.0)))), max(1, radius))
+    angle_deg = np.degrees(float(blob.get("angle", 0.0)))
     fg = float(blob["fg_intensity"])
+    string = blob.get("string")
+    pivot = None if not string else np.array(string["pivot"], dtype=float) * (w, h)
     for i in range(n):
-        cv2.circle(frames[i], (round(px[i, 0]), round(px[i, 1])), radius, fg, thickness=-1)
+        centre = (round(px[i, 0]), round(px[i, 1]))
+        if pivot is not None:
+            cv2.line(frames[i], (round(pivot[0]), round(pivot[1])), centre,
+                     float(string["intensity"]), int(string["thickness_px"]))
+            angle_deg = np.degrees(np.arctan2(px[i, 1] - pivot[1], px[i, 0] - pivot[0]))
+        cv2.ellipse(frames[i], centre, axes, angle_deg, 0, 360, fg, thickness=-1)
     return frames
 
 

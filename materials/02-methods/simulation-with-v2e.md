@@ -50,19 +50,37 @@ the first 5 s, within 60 px of the ground truth and outside it:
 
 | | real | sim |
 |---|---|---|
-| target event rate (ev/s) | 82.0 k | 89.1 k |
-| ON fraction | 0.509 | 0.507 |
-| footprint: median event distance from gt (px) | 18.2 | 18.3 |
+| target event rate (ev/s) | 82.0 k | 82.0 k |
+| ON fraction | 0.509 | 0.505 |
+| footprint: median event distance from gt (px) | 18.2 | 17.9 |
+| trail: 90th pct of distance behind the target (px) | 19.6 | 17.4 |
 | noise far from target (ev/px/s) | 0.291 | 0.292 |
 
-Reached with blob radius 18 px, background 30 / blob 170 (8-bit), thresholds 0.2,
-sigma 0.03, shot noise 0.33 Hz/px (`params.yaml`). Starting values (radius 12, 64/128,
-noise 0.01) were 4.5x short on target rate and 36x short on noise. What the match does
-not capture: the string above the brush, and the brush's bristle texture -- the sim blob
-is a disc. `runs/match/` keeps the montage, `stats.json`, and both clips as `.npz` for
-`scripts/replay_gt.py`.
+Reached with blob radius 18 px, background 30 / blob 115 (8-bit), thresholds 0.2,
+sigma 0.03, shot noise 0.33 Hz/px, **photoreceptor filter off** (`params.yaml`).
+Starting values (radius 12, 64/128, noise 0.01) were 4.5x short on target rate and
+36x short on noise.
 
-## Domain randomisation
-For each generated clip, sample threshold, σ, noise rate, blob contrast, and a small random
-affine on the path within plausible ranges. A model trained across the spread transfers to
-real data far better than one trained on one idealised setting.
+**Why the filter is off.** v2e scales the photoreceptor time constant by 275/(I+20),
+so with a dark background (I = 30) the trailing edge of the blob decays with tau ~ 29 ms
+and OFF events dribble out for ~60-90 ms after the target has passed -- a trail the real
+camera does not show. On the slow fan clip this was invisible (trail 22.7 vs 19.6 px);
+on `pendulum/small_01` (~720 px/s) it was 36 px against 24 real, and 17 with the filter
+off. The real DVXplorer's bandwidth in room light is far above our motion, so no filter.
+
+**What the match does not capture**, seen on the pendulum clip: the real target there
+is a ~120 x 30 px brush hanging on a visible string, its scene noise is 2.6 ev/px/s
+(9x the fan's), and its rate 594 k/s. The corpus randomisation ranges were widened to
+span both clips, and the renderer draws elongated targets and strings (below).
+`runs/match*/` keep each comparison's montage, `stats.json`, and both clips as `.npz`
+for `scripts/replay_gt.py`.
+
+## Domain randomisation (`scripts/make_sim_dataset.py`)
+Per clip, from `sim.randomise`: threshold, sigma, shot noise, blob contrast, size, aspect
+(1 = disc to 4 = brush), angle, an optional string to a pivot above the frame (the target
+then hangs along it), and the path -- shape, size, period, position, rotation, half with
+a scripted deviation. 30 % of paths are exact; the rest carry small smooth imperfections
+(`trajectories.Wobble`: amplitude beating, slow centre wander, period jitter, slow
+growth/decay), each drawn from a range starting at zero, so the corpus runs from perfect
+to clearly imperfect without any of it looking like a deviation. A model trained across
+the spread transfers to real data far better than one trained on one idealised setting.

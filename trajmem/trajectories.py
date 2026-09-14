@@ -19,6 +19,18 @@ class Deviation:
 
 
 @dataclass
+class Wobble:
+    """Small, smooth imperfections a real repetitive motion has. All zero = perfect."""
+    amp_depth: float = 0.0                    # size x (1 + depth sin(2 pi t / amp_period)): beating
+    amp_period_s: float = 1.0
+    drift: tuple[float, float] = (0.0, 0.0)   # centre wanders by (dx sin, dy cos)(2 pi t / drift_period)
+    drift_period_s: float = 1.0
+    phase_depth: float = 0.0                  # phase + depth sin(2 pi t / phase_period): period jitter
+    phase_period_s: float = 1.0
+    growth: float = 0.0                       # size x (1 + growth t): slow gain or decay
+
+
+@dataclass
 class TrajectorySpec:
     shape: Shape
     size: tuple[float, float]          # circle: (r, r); ellipse/figure8: (a, b); lissajous: (A, B)
@@ -28,6 +40,7 @@ class TrajectorySpec:
     lissajous: tuple[float, float, float] = (3.0, 2.0, np.pi / 2)  # (a, b, delta)
     rotation: float = 0.0              # radians, turns the path about its centre
     deviations: list[Deviation] = field(default_factory=list)
+    wobble: Wobble | None = None
 
 
 def sample(spec: TrajectorySpec, t):
@@ -39,6 +52,8 @@ def sample(spec: TrajectorySpec, t):
     phi = _phase(spec, t)
     sx, sy = _size(spec, t)
     cx, cy = _center(spec, t)
+    if spec.wobble is not None:
+        phi, sx, sy, cx, cy = _wobbled(spec.wobble, t, phi, sx, sy, cx, cy)
     ox, oy = _offset_with_switches(spec, sx, sy, phi, t)
     c, s = np.cos(spec.rotation), np.sin(spec.rotation)
     return np.stack([cx + c * ox - s * oy, cy + s * ox + c * oy], axis=-1)
@@ -83,6 +98,15 @@ def _center(spec: TrajectorySpec, t):
             cx = cx + vx * dt
             cy = cy + vy * dt
     return cx, cy
+
+
+def _wobbled(w: Wobble, t, phi, sx, sy, cx, cy):
+    two_pi = 2.0 * np.pi
+    phi = phi + w.phase_depth * np.sin(two_pi * t / w.phase_period_s)
+    gain = (1.0 + w.amp_depth * np.sin(two_pi * t / w.amp_period_s)) * (1.0 + w.growth * t)
+    cx = cx + w.drift[0] * np.sin(two_pi * t / w.drift_period_s)
+    cy = cy + w.drift[1] * np.cos(two_pi * t / w.drift_period_s)
+    return phi, sx * gain, sy * gain, cx, cy
 
 
 def _offset_with_switches(spec: TrajectorySpec, sx, sy, phi, t):

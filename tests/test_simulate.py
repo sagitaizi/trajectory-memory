@@ -154,3 +154,46 @@ def test_saved_simulated_clip_keeps_the_apparent_ground_truth(tmp_path):
     back = load_clip(save_clip(clip, tmp_path / "c"))
     t = np.linspace(0, 0.05, 5)
     assert np.allclose(back.gt(t), clip.gt(t))
+
+
+def _blob_axes(frame, bg):
+    """Semi-axis lengths of the lit region, from its second moments."""
+    ys, xs = np.where(frame > bg)
+    cov = np.cov(np.stack([xs, ys]))
+    return 2 * np.sqrt(np.sort(np.linalg.eigvalsh(cov))[::-1])   # uniform ellipse: a = 2 sigma
+
+
+def test_render_frames_draws_an_elongated_target_with_the_given_aspect():
+    cfg = {**SIM_CFG, "resolution": [160, 120],
+           "blob": {**SIM_CFG["blob"], "radius_px": 6, "aspect": 3.0, "angle": 0.0}}
+    spec = TrajectorySpec(shape="circle", size=(0.0, 0.0), period_s=1.0)   # sits still
+    frame = render_frames(spec, cfg)[0]
+    long, short = _blob_axes(frame, cfg["blob"]["bg_intensity"])
+    assert 2.4 < long / short < 3.6
+    ys, xs = np.where(frame > cfg["blob"]["bg_intensity"])
+    assert np.ptp(xs) > np.ptp(ys)                                # angle 0: long axis along x
+
+
+def test_render_frames_draws_a_string_from_the_pivot_to_the_target():
+    cfg = {**SIM_CFG, "resolution": [160, 120],
+           "blob": {**SIM_CFG["blob"], "radius_px": 4,
+                    "string": {"pivot": [0.5, -0.5], "thickness_px": 1, "intensity": 100}}}
+    spec = TrajectorySpec(shape="circle", size=(0.0, 0.0), period_s=1.0)
+    frame = render_frames(spec, cfg)[0]
+    column = frame[:, 80]
+    assert (column[:50] == 100).all()                             # string above the blob
+    assert column[60] == cfg["blob"]["fg_intensity"]              # blob drawn on top
+    assert (frame[:50, 70] == cfg["blob"]["bg_intensity"]).all()   # nothing beside it
+
+    plain = render_frames(spec, {**cfg, "blob": {**cfg["blob"], "string": None}})[0]
+    assert (plain[:50, 80] == cfg["blob"]["bg_intensity"]).all()
+
+
+def test_an_elongated_target_on_a_string_hangs_along_it():
+    cfg = {**SIM_CFG, "resolution": [160, 120],
+           "blob": {**SIM_CFG["blob"], "radius_px": 4, "aspect": 3.0, "angle": 0.0,
+                    "string": {"pivot": [0.5, -0.5], "thickness_px": 1, "intensity": 100}}}
+    spec = TrajectorySpec(shape="circle", size=(0.0, 0.0), period_s=1.0)
+    frame = render_frames(spec, cfg)[0]
+    ys, xs = np.where(frame == cfg["blob"]["fg_intensity"])
+    assert np.ptp(ys) > np.ptp(xs)                                # long axis along the string

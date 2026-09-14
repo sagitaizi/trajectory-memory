@@ -25,28 +25,40 @@ from scripts.mark_anchors import accumulate  # noqa: E402
 from trajmem.data import Clip, load_recording, load_sim, save_clip, sim_params  # noqa: E402
 from trajmem.trajectories import fit_ellipse  # noqa: E402
 
-STATS = ("target_rate", "on_fraction", "footprint_px", "noise_rate_per_px")
+STATS = ("target_rate", "on_fraction", "footprint_px", "trail_px", "noise_rate_per_px")
 
 
 def event_stats(clip: Clip, resolution, radius_px: float) -> dict:
     """Rate, polarity and spread of events within `radius_px` of gt; noise rate outside.
 
-    Events at instants where gt is unknown (NaN) are left out of both.
+    `trail_px` is how far behind the target, along its direction of motion, the
+    near events reach (90th percentile) -- a lagging photoreceptor shows up here.
+    Events at instants where gt is unknown (NaN) are left out of everything.
     """
     w, h = resolution
+    scale = np.array([w, h], dtype=float)
     ev = clip.events
     t = ev["timestamp"] / 1e6
-    target = np.atleast_2d(clip.gt(t)) * np.array([w, h], dtype=float)
-    d = np.hypot(ev["x"] - target[:, 0], ev["y"] - target[:, 1])
+    target = np.atleast_2d(clip.gt(t)) * scale
+    offset = np.column_stack([ev["x"] - target[:, 0], ev["y"] - target[:, 1]])
+    d = np.hypot(*offset.T)
     known = np.isfinite(d)
     near = known & (d <= radius_px)
     far = known & ~near
+
+    dt = 1e-3
+    vel = (np.atleast_2d(clip.gt(t[near] + dt)) - np.atleast_2d(clip.gt(t[near] - dt))) * scale / (2 * dt)
+    speed = np.hypot(*vel.T)
+    moving = speed > 1.0
+    along = np.einsum("ij,ij->i", offset[near][moving], vel[moving]) / speed[moving]
+    behind = np.clip(-along, 0.0, None)
 
     seconds = clip.duration_us / 1e6
     return {
         "target_rate": float(near.sum() / seconds),
         "on_fraction": float(ev["polarity"][near].mean()) if near.any() else float("nan"),
         "footprint_px": float(np.median(d[near])) if near.any() else float("nan"),
+        "trail_px": float(np.percentile(behind, 90)) if moving.any() else float("nan"),
         "noise_rate_per_px": float(far.sum() / seconds / (w * h - np.pi * radius_px ** 2)),
     }
 

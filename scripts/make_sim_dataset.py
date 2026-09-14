@@ -4,8 +4,9 @@ matched camera model, each with exact ground truth.
     python scripts/make_sim_dataset.py --n 100 --duration 15 --out corpus/sim
 
 Every clip draws its own path (shape, size, period, position, angle; half get one
-scripted deviation in the middle third) and its own camera settings from the
-`sim.randomise` ranges in params.yaml. Clip i depends only on (--seed, i), so a run
+scripted deviation in the middle third; most get small smooth imperfections, some
+stay perfect), its own target (aspect, angle, an optional string to a pivot) and
+its own camera settings, all from the `sim.randomise` ranges in params.yaml. Clip i depends only on (--seed, i), so a run
 that is killed resumes by skipping the files already written. Watch a clip with
 `python scripts/replay_gt.py corpus/sim/sim_000.npz`.
 """
@@ -24,10 +25,11 @@ import _thesis_path  # noqa: F401,E402  (adds the thesis repo to sys.path)
 import numpy as np  # noqa: E402
 
 from trajmem.data import load_clip, load_sim, save_clip, sim_params  # noqa: E402
-from trajmem.trajectories import Deviation, TrajectorySpec, sample  # noqa: E402
+from trajmem.trajectories import Deviation, TrajectorySpec, Wobble, sample  # noqa: E402
 
-MANIFEST_FIELDS = ("name", "shape", "period_s", "deviation", "deviation_t", "seed",
-                   "pos_thres", "sigma_thres", "shot_noise_rate_hz", "fg_intensity", "radius_px")
+MANIFEST_FIELDS = ("name", "shape", "period_s", "deviation", "deviation_t", "wobble", "seed",
+                   "pos_thres", "sigma_thres", "shot_noise_rate_hz", "fg_intensity", "radius_px",
+                   "aspect", "string")
 _SWITCH_TARGETS = ("circle", "ellipse", "figure8", "lissajous")
 
 
@@ -53,6 +55,7 @@ def random_spec(rng: np.random.Generator, path_cfg: dict, duration_s: float) -> 
             phase0=float(rng.uniform(0, 2 * np.pi)),
             rotation=float(rng.uniform(0, np.pi)),
             deviations=_random_deviations(rng, path_cfg, duration_s, shape),
+            wobble=_random_wobble(rng, path_cfg["wobble"]),
         )
         pos = sample(spec, np.linspace(0, duration_s, int(200 * duration_s) + 1))
         if pos.min() >= margin and pos.max() <= 1 - margin:
@@ -78,6 +81,20 @@ def _random_deviations(rng, path_cfg, duration_s, shape) -> list[Deviation]:
     return [Deviation(at_t=at_t, kind=str(kind), params=params)]
 
 
+def _random_wobble(rng, cfg) -> Wobble | None:
+    """None for a perfect path; otherwise every term drawn on its own, so the spread
+    runs from barely imperfect to clearly wobbly."""
+    if rng.uniform() < cfg["perfect_fraction"]:
+        return None
+    u = lambda key: float(rng.uniform(*cfg[key]))  # noqa: E731
+    return Wobble(
+        amp_depth=u("amp_depth"), amp_period_s=u("amp_period_s"),
+        drift=(u("drift"), u("drift")), drift_period_s=u("drift_period_s"),
+        phase_depth=u("phase_depth"), phase_period_s=u("phase_period_s"),
+        growth=u("growth"),
+    )
+
+
 def random_sim_cfg(rng: np.random.Generator, sim_cfg: dict) -> dict:
     """A copy of `sim_cfg` with the `randomise` ranges drawn and dropped."""
     cfg = copy.deepcopy(sim_cfg)
@@ -85,8 +102,19 @@ def random_sim_cfg(rng: np.random.Generator, sim_cfg: dict) -> dict:
     for key in ("pos_thres", "sigma_thres", "shot_noise_rate_hz"):
         cfg["v2e"][key] = float(rng.uniform(*ranges[key]))
     cfg["v2e"]["neg_thres"] = cfg["v2e"]["pos_thres"]
-    cfg["blob"]["fg_intensity"] = float(rng.uniform(*ranges["fg_intensity"]))
-    cfg["blob"]["radius_px"] = int(rng.integers(ranges["radius_px"][0], ranges["radius_px"][1] + 1))
+    blob = cfg["blob"]
+    blob["fg_intensity"] = float(rng.uniform(*ranges["fg_intensity"]))
+    blob["radius_px"] = int(rng.integers(ranges["radius_px"][0], ranges["radius_px"][1] + 1))
+    blob["aspect"] = float(rng.uniform(*ranges["aspect"]))
+    blob["angle"] = float(rng.uniform(0, np.pi))
+    blob["string"] = None
+    if rng.uniform() < ranges["string_fraction"]:
+        lo, hi = ranges["string_thickness_px"]
+        blob["string"] = {                       # the pivot sits above the frame
+            "pivot": [float(rng.uniform(0.1, 0.9)), float(rng.uniform(-0.6, -0.05))],
+            "thickness_px": int(rng.integers(lo, hi + 1)),
+            "intensity": float(rng.uniform(*ranges["string_intensity"])),
+        }
     return cfg
 
 
@@ -99,12 +127,15 @@ def manifest_row(name: str, clip) -> dict:
         "period_s": f"{spec.period_s:.4f}",
         "deviation": dev.kind if dev else "",
         "deviation_t": f"{dev.at_t:.3f}" if dev else "",
+        "wobble": "" if spec.wobble is None else "yes",
         "seed": clip.meta["seed"],
         "pos_thres": f"{cfg['v2e']['pos_thres']:.4f}",
         "sigma_thres": f"{cfg['v2e']['sigma_thres']:.4f}",
         "shot_noise_rate_hz": f"{cfg['v2e']['shot_noise_rate_hz']:.4f}",
         "fg_intensity": f"{cfg['blob']['fg_intensity']:.1f}",
         "radius_px": cfg["blob"]["radius_px"],
+        "aspect": f"{cfg['blob']['aspect']:.2f}",
+        "string": "yes" if cfg["blob"].get("string") else "",
     }
 
 

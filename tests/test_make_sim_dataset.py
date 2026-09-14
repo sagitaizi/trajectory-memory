@@ -14,6 +14,13 @@ PATH_CFG = {
     "semi_axis": [0.05, 0.35],
     "margin": 0.03,
     "deviation_fraction": 0.5,
+    "wobble": {
+        "perfect_fraction": 0.3,
+        "amp_depth": [0.0, 0.08], "amp_period_s": [3.0, 12.0],
+        "drift": [0.0, 0.02], "drift_period_s": [4.0, 15.0],
+        "phase_depth": [0.0, 0.15], "phase_period_s": [3.0, 10.0],
+        "growth": [-0.02, 0.03],
+    },
 }
 SIM_CFG = {
     "resolution": [64, 48], "fps": 200, "duration_s": 0.2,
@@ -24,6 +31,8 @@ SIM_CFG = {
     "randomise": {
         "pos_thres": [0.15, 0.30], "sigma_thres": [0.01, 0.06],
         "shot_noise_rate_hz": [0.0, 0.1], "fg_intensity": [120, 220], "radius_px": [2, 5],
+        "aspect": [1.0, 4.0],
+        "string_fraction": 0.5, "string_intensity": [60, 150], "string_thickness_px": [1, 3],
         "path": PATH_CFG,
     },
 }
@@ -57,6 +66,33 @@ def test_random_spec_covers_every_shape_and_puts_deviations_in_the_middle_third(
     assert kinds == {"shrink", "speed_change", "drift", "switch_shape"}
 
 
+def test_random_spec_leaves_some_paths_perfect_and_wobbles_the_rest_with_variety():
+    specs = [random_spec(np.random.default_rng(i), PATH_CFG, duration_s=12.0) for i in range(100)]
+    perfect = [s for s in specs if s.wobble is None]
+    assert 15 <= len(perfect) <= 45
+    wobbly = [s.wobble for s in specs if s.wobble is not None]
+    w = PATH_CFG["wobble"]
+    for wb in wobbly:
+        assert w["amp_depth"][0] <= wb.amp_depth <= w["amp_depth"][1]
+        assert w["growth"][0] <= wb.growth <= w["growth"][1]
+        assert 0 <= wb.drift[0] <= w["drift"][1] and 0 <= wb.drift[1] <= w["drift"][1]
+    assert np.std([wb.amp_depth for wb in wobbly]) > 0.01           # spread, not one value
+    assert min(wb.amp_depth + wb.phase_depth + abs(wb.growth) for wb in wobbly) < 0.05   # some near-perfect
+
+
+def test_random_sim_cfg_draws_shape_and_string():
+    cfgs = [random_sim_cfg(np.random.default_rng(i), SIM_CFG) for i in range(60)]
+    aspects = [c["blob"]["aspect"] for c in cfgs]
+    assert min(aspects) >= 1.0 and max(aspects) <= 4.0 and np.std(aspects) > 0.3
+    assert all(0 <= c["blob"]["angle"] < np.pi for c in cfgs)
+    strung = [c for c in cfgs if c["blob"]["string"]]
+    assert 15 <= len(strung) <= 45
+    for c in strung:
+        st = c["blob"]["string"]
+        assert st["pivot"][1] < 0.0                                  # above the frame
+        assert 60 <= st["intensity"] <= 150 and 1 <= st["thickness_px"] <= 3
+
+
 def test_random_sim_cfg_draws_inside_the_ranges_and_keeps_thresholds_symmetric():
     cfg = random_sim_cfg(np.random.default_rng(0), SIM_CFG)
     r = SIM_CFG["randomise"]
@@ -81,7 +117,8 @@ def test_main_writes_clips_and_a_manifest_and_resumes(tmp_path):
     with open(out / "manifest.csv", newline="") as fh:
         rows = list(csv.DictReader(fh))
     assert [r["name"] for r in rows] == ["sim_000", "sim_001"]
-    assert {"shape", "period_s", "deviation", "deviation_t", "pos_thres", "radius_px"} <= rows[0].keys()
+    assert {"shape", "period_s", "deviation", "deviation_t", "pos_thres", "radius_px",
+            "aspect", "string", "wobble"} <= rows[0].keys()
 
     clip = load_clip(files[1])
     assert clip.gt is not None and len(clip.events) > 0

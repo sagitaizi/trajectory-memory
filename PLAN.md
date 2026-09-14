@@ -75,13 +75,17 @@ inference.
   footprint and noise floor against the real clip; all four now agree within 10 %
   (`materials/02-methods/simulation-with-v2e.md`). `params.yaml` carries the matched values.
 - **Simulated corpus** (`scripts/make_sim_dataset.py`, started 2026-09-15): 100 clips x 15 s
-  into `corpus/sim/` with a `manifest.csv`, ~77 s per clip at 650 fps. Each clip draws a
+  into `corpus/sim/` with a `manifest.csv`, ~2-3 min per clip at 650 fps. Each clip draws a
   random path (circle, ellipse, straight sweep, figure-8, Lissajous; period 0.8-4 s; half
-  with one scripted deviation in the middle third) and its own camera settings from
-  `sim.randomise`. Clip i depends only on (seed, i), so a killed run resumes.
+  with one scripted deviation in the middle third; 30 % exact, the rest with small smooth
+  imperfections), a random target (disc to brush-like, half on a string) and its own camera
+  settings from `sim.randomise`. Clip i depends only on (seed, i), so a killed run resumes —
+  which also means stale clips must be deleted by hand before a regeneration.
   Ground truth on simulated clips is the target's **apparent** (lens-distorted) position,
   the same thing hand-labels record on real clips — the ideal path would put a
   lens-shaped offset of up to ~50 px in the corners between the two.
+  First run was discarded: v2e's photoreceptor filter left an event trail behind fast
+  targets; it is now off (`materials/02-methods/simulation-with-v2e.md`).
 - **Done when:** a simulated clip and a real clip load through the same path ✅; sim events
   resemble the real DVXplorer stream on a matched trajectory ✅; enough real clips
   carry ground truth to evaluate on (development set ✅, held-out pending).

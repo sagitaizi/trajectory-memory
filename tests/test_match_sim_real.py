@@ -43,3 +43,20 @@ def test_event_stats_skips_events_where_the_target_is_unknown():
     clip = a_clip([320] * 4, [240] * 4, ts, [1] * 4, gt)
     s = event_stats(clip, (640, 480), radius_px=50)
     assert s["target_rate"] == 2.0
+
+
+def test_event_stats_measures_how_far_events_trail_behind_the_target():
+    def moving_gt(t):                                   # 100 px/s along +x
+        t = np.asarray(t, dtype=float)
+        tt = np.atleast_1d(t)
+        out = np.stack([0.25 + 100 / 640 * tt, np.full_like(tt, 0.5)], axis=-1)
+        return out[0] if t.ndim == 0 else out
+
+    ts = np.linspace(100_000, 900_000, 9).astype(np.int64)
+    xs = np.rint(160 + 100 * ts / 1e6 - 10).astype(int)   # every event 10 px behind
+    clip = a_clip(xs, [240] * 9, ts, [1] * 9, moving_gt)
+    s = event_stats(clip, (640, 480), radius_px=50)
+    assert np.isclose(s["trail_px"], 10.0, atol=0.6)
+
+    ahead = a_clip(xs + 20, [240] * 9, ts, [1] * 9, moving_gt)   # 10 px ahead: no trail
+    assert np.isclose(event_stats(ahead, (640, 480), radius_px=50)["trail_px"], 0.0, atol=0.6)
