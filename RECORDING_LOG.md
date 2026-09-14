@@ -34,7 +34,7 @@ predict than a clean circle. GT = hand-labels + interpolation, not analytic.
 | Clip | Mean rate | Verdict |
 |---|---|---|
 | fan/fan_brush_slow_01 | 259 k/s | denoised rate rises ~10x over the clip (fan spin-up) — non-stationary, use with care or trim the ramp |
-| fan/fan_brush_slow_02 | 165 k/s | stats OK; frame check pending |
+| fan/fan_brush_slow_02 | 165 k/s | **Labelled** — a clean, rigid **ellipse** ~85 × 45 px, T = 1.20 s (50 rpm), 25 laps at constant amplitude. The only true 2-D loop in the development set and the closest real clip to the simulator's analytic paths. Brush behaved as if on a rod, not a swinging string |
 | fan/fan_brush_slow_03 | 166 k/s | stats OK; frame check pending |
 | fan/fan_brush_fast_01 | 218 k/s | stats OK; frame check pending |
 | fan/fan_brush_fast_02 | 200 k/s | stats OK; frame check pending |
