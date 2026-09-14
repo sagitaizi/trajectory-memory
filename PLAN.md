@@ -59,6 +59,11 @@ inference.
   Six development, eleven held-out, ~2,900 marks in all. 4b sits in development because
   its marginal SNR is where the localiser will be stressed. 4a is kept as a *different*
   condition — the whole scene moves, not just the target — worth one row in §V.
+  A clip can serve more than once: `loop_break_01` is a diagonal sweep, then a break,
+  then a horizontal sweep — two repetitive segments and a deviation with a known path
+  on both sides. Using segments needs a time-window slice of `Clip` (events rebased,
+  `gt` and break times shifted) — the same thing that trims `wide_02`'s 5 s settling
+  transient — to be added to `data.py` when Phase B starts consuming clips.
   Everything else in the corpus is spare. Excluded on purpose: `fan_brush_slow_01`
   (10× rate ramp), `fan_blade_01` (extended object), `fan_two_strings_01` (two targets —
   out of scope), `updown_02` (singleton), `loop_02` (leaves frame), `scan_pan_fast_02`
