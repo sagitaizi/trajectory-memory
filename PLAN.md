@@ -22,7 +22,7 @@ inference.
 | Phase | Status |
 |---|---|
 | A — Data | 🟨 Corpus recorded (54 clips) and code in place; **labelling is the open work** |
-| B — Frontend + baseline | ⬜ |
+| B — Frontend + baseline | ✅ Done 2026-09-16; first numbers below |
 | C — Trajectory memory (Stage 1, frames) | ⬜ The goal |
 | D — Deviation detection | ⬜ In scope |
 | E — Raw events (Stage 2) | ⬜ Upside only |
@@ -91,13 +91,32 @@ inference.
   carry ground truth to evaluate on (development set ✅, held-out pending).
 - **Unlocks:** §IV-A's contrast-threshold and noise holes; clears the §IV-B ground-truth caveat.
 
-### B — Frontend + baseline
-- `frontend.py`: `frames` (accumulate → images/time surfaces, reusing the main repo's
-  `pipeline`), `position` (classical centroid).
-- `baseline.py`: Kalman with a periodic-motion model; Fourier/harmonic fit.
-- `metrics.py`: prediction error, lock-on time, deviation ROC + detection latency.
+### B — Frontend + baseline ✅
+- `frontend.py`: `to_frames` (ON/OFF count frames, optional block downsample; time
+  surfaces via the main repo's `pipeline.time_surface`), `to_position` (dense-cell
+  centroid, robust to noise and to a string). `to_raw` waits for E.
+- `baseline.py`: `PeriodicKalman` (harmonic state, normalised-innovation surprise) and
+  `HarmonicFit` (sliding least-squares harmonics); both estimate the period from a 3 s
+  warm-up and keep it. `data.slice_clip` cuts a time window into a clip of its own.
+- `metrics.py` per `materials/02-methods/metrics.md`; `experiment.evaluate_clip` is the
+  one loop every method goes through; `scripts/run_experiment.py` prints the scorecard;
+  `scripts/replay_gt.py --model kalman` draws a memory's output live over the clip.
+- **First numbers** (5 ms windows, 100 ms horizon, px, median over the steady part):
+
+  | Clip | Localiser vs labels | Kalman | Harmonic | Note |
+  |---|---|---|---|---|
+  | matched sim (fan ellipse) | 3.0 | 2.6 | 3.1 | exact ground truth |
+  | `fan_brush_slow_02` | 5.7 | 7.9 | 7.2 | labels carry ~4.5 px themselves |
+  | `pendulum/small_01` | 27.5 | 26.2 | 31.1 | almost all a constant −27 px vertical offset between the event centroid and the marked brush centre; 4 px sideways |
+  | `pendulum/wide_break` | — | 42.0 | 44.8 | break at 13.2 s: Kalman AUC 0.83, latency 1.4 s; harmonic AUC 0.56 |
+
+  The pendulum's offset is a labelling-convention gap, not tracking error; it sets a
+  floor on any pendulum prediction error scored against the labels and needs a stated
+  treatment in §IV-D (score against the frontend's own track, or subtract the offset).
+  The false-alarm column of the scorecard is circular until D picks thresholds on
+  development clips.
 - **Done when:** the classical baseline predicts a clean simulated circle within a stated
-  tolerance and the metrics reproduce on a fixed clip.
+  tolerance ✅ (2.6 px at 100 ms); the metrics reproduce on a fixed clip ✅.
 - **Unlocks:** §III-B's window values; §IV-C's tuned baseline settings.
 
 ### C — Trajectory memory, Stage 1 (the goal)

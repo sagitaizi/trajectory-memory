@@ -3,11 +3,16 @@
     python scripts/replay_gt.py corpus/real/wall/scan_pan_slow_01
     python scripts/replay_gt.py corpus/real/wall/scan_pan_slow_01 --gt-scale 1.307
     python scripts/replay_gt.py corpus/real/wall/scan_pan_slow_01 --save
+    python scripts/replay_gt.py corpus/real/fan/fan_brush_slow_02 --model kalman
 
 Plays accumulated event frames with a crosshair at gt(t), a fading trail of where the
 ground truth has just been, the marked anchor, and a HUD. The point is to catch a
 ground truth whose *shape* is right but whose scale or sign is not: a marker that
 drifts off the target over a sweep is a calibration error, not a labelling one.
+
+With --model a memory (a baseline now, the SNN later) runs over the clip first and
+its output is drawn live: the measured position (cyan), the prediction for t+horizon
+(magenta, joined to it), and the error and surprise score in a second HUD line.
 
 Needs a clip that has ground truth -- a marked anchor (Setup 4a) or hand-labels.
 """
@@ -101,8 +106,46 @@ def _ticks_at(track, t0_us: int, t: float):
     return track.position_at(int(t0_us + t * 1e6))
 
 
+class ModelOverlay:
+    """A memory's per-step trace, looked up at the instant a frame shows."""
+
+    def __init__(self, trace, resolution, name: str):
+        self.trace, self.scale, self.name = trace, np.array(resolution, dtype=float), name
+
+    def at(self, t: float) -> dict:
+        i = int(np.clip(np.searchsorted(self.trace.t, t), 0, len(self.trace.t) - 1))
+        if i > 0 and abs(self.trace.t[i - 1] - t) < abs(self.trace.t[i] - t):
+            i -= 1
+        pred = self.trace.pred[i] * self.scale
+        err = np.hypot(*(pred - self.trace.gt_ahead[i] * self.scale))
+        return {"obs_px": self.trace.obs[i] * self.scale, "pred_px": pred,
+                "score": float(self.trace.score[i]), "err_px": float(err),
+                "horizon_s": self.trace.horizon_s}
+
+
+def _draw_model(view, step: dict, name: str, z: float) -> None:
+    import cv2
+
+    ox, oy = step["obs_px"]
+    px, py = step["pred_px"]
+    if not np.isnan(px):
+        p = (int(round(px * z)), int(round(py * z)))
+        if not np.isnan(ox):
+            cv2.line(view, (int(round(ox * z)), int(round(oy * z))), p, (255, 0, 255), 1)
+        cv2.circle(view, p, 10, (255, 0, 255), 2)
+    if not np.isnan(ox):
+        cv2.circle(view, (int(round(ox * z)), int(round(oy * z))), 4, (255, 220, 0), -1)
+    err = "err  n/a" if np.isnan(step["err_px"]) else f"err {step['err_px']:5.1f} px"
+    hud = f"{name}  +{step['horizon_s'] * 1000:.0f} ms: {err}   surprise {step['score']:5.2f}"
+    cv2.putText(view, hud, (8, view.shape[0] - 32), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                (255, 0, 255), 1, cv2.LINE_AA)
+    bar = int(min(step["score"], 10.0) / 10.0 * 120)
+    cv2.rectangle(view, (view.shape[1] - 130, view.shape[0] - 40),
+                  (view.shape[1] - 130 + bar, view.shape[0] - 28), (255, 0, 255), -1)
+
+
 def _draw(img, gt_px, trail_px, anchor, view_zoom, label, t, view_window_s,
-          view_brightness, ticks, gt_scale=1.0):
+          view_brightness, ticks, gt_scale=1.0, model=None):
     import cv2
 
     z = view_zoom
@@ -141,6 +184,8 @@ def _draw(img, gt_px, trail_px, anchor, view_zoom, label, t, view_window_s,
                 (0, 220, 255), 1, cv2.LINE_AA)
     cv2.putText(view, _HELP, (8, view.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX,
                 0.42, (190, 190, 190), 1, cv2.LINE_AA)
+    if model is not None:
+        _draw_model(view, model["step"], model["name"], z)
     return view
 
 
@@ -156,7 +201,7 @@ def _motor_track(clip):
 
 
 def render(clip, t: float, view_window_s: float, view_brightness: int, trail_s: float,
-           view_zoom: float, label: str, track=None):
+           view_zoom: float, label: str, track=None, overlay: ModelOverlay | None = None):
     """One overlaid frame: events in [t, t+view_window) with the ground truth on top.
 
     The marker is sampled at the window's *centre*, not its start: the displayed
@@ -172,7 +217,8 @@ def render(clip, t: float, view_window_s: float, view_brightness: int, trail_s: 
     return _draw(img, gt_px, trail_px, anchor[:2] if anchor else None, view_zoom,
                  label, t, view_window_s, view_brightness,
                  _ticks_at(track, clip.meta.get("t0_device_us", 0), mid),
-                 clip.meta.get("gt_scale", 1.0))
+                 clip.meta.get("gt_scale", 1.0),
+                 None if overlay is None else {"step": overlay.at(mid), "name": overlay.name})
 
 
 def open_clip(path):
@@ -185,13 +231,13 @@ def open_clip(path):
 
 
 def save(clip, path, fps: float, view_window_s: float, view_brightness: int,
-         trail_s: float, view_zoom: float, label: str) -> pathlib.Path:
+         trail_s: float, view_zoom: float, label: str, overlay=None) -> pathlib.Path:
     import cv2
 
     track = _motor_track(clip)
     times = frame_times(clip.duration_us / 1e6, fps)
     first = render(clip, times[0], view_window_s, view_brightness, trail_s, view_zoom,
-                   label, track)
+                   label, track, overlay)
     h, w = first.shape[:2]
 
     path = pathlib.Path(path)
@@ -201,14 +247,14 @@ def save(clip, path, fps: float, view_window_s: float, view_brightness: int,
         writer.write(first)
         for t in times[1:]:
             writer.write(render(clip, t, view_window_s, view_brightness, trail_s,
-                                view_zoom, label, track))
+                                view_zoom, label, track, overlay))
     finally:
         writer.release()
     return path
 
 
 def play(clip, fps: float, view_window_s: float, view_brightness: int, trail_s: float,
-         view_zoom: float, label: str) -> None:
+         view_zoom: float, label: str, overlay=None) -> None:
     import cv2
 
     track = _motor_track(clip)
@@ -220,7 +266,7 @@ def play(clip, fps: float, view_window_s: float, view_brightness: int, trail_s: 
     try:
         while True:
             cv2.imshow(_WINDOW, render(clip, times[i], view_window_s, view_brightness,
-                                       trail_s, view_zoom, label, track))
+                                       trail_s, view_zoom, label, track, overlay))
             if cv2.getWindowProperty(_WINDOW, cv2.WND_PROP_VISIBLE) < 1:
                 break                           # the human closed the window
             key = cv2.waitKeyEx(delay if playing else 20)
@@ -274,6 +320,9 @@ def main() -> None:
                    help="the one flag that changes the ground truth: divides "
                         "ticks_per_radian by F, widening the predicted sweep F-fold. "
                         "Nothing on disk is written either way")
+    p.add_argument("--model", metavar="NAME", help="draw a memory's live output (kalman, harmonic)")
+    p.add_argument("--horizon", type=float, default=0.1, help="model prediction horizon (s)")
+    p.add_argument("--window-us", type=int, default=5000, help="model input window")
     p.add_argument("--save", nargs="?", const="", metavar="PATH",
                    help="write a video instead of opening a window "
                         "(default runs/replay/<slug>.mp4)")
@@ -285,15 +334,24 @@ def main() -> None:
     if args.gt_scale != 1.0:
         clip = rescale_gt(clip, args.gt_scale)
 
+    overlay = None
+    if args.model:
+        from trajmem.experiment import evaluate_clip, make_memory
+
+        memory = make_memory(args.model, dt_s=args.window_us / 1e6)
+        trace = evaluate_clip(memory, clip, args.window_us, args.horizon)
+        overlay = ModelOverlay(trace, clip.meta["resolution"], args.model)
+        label = f"{label} + {args.model}"
+
     if args.save is None:
         play(clip, args.fps, args.view_window, args.view_brightness, args.trail,
-             args.view_zoom, label)
+             args.view_zoom, label, overlay)
         return
 
     out = (pathlib.Path(args.save) if args.save
-           else pathlib.Path("runs/replay") / f"{label}.mp4")
+           else pathlib.Path("runs/replay") / f"{label.replace(' + ', '_')}.mp4")
     print("wrote", save(clip, out, args.fps, args.view_window, args.view_brightness,
-                        args.trail, args.view_zoom, label))
+                        args.trail, args.view_zoom, label, overlay))
 
 
 if __name__ == "__main__":

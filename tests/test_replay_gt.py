@@ -106,3 +106,30 @@ def test_open_clip_reads_a_saved_simulated_clip(tmp_path):
     assert clip.gt is not None
     frame = render(clip, 0.02, 0.01, 40, 0.05, 1.0, label)   # a sim clip has no motor HUD
     assert frame.shape[0] > 0
+
+
+# --- model overlay -------------------------------------------------------------
+
+def test_model_overlay_looks_up_the_trace_step_and_draws(tmp_path):
+    from scripts.replay_gt import ModelOverlay, render
+    from trajmem.experiment import Trace
+
+    t = np.array([0.0025, 0.0075, 0.0125])
+    trace = Trace(t=t, obs=np.array([[0.1, 0.2], [0.11, 0.21], [np.nan, np.nan]]),
+                  pred=np.array([[0.2, 0.3], [0.21, 0.31], [0.22, 0.32]]),
+                  gt_ahead=np.array([[0.2, 0.3], [0.2, 0.3], [np.nan, np.nan]]),
+                  score=np.array([0.0, 1.5, 3.0]), horizon_s=0.1, window_us=5000)
+    ov = ModelOverlay(trace, (100, 100), "kalman")
+
+    step = ov.at(0.008)                                  # nearest: the second step
+    assert np.allclose(step["obs_px"], [11, 21]) and np.allclose(step["pred_px"], [21, 31])
+    assert step["score"] == 1.5 and step["err_px"] == pytest.approx(np.hypot(1, 1))
+    assert np.isnan(ov.at(0.0125)["obs_px"]).all() and np.isnan(ov.at(0.0125)["err_px"])
+
+    from trajmem.data import Clip
+    from trajmem.simulate import EVENT_DTYPE
+    ev = np.zeros(2, dtype=EVENT_DTYPE); ev["timestamp"] = [0, 10_000]
+    clip = Clip(events=ev, duration_us=20_000, gt=a_gt(lambda t: (0.2 + 0 * t, 0.3 + 0 * t)),
+                meta={"resolution": (100, 100)})
+    frame = render(clip, 0.0, 0.01, 40, 0.05, 1.0, "x", overlay=ov)
+    assert frame.shape[0] == 100 and frame[..., 2].max() > 0       # something drawn

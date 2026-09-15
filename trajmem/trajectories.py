@@ -148,7 +148,7 @@ def fit_ellipse(points, period_s: float | None = None) -> TrajectorySpec:
         raise ValueError("need at least five marks with a known position")
     t, xy = marks[:, 0], marks[:, 1:3]
     if period_s is None:
-        period_s = _search_period(t, xy)
+        period_s = search_period(t, xy)
 
     coef, _ = _harmonic_fit(t, xy, period_s)
     center = coef[0]
@@ -177,7 +177,7 @@ def _harmonic_fit(t, xy, period_s):
     return coef, float(np.sum((design @ coef - xy) ** 2))
 
 
-def _search_period(t, xy) -> float:
+def search_period(t, xy) -> float:
     """Period with the smallest harmonic-fit residual: a frequency grid, then a fine pass."""
     span = t.max() - t.min()
     f_lo, f_hi = 1.0 / span, 0.5 / np.median(np.diff(np.sort(t)))
