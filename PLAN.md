@@ -19,7 +19,7 @@ freely moving real target, with a break signal.
 |---|---|
 | A — Data | 🟨 Real corpus recorded and split; development set labelled; sim corpus generated. **Open: label the held-out clips.** |
 | B — Frontend + baselines | ✅ |
-| C — Trajectory memory, Stage 1 | ⬜ **Next.** Framework and architecture to be decided together (G-F). |
+| C — Trajectory memory, Stage 1 | ⬜ **Next.** Framework: snnTorch (G-F, provisional); architecture and training to be decided together. |
 | D — Deviation detection | ⬜ Scoring exists; thresholds must be chosen on development clips. |
 | E — Raw events, Stage 2 | ⬜ Only if Stage 1 lands. |
 | F — Paper | 🟨 Written as sections unlock; draft due 2026-10-01. |
@@ -113,16 +113,18 @@ freely moving real target, with a break signal.
 Per-section status in `PAPER_PROGRESS.md`. Results table: baseline vs Stage 1 (vs Stage 2),
 prediction + deviation; one external-dataset generalisation check; 8 pages IEEE.
 
-## Decision gate G-F — framework for the SNN core (OPEN)
+## Decision gate G-F — framework for the SNN core
 
-Decided together, after a short bake-off on simulated tracks. Unlocks §III-C/D.
+**snnTorch** (provisional, 2026-09-17; Sagi to confirm). Both parts — localiser and memory — in
+one framework; Nengo's LMU stays as an optional memory-core comparison. SpikingJelly was
+the alternative: 2.3× faster conv-localiser training with its fused CuPy kernels (0.15 vs
+0.35 s per step, T = 200, batch 8, RTX 3060) but its fast path needs an `np.int` shim on
+NumPy 2 and its plain-torch path is 6× slower than snnTorch; the recurrent memory gains
+nothing from fused kernels. Norse, Lava, Sinabs/Rockpool, Brian2, BindsNET ruled out
+(inactive, hardware-bound, or not for supervised regression). snnTorch exports to NIR,
+which supports the hardware-path claim. Installed: `snntorch 1.0.0`, `nengo 4.1.0`,
+`torch 2.14.0+cu126` on the RTX 3060; SpikingJelly and CuPy are installed but unpinned.
 
-- **Candidates.** Memory core: reservoir/LSM + online readout, Legendre Memory Unit (Nengo),
-  or surrogate-gradient spiking RNN (snnTorch). Localiser: topographic, so a small spiking
-  conv / WTA (snnTorch); NEF is the wrong shape for it. Raw events push toward
-  snnTorch/SpikingJelly or a custom reservoir rather than Nengo.
-- **Installed**: `snntorch 1.0.0`, `nengo 4.1.0`, `torch 2.14.0+cu126` on the RTX 3060
-  (6 GB). Not installed: SpikingJelly, Norse, Lava, nengo-dl.
 - **Inputs ready**: `corpus/sim/tracks.npz` (300 k position steps, half the clips with a
   break); frame sets via `make_frames.py --downsample d` (8× → 2×60×80 per 5 ms).
 - **One evaluation loop** for every candidate: `run_experiment.py --set development`.
