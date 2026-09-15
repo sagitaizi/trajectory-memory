@@ -3,6 +3,7 @@
 # `held_out` is labelled last and scored once, after the freeze. A `slice` is
 # [start_s, end_s] (null = the clip's end) cut with data.slice_clip; `name` labels a
 # slice in the results tables. Clips without ground truth yet are skipped by the runner.
+# `{glob: pattern}` stands for every clip the pattern matches (the simulated corpus).
 
 development:
   - {clip: corpus/real/pendulum/small_01}
@@ -26,3 +27,6 @@ held_out:
   - {clip: corpus/real/wall/scan_pan_slow_01}
   - {clip: corpus/real/wall/scan_both_slow_01}
   - {clip: corpus/real/wall/scan_diag_break_01}
+
+sim:
+  - {glob: corpus/sim/sim_*.npz}

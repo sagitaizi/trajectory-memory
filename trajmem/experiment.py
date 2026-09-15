@@ -78,7 +78,8 @@ def score_trace(trace: Trace, clip: Clip, tol_px: float, settle_s: float = 0.0,
 # --- clip sets --------------------------------------------------------------------
 
 def load_set(name: str, path=None) -> list[dict]:
-    """Entries of a named clip set from corpus/sets.yaml: clip path, display name, slice."""
+    """Entries of a named clip set from corpus/sets.yaml: clip path, display name, slice.
+    An entry `{glob: pattern}` stands for every clip the pattern matches."""
     import yaml
 
     sets = yaml.safe_load(Path(path or SETS_PATH).read_text(encoding="utf-8"))
@@ -86,6 +87,11 @@ def load_set(name: str, path=None) -> list[dict]:
         raise ValueError(f"no clip set {name!r}; one of {sorted(sets)}")
     out = []
     for e in sets[name] or []:
+        if "glob" in e:                                   # every matching clip, in name order
+            import glob
+
+            out += [{"clip": c, "name": Path(c).stem, "slice": None} for c in sorted(glob.glob(e["glob"]))]
+            continue
         window = e.get("slice")
         out.append({"clip": e["clip"], "name": e.get("name", Path(e["clip"]).name),
                     "slice": None if window is None else (window[0], window[1])})

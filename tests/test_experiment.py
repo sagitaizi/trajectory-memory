@@ -96,3 +96,15 @@ def test_run_set_scores_each_clip_and_pools_the_medians():
     assert pooled["error_px"]["median"] == pytest.approx(
         np.median([rows[0]["error_px"]["median"], rows[1]["error_px"]["median"]]))
     assert pooled["deviation"]["auc"] == rows[1]["deviation"]["auc"]   # the only break clip
+
+
+def test_load_set_expands_a_glob_entry(tmp_path):
+    from trajmem.experiment import load_set
+
+    for name in ("sim_001", "sim_000"):
+        (tmp_path / f"{name}.npz").write_bytes(b"")
+    sets = tmp_path / "sets.yaml"
+    sets.write_text(f"sim:\n  - {{glob: '{tmp_path.as_posix()}/sim_*.npz'}}\n")
+    entries = load_set("sim", sets)
+    assert [e["name"] for e in entries] == ["sim_000", "sim_001"]
+    assert entries[0]["clip"].endswith("sim_000.npz") and entries[0]["slice"] is None
