@@ -65,3 +65,34 @@ def test_make_memory_builds_the_named_baseline():
     assert isinstance(make_memory("harmonic", dt_s=0.005), HarmonicFit)
     with pytest.raises(ValueError):
         make_memory("nonsense", dt_s=0.005)
+
+
+# --- clip sets and pooled runs ---------------------------------------------------
+
+def test_load_set_reads_entries_with_optional_slices(tmp_path):
+    from trajmem.experiment import load_set
+
+    sets = tmp_path / "sets.yaml"
+    sets.write_text("development:\n"
+                    "  - {clip: a/b/c}\n"
+                    "  - {clip: a/b/c, slice: [6.0, null], name: c/steady}\n"
+                    "held_out: []\n")
+    entries = load_set("development", sets)
+    assert entries == [{"clip": "a/b/c", "name": "c", "slice": None},
+                       {"clip": "a/b/c", "name": "c/steady", "slice": (6.0, None)}]
+    assert load_set("held_out", sets) == []
+
+
+def test_run_set_scores_each_clip_and_pools_the_medians():
+    from trajmem.experiment import run_set
+
+    spec = a_spec(deviations=[Deviation(at_t=6.0, kind="shrink", params={"factor": 0.5})])
+    clips = [("one", a_clip_of_events(a_spec())), ("two", a_clip_of_events(spec, seed=1))]
+    rows, pooled = run_set(lambda: HarmonicFit(dt_s=0.005, warmup_s=3.0), clips,
+                           window_us=5000, horizon_s=0.1, tol_px=10.0, settle_s=4.0)
+    assert [r["name"] for r in rows] == ["one", "two"]
+    assert rows[0]["error_px"]["median"] < 6.0 and rows[1]["deviation"]["auc"] > 0.9
+    assert pooled["name"] == "pooled" and pooled["n_clips"] == 2
+    assert pooled["error_px"]["median"] == pytest.approx(
+        np.median([rows[0]["error_px"]["median"], rows[1]["error_px"]["median"]]))
+    assert pooled["deviation"]["auc"] == rows[1]["deviation"]["auc"]   # the only break clip

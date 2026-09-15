@@ -7,12 +7,15 @@ pretrain -> freeze -> evaluate run is added with Phase C.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
 from .data import Clip
 from .frontend import to_position
 from .metrics import deviation_roc, lock_on_time, prediction_error
+
+SETS_PATH = Path(__file__).resolve().parent.parent / "corpus" / "sets.yaml"
 
 
 @dataclass
@@ -69,4 +72,67 @@ def score_trace(trace: Trace, clip: Clip, tol_px: float, settle_s: float = 0.0,
         "deviation": deviation_roc(trace.score, trace.t, clip.deviation_times, threshold=threshold),
         "n_steps": int(len(trace.t)),
         "unseen_fraction": float(np.isnan(trace.obs[:, 0]).mean()),
+    }
+
+
+# --- clip sets --------------------------------------------------------------------
+
+def load_set(name: str, path=None) -> list[dict]:
+    """Entries of a named clip set from corpus/sets.yaml: clip path, display name, slice."""
+    import yaml
+
+    sets = yaml.safe_load(Path(path or SETS_PATH).read_text(encoding="utf-8"))
+    if name not in sets:
+        raise ValueError(f"no clip set {name!r}; one of {sorted(sets)}")
+    out = []
+    for e in sets[name] or []:
+        window = e.get("slice")
+        out.append({"clip": e["clip"], "name": e.get("name", Path(e["clip"]).name),
+                    "slice": None if window is None else (window[0], window[1])})
+    return out
+
+
+def open_set(name: str, path=None) -> list[tuple[str, Clip]]:
+    """The set's clips, loaded and sliced; entries without ground truth yet are skipped."""
+    from .data import load_clip, load_recording, slice_clip
+
+    clips = []
+    for e in load_set(name, path):
+        p = Path(e["clip"])
+        clip = load_clip(p) if p.suffix == ".npz" else load_recording(p)
+        if clip.gt is None:
+            continue
+        if e["slice"] is not None:
+            t0, t1 = e["slice"]
+            clip = slice_clip(clip, t0 or 0.0, clip.duration_us / 1e6 if t1 is None else t1)
+        clips.append((e["name"], clip))
+    return clips
+
+
+def run_set(make_memory_fn, clips, window_us: int, horizon_s: float, tol_px: float,
+            settle_s: float, threshold: float | None = None):
+    """Score a fresh memory on every clip; return the per-clip rows and a pooled row
+    (medians of the per-clip numbers; detection numbers over the break clips only)."""
+    rows = []
+    for name, clip in clips:
+        trace = evaluate_clip(make_memory_fn(), clip, window_us, horizon_s)
+        rows.append({"name": name, **score_trace(trace, clip, tol_px, settle_s, threshold)})
+    return rows, pool(rows)
+
+
+def pool(rows: list[dict]) -> dict:
+    def med(values):
+        v = [x for x in values if np.isfinite(x)]
+        return float(np.median(v)) if v else np.nan
+
+    breaks = [r for r in rows if np.isfinite(r["deviation"]["auc"])]
+    return {
+        "name": "pooled", "n_clips": len(rows),
+        "error_px": {"median": med(r["error_px"]["median"] for r in rows),
+                     "iqr": med(r["error_px"]["iqr"] for r in rows)},
+        "lock_on_s": med(r["lock_on_s"] for r in rows),
+        "deviation": {"auc": med(r["deviation"]["auc"] for r in breaks),
+                      "latency_s": med(r["deviation"]["latency_s"] for r in breaks),
+                      "fp_per_min": med(r["deviation"]["fp_per_min"] for r in rows)},
+        "unseen_fraction": med(r["unseen_fraction"] for r in rows),
     }

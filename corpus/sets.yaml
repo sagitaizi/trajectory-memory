@@ -1,0 +1,28 @@
+# Which real clips are used for what (PLAN.md, "Real-clip split", decided 2026-09-13).
+# Real clips are never trained on. `development` is looked at freely while building;
+# `held_out` is labelled last and scored once, after the freeze. A `slice` is
+# [start_s, end_s] (null = the clip's end) cut with data.slice_clip; `name` labels a
+# slice in the results tables. Clips without ground truth yet are skipped by the runner.
+
+development:
+  - {clip: corpus/real/pendulum/small_01}
+  - {clip: corpus/real/pendulum/wide_02, slice: [6.0, null], name: wide_02/steady}   # first ~5 s is the push settling
+  - {clip: corpus/real/pendulum/wide_break}
+  - {clip: corpus/real/fan/fan_brush_slow_02}
+  - {clip: corpus/real/wall_target/loop_01}
+  - {clip: corpus/real/wall_target/loop_break_01}
+  - {clip: corpus/real/wall_target/loop_break_01, slice: [0.0, 10.5], name: loop_break_01/diagonal}
+  - {clip: corpus/real/wall_target/loop_break_01, slice: [13.0, null], name: loop_break_01/horizontal}
+
+held_out:
+  - {clip: corpus/real/pendulum/small_03}
+  - {clip: corpus/real/pendulum/wide_01}
+  - {clip: corpus/real/pendulum/small_break}
+  - {clip: corpus/real/fan/fan_brush_fast_01}
+  - {clip: corpus/real/fan/fan_string_01}
+  - {clip: corpus/real/fan/break/fan_brush_break_01}
+  - {clip: corpus/real/wall_target/loop_03}
+  - {clip: corpus/real/wall_target/loop_break_02}
+  - {clip: corpus/real/wall/scan_pan_slow_01}
+  - {clip: corpus/real/wall/scan_both_slow_01}
+  - {clip: corpus/real/wall/scan_diag_break_01}
