@@ -66,20 +66,21 @@ freely moving real target, with a break signal.
 
   | Clip | Centroid vs labels | Kalman | Harmonic |
   |---|---|---|---|
-  | sim (exact truth) | 3.0 | 2.6 | 3.1 |
-  | `fan_brush_slow_02` | 5.7 | 8.0 | 7.3 |
-  | `small_01` | 27.5 | 26.1 | 28.8 |
-  | `loop_01` | 21.7 (p90 93) | 55.8 | 55.3 |
-  | `loop_break_01` | 22.1 | 22.3 (AUC 0.75) | 18.9 (AUC 0.81) |
-  | `wide_break` | 46.3 | 41.3 (AUC 0.86) | 42.2 (AUC 0.67) |
-  | pooled, development (8 entries) | — | 24.2 | 32.6 |
-  | pooled, all 100 sim clips | 10.8 | 25.1 | 30.8 |
-  | sim clips where the centroid tracks (49) | < 15 | 9.9 | 17.0 |
+  | sim, matched fan ellipse (exact truth) | 3.0 | 2.6 | 3.1 |
+  | `fan_brush_slow_02` | 5.7 | 8.3 | 7.8 |
+  | `small_01` | 27.5 | 27.3 | 29.7 |
+  | `loop_01` | 21.7 (p90 93) | 63.1 | 55.1 |
+  | `loop_break_01` | 22.1 | 21.8 (AUC 0.75) | 19.0 (AUC 0.81) |
+  | `wide_break` | 46.3 | 41.6 (AUC 0.86) | 42.6 (AUC 0.67) |
+  | pooled, development (8 entries) | — | 24.8 | 36.2 |
+  | pooled, all 100 sim clips | 10.8 | 17.5 | 29.5 |
+  | sim clips where the centroid tracks (49) | < 15 | 7.5 | 15.3 |
 
   On sim the localiser is the bottleneck: on 39 of 88 clips the centroid is ≥ 15 px off
-  (the string) and the predictors follow it (55 px); with clean positions the Kalman is
-  ~10 px, 7 on exact paths. Both baselines use two harmonics, so 3:2 Lissajous paths score
-  worse (Kalman 39.5 px). Break detection on sim: AUC 0.91 / 0.86, latency 0.28 / 0.07 s.
+  (the string) and the predictors follow it (~49 px); with clean positions the Kalman is
+  7.5 px, 5.6 on exact paths. Break detection on sim: AUC 0.91 / 0.87, latency 0.33 /
+  0.15 s. Lock-on pools to "never" on both sets at a 15 px tolerance — the tolerance
+  must be set per regime (§IV-D).
   The pendulum numbers are a *constant* vertical offset of 27–43 px between the event
   centroid and the marked brush centre (1–3 px sideways) — a labelling convention, and a
   floor under any pendulum error scored against labels. How to treat it is an open §IV-D
