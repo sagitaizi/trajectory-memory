@@ -104,7 +104,32 @@ def test_load_set_expands_a_glob_entry(tmp_path):
     for name in ("sim_001", "sim_000"):
         (tmp_path / f"{name}.npz").write_bytes(b"")
     sets = tmp_path / "sets.yaml"
-    sets.write_text(f"sim:\n  - {{glob: '{tmp_path.as_posix()}/sim_*.npz'}}\n")
+    sets.write_text(f"sim:\n  - {{glob: '{tmp_path.name}/sim_*.npz'}}\n")   # root = its grandparent
     entries = load_set("sim", sets)
     assert [e["name"] for e in entries] == ["sim_000", "sim_001"]
     assert entries[0]["clip"].endswith("sim_000.npz") and entries[0]["slice"] is None
+
+
+def test_pool_keeps_misses_and_counts_them():
+    from trajmem.experiment import pool
+
+    def row(name, latency, lock):
+        return {"name": name, "error_px": {"median": 1.0, "iqr": 0.1}, "lock_on_s": lock,
+                "deviation": {"auc": 0.9, "latency_s": latency, "fp_per_min": 0.0}, "unseen_fraction": 0.0}
+    pooled = pool([row("a", 0.3, 1.0), row("b", np.inf, np.inf), row("c", 0.4, 2.0), row("d", np.inf, 3.0)])
+    assert pooled["deviation"]["latency_s"] == np.inf            # half the breaks were missed
+    assert pooled["deviation"]["missed"] == 2 and pooled["never_locked"] == 1
+    assert pooled["lock_on_s"] == 2.5                            # median of [1, inf, 2, 3]
+
+
+def test_load_set_glob_resolves_against_the_repo_and_refuses_an_empty_match(tmp_path, monkeypatch):
+    from trajmem.experiment import load_set
+
+    (tmp_path / "corpus").mkdir()
+    (tmp_path / "corpus" / "sim_000.npz").write_bytes(b"")
+    sets = tmp_path / "corpus" / "sets.yaml"
+    sets.write_text("sim:\n  - {glob: corpus/sim_*.npz}\nnone:\n  - {glob: corpus/nothing_*.npz}\n")
+    monkeypatch.chdir(tmp_path / "corpus")                        # not the repo root
+    assert [e["name"] for e in load_set("sim", sets)] == ["sim_000"]
+    with pytest.raises(ValueError, match="matches no clip"):
+        load_set("none", sets)

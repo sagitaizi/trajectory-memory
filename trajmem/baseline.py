@@ -2,7 +2,8 @@
 
 Both take one position per step of `dt_s`, estimate the period from the first
 `warmup_s` of observations and keep it, then predict ahead and score surprise. The
-warm-up must cover at least about a cycle; real clips run up to 4 s periods.
+warm-up must cover at least about a cycle; real clips run up to 4 s periods. Three
+harmonics cover every path family in the corpus (a 3:2 Lissajous needs the third).
 A NaN observation (target unseen) is skipped. Positions are in normalised image
 coordinates, like every Clip's ground truth.
 """
@@ -16,10 +17,10 @@ from .trajectories import search_period
 class _Periodic:
     """Shared plumbing: the observation buffer, the warm-up, the surprise smoothing."""
 
-    def __init__(self, dt_s: float, warmup_s: float = 5.0, n_harmonics: int = 2,
+    def __init__(self, dt_s: float, warmup_s: float = 5.0, n_harmonics: int = 3,
                  score_tau_s: float = 0.1):
         self.dt_s, self.warmup_s, self.n_harmonics = dt_s, warmup_s, n_harmonics
-        self.score_alpha = dt_s / score_tau_s
+        self.score_alpha = min(1.0, dt_s / score_tau_s)
         self.reset()
 
     def reset(self) -> None:
@@ -44,7 +45,7 @@ class _Periodic:
         self.last_known = (float(x), float(y))
         if self.period_s is None:
             if self.t_now >= self.warmup_s and len(self.times) >= 8:
-                self.period_s = search_period(np.array(self.times), np.array(self.xys))
+                self.period_s = search_period(np.array(self.times), np.array(self.xys), self.n_harmonics)
                 self._start(np.array(self.times), np.array(self.xys))
             return
         self._step(self.t_now, np.array([x, y], dtype=float))
@@ -69,7 +70,7 @@ class HarmonicFit(_Periodic):
     fit said it would be, relative to the fit's own residual spread.
     """
 
-    def __init__(self, dt_s: float, warmup_s: float = 5.0, n_harmonics: int = 2,
+    def __init__(self, dt_s: float, warmup_s: float = 5.0, n_harmonics: int = 3,
                  window_periods: float = 3.0, score_tau_s: float = 0.1):
         self.window_periods = window_periods
         super().__init__(dt_s, warmup_s, n_harmonics, score_tau_s)
@@ -107,7 +108,7 @@ class PeriodicKalman(_Periodic):
     innovation (chi-squared with two degrees of freedom when the model holds).
     """
 
-    def __init__(self, dt_s: float, warmup_s: float = 5.0, n_harmonics: int = 2,
+    def __init__(self, dt_s: float, warmup_s: float = 5.0, n_harmonics: int = 3,
                  process_noise: float = 1e-6, measurement_noise: float = 1e-4,
                  score_tau_s: float = 0.1):
         self.q, self.r = process_noise, measurement_noise

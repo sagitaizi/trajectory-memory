@@ -92,3 +92,17 @@ def test_predicts_a_slow_path_whose_period_exceeds_the_warmup(make):
     out = run(make(), t, sample(spec, t), horizon_s=0.1, start_s=8.0)
     err = np.hypot(*(out[:, 1:3] - sample(spec, out[:, 0] + 0.1)).T)
     assert np.median(err) < 0.01
+
+
+@pytest.mark.parametrize("make", [lambda: PeriodicKalman(dt_s=DT), lambda: HarmonicFit(dt_s=DT)])
+def test_predicts_a_figure8_whose_energy_sits_at_the_second_harmonic(make):
+    spec = TrajectorySpec(shape="figure8", size=(0.1, 0.3), period_s=2.0, rotation=0.3)
+    t = np.arange(0, 12.0, DT) + DT / 2
+    out = run(make(), t, sample(spec, t), horizon_s=0.1, start_s=7.0)
+    err = np.hypot(*(out[:, 1:3] - sample(spec, out[:, 0] + 0.1)).T)
+    assert np.median(err) < 0.01
+
+
+def test_surprise_smoothing_is_stable_for_windows_longer_than_its_time_constant():
+    m = PeriodicKalman(dt_s=0.2, warmup_s=5.0)
+    assert m.score_alpha <= 1.0

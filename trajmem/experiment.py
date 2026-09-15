@@ -88,9 +88,11 @@ def load_set(name: str, path=None) -> list[dict]:
     out = []
     for e in sets[name] or []:
         if "glob" in e:                                   # every matching clip, in name order
-            import glob
-
-            out += [{"clip": c, "name": Path(c).stem, "slice": None} for c in sorted(glob.glob(e["glob"]))]
+            root = Path(path or SETS_PATH).resolve().parent.parent      # corpus/sets.yaml -> repo
+            found = sorted(root.glob(e["glob"]))
+            if not found:
+                raise ValueError(f"set {name!r}: {e['glob']!r} matches no clip under {root}")
+            out += [{"clip": str(c), "name": c.stem, "slice": None} for c in found]
             continue
         window = e.get("slice")
         out.append({"clip": e["clip"], "name": e.get("name", Path(e["clip"]).name),
@@ -127,18 +129,25 @@ def run_set(make_memory_fn, clips, window_us: int, horizon_s: float, tol_px: flo
 
 
 def pool(rows: list[dict]) -> dict:
+    """Medians of the per-clip numbers. `inf` ("never flagged", "never locked on") stays
+    in, so a method that fails on half the clips pools to inf rather than to the hits'
+    median; the misses are counted as well."""
     def med(values):
-        v = [x for x in values if np.isfinite(x)]
+        v = [x for x in values if not np.isnan(x)]
         return float(np.median(v)) if v else np.nan
 
     breaks = [r for r in rows if np.isfinite(r["deviation"]["auc"])]
+    latencies = [r["deviation"]["latency_s"] for r in breaks]
+    locks = [r["lock_on_s"] for r in rows]
     return {
         "name": "pooled", "n_clips": len(rows),
         "error_px": {"median": med(r["error_px"]["median"] for r in rows),
                      "iqr": med(r["error_px"]["iqr"] for r in rows)},
-        "lock_on_s": med(r["lock_on_s"] for r in rows),
+        "lock_on_s": med(locks),
+        "never_locked": int(sum(np.isinf(x) for x in locks)),
         "deviation": {"auc": med(r["deviation"]["auc"] for r in breaks),
-                      "latency_s": med(r["deviation"]["latency_s"] for r in breaks),
+                      "latency_s": med(latencies),
+                      "missed": int(sum(np.isinf(x) for x in latencies)),
                       "fp_per_min": med(r["deviation"]["fp_per_min"] for r in rows)},
         "unseen_fraction": med(r["unseen_fraction"] for r in rows),
     }

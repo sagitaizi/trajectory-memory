@@ -26,6 +26,8 @@ def to_frames(clip: Clip, window_us: int, kind: str = "count", downsample: int =
     optionally block-summed by `downsample`. `surface`: the main repo's decaying time
     surface (H, W) in [0, 1], queried at the window's end."""
     w, h = clip.meta["resolution"]
+    if kind == "count" and (w % downsample or h % downsample):
+        raise ValueError(f"downsample {downsample} must divide the sensor {w}x{h}")
     if kind == "count":
         for t0, ev in windows(clip, window_us):
             yield t0, _count_frame(ev, w, h, downsample)

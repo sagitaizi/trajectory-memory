@@ -93,3 +93,9 @@ def test_position_tracks_a_moving_cluster_window_by_window():
     ev = events_at(np.clip(xs, 0, 63), np.clip(ys, 0, 47), ts)
     got = list(to_position(a_clip(ev, 4000), 1000))
     assert np.allclose([x * 64 for _, x, _ in got], [10, 18, 26, 34], atol=1.0)
+
+
+def test_count_frames_reject_a_downsample_that_does_not_divide_the_sensor():
+    ev = events_at([1], [1], [10])
+    with pytest.raises(ValueError, match="divide"):
+        list(to_frames(a_clip(ev, 1000), 1000, kind="count", downsample=5))   # 48 / 5

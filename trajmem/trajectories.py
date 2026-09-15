@@ -169,22 +169,43 @@ def fit_ellipse(points, period_s: float | None = None) -> TrajectorySpec:
     )
 
 
-def _harmonic_fit(t, xy, period_s):
-    """Fit xy(t) = c + A cos wt + B sin wt; returns the (3, 2) coefficients and residual."""
+def _harmonic_fit(t, xy, period_s, n_harmonics: int = 1):
+    """Fit xy(t) = c + sum_k (A_k cos k w t + B_k sin k w t); returns the coefficients
+    ((1 + 2 n_harmonics, 2)) and the residual."""
     w = 2.0 * np.pi / period_s
-    design = np.column_stack([np.ones_like(t), np.cos(w * t), np.sin(w * t)])
+    cols = [np.ones_like(t)]
+    for k in range(1, n_harmonics + 1):
+        cols += [np.cos(k * w * t), np.sin(k * w * t)]
+    design = np.column_stack(cols)
     coef, *_ = np.linalg.lstsq(design, xy, rcond=None)
     return coef, float(np.sum((design @ coef - xy) ** 2))
 
 
-def search_period(t, xy) -> float:
+def search_period(t, xy, n_harmonics: int = 3) -> float:
     """Period with the smallest harmonic-fit residual: a frequency grid, then a fine pass.
-    Periods up to twice the span of the marks are in reach, so under a cycle will do."""
+    Periods up to twice the span of the marks are in reach, so under a cycle will do.
+
+    The fit carries `n_harmonics`, so a path whose energy sits at a multiple of the
+    fundamental (a figure-8, a 3:2 Lissajous) is not mistaken for its harmonic. A
+    multiple of the true period fits just as well, so the shortest divisor of the best
+    period that fits as well is taken. The grid stops where the model's highest
+    harmonic would exceed what the marks can resolve.
+    """
     span = t.max() - t.min()
-    f_lo, f_hi = 0.5 / span, 0.5 / np.median(np.diff(np.sort(t)))
+    f_lo = 0.5 / span
+    f_hi = 0.5 / np.median(np.diff(np.sort(t))) / n_harmonics
     step = 1.0 / (8.0 * span)
+    tie = 1e-6 * float(np.sum((xy - xy.mean(axis=0)) ** 2))       # "as good as the best"
+
+    def resid(f):
+        return _harmonic_fit(t, xy, 1.0 / f, n_harmonics)[1]
+
     coarse = np.arange(f_lo, f_hi, step)
-    best = coarse[np.argmin([_harmonic_fit(t, xy, 1.0 / f)[1] for f in coarse])]
+    best = coarse[np.argmin([resid(f) for f in coarse])]
     fine = np.linspace(best - step, best + step, 201)
     fine = fine[fine > 0]
-    return float(1.0 / fine[np.argmin([_harmonic_fit(t, xy, 1.0 / f)[1] for f in fine])])
+    best, best_resid = min(((f, resid(f)) for f in fine), key=lambda fr: fr[1])
+    for m in (3, 2):                                              # T/3, then T/2
+        if m * best < f_hi and resid(m * best) <= best_resid + tie:
+            return float(1.0 / (m * best))
+    return float(1.0 / best)

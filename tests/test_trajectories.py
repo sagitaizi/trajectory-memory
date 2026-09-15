@@ -280,3 +280,13 @@ def test_search_period_reaches_beyond_the_span_of_the_marks():
         spec = TrajectorySpec(shape="ellipse", size=(0.2, 0.12), period_s=period)
         t = np.arange(0, 3.0, 0.005)                     # under one cycle
         assert np.isclose(search_period(t, sample(spec, t)), period, rtol=0.03)
+
+
+def test_search_period_finds_the_fundamental_of_a_figure8_and_a_lissajous():
+    from trajmem.trajectories import search_period
+
+    fig8 = TrajectorySpec(shape="figure8", size=(0.1, 0.3), period_s=2.0)   # y runs at 2f, and louder
+    liss = TrajectorySpec(shape="lissajous", size=(0.2, 0.2), period_s=2.0)
+    t = np.arange(0, 6.0, 0.005)
+    for spec in (fig8, liss):
+        assert np.isclose(search_period(t, sample(spec, t)), 2.0, rtol=0.02)
