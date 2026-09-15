@@ -42,7 +42,7 @@ Input: a frame sequence + its frame rate (upsampled internally). Output: DVS eve
   1000 fps gave ~3 M ev/s (v2e emits ~ln(ratio)/pos_thres events per edge pixel per frame).
   Start with a modest ratio (~2x) and raise it only to match the measured real rate.
 
-## Match to real (done 2026-09-15, `scripts/match_sim_real.py`)
+## Match to real (`scripts/match_sim_real.py`)
 Against `fan/fan_brush_slow_02`, the one labelled real clip on a clean analytic path: an
 ellipse fitted to its hand-labels (semi-axes 37 x 23 px, T = 1.189 s, residual median
 4.5 px) is simulated with the same timing at 650 fps and both streams are scored over
@@ -56,26 +56,22 @@ the first 5 s, within 60 px of the ground truth and outside it:
 | trail: 90th pct of distance behind the target (px) | 19.6 | 17.1 |
 | noise floor: median 32-px tile far from target (ev/px/s) | 0.105 | 0.088 |
 
-Reached with blob radius 18 px, texture depth 0.4, background 30 / blob 90 (8-bit),
-thresholds 0.2, sigma 0.03, shot noise 0.1 Hz/px, **photoreceptor filter off**
-(`params.yaml`). Starting values (radius 12, 64/128, noise 0.01) were 4.5x short on
-target rate. The noise floor is the *median tile* rate on purpose: the real far-field
-is very uneven (hot pixels, flicker, the string; 95th-percentile tiles run 1-8 ev/px/s),
-and matching the mean had put a flat 0.29 everywhere, 3x the real floor.
+Matched values (`params.yaml`): blob radius 18 px, texture depth 0.4, background 30 /
+blob 90 (8-bit), thresholds 0.2, sigma 0.03, shot noise 0.1 Hz/px, photoreceptor filter
+off. The noise floor is the *median tile* rate because the real far-field is uneven (hot
+pixels, flicker, the string; 95th-percentile tiles run 1-8 ev/px/s) and a mean would
+put that everywhere.
 
-**Why the filter is off.** v2e scales the photoreceptor time constant by 275/(I+20),
-so with a dark background (I = 30) the trailing edge of the blob decays with tau ~ 29 ms
-and OFF events dribble out for ~60-90 ms after the target has passed -- a trail the real
-camera does not show. On the slow fan clip this was invisible (trail 22.7 vs 19.6 px);
-on `pendulum/small_01` (~720 px/s) it was 36 px against 24 real, and 17 with the filter
-off. The real DVXplorer's bandwidth in room light is far above our motion, so no filter.
+**Why the filter is off.** v2e scales the photoreceptor time constant by 275/(I+20), so
+against a dark background the trailing edge decays with tau ~ 29 ms and OFF events
+dribble out for 60-90 ms behind a fast target -- a trail the real camera does not show
+(on `pendulum/small_01`, ~720 px/s: 36 px with the filter vs 24 real vs 17 without).
+The DVXplorer's bandwidth in room light is far above our motion.
 
-**What the match does not capture**, seen on the pendulum clip: the real target there
-is a ~120 x 30 px brush hanging on a visible string, its scene noise is 2.6 ev/px/s
-(9x the fan's), and its rate 594 k/s. The corpus randomisation ranges were widened to
-span both clips, and the renderer draws elongated targets and strings (below).
-`runs/match*/` keep each comparison's montage, `stats.json`, and both clips as `.npz`
-for `scripts/replay_gt.py`.
+**Beyond the fan clip**: the pendulum target is a ~120 x 30 px brush on a visible string,
+with 2.6 ev/px/s of scene clutter and 594 k ev/s; the randomisation ranges span both
+clips and the renderer draws elongated, textured targets on strings. `runs/match*/`
+keep each comparison's montage, `stats.json`, and both clips as `.npz` for `replay_gt.py`.
 
 ## Domain randomisation (`scripts/make_sim_dataset.py`)
 Per clip, from `sim.randomise`: threshold, sigma, shot noise, an optional photoreceptor
@@ -89,7 +85,7 @@ growth/decay), each drawn from a range starting at zero, so the corpus runs from
 to clearly imperfect without any of it looking like a deviation. A model trained across
 the spread transfers to real data far better than one trained on one idealised setting.
 
-## The corpus (generated 2026-09-16, `corpus/sim/`, `scripts/corpus_summary.py`)
+## The corpus (`corpus/sim/`, `scripts/corpus_summary.py`)
 | | |
 |---|---|
 | Clips | 100, 15 s each, 650 fps render, seed-reproducible (`make_sim_dataset.py --seed 0`) |
@@ -102,8 +98,8 @@ the spread transfers to real data far better than one trained on one idealised s
 | Events per clip | 0.5–86.9 M (median 7.7 M) |
 | On disk | 14.7 GB (6–1129 MB per clip) |
 
-Every clip loads and its ground truth is finite inside the frame at start, middle and end.
 The manifest (`corpus/sim/manifest.csv`) records each clip's draw. The heaviest clips are
-fast circles with a large textured target at a low threshold (up to 5.8 M ev/s); they are
-realistic (the real pendulum runs 1.5 M ev/s) but memory-hungry, which is why v2e's chunks
-are packed as they arrive.
+fast circles with a large textured target at a low threshold (up to 5.8 M ev/s) --
+realistic (the real pendulum runs 1.5 M ev/s). On ~10 % of clips the string is as bright
+as the target and the classical centroid locks onto it; kept, as the real pendulum's
+string is the brightest line in its frames.

@@ -35,13 +35,15 @@ Read `PLAN.md` first for what's next. `TIMELINE.md` has the dated milestones.
 | `TIMELINE.md` | Dated milestones with checkmarks. |
 | `PAPER_PROGRESS.md` | Which paper sections are writable, blocked, drafted. The paper is written as we go. |
 | `docs/implementation-plan.md` | Architecture, modules, data flow, frameworks. |
-| `RECORDING_PLAN.md` | The one-night recording session (camera leaves 2026-09-10). |
+| `RECORDING_LOG.md` | Every real clip: setup, rate, what it shows, label status. |
+| `corpus/sets.yaml` | Which real clips are development and which are held-out, with slices. |
 | `BIBLIOGRAPHY.md` | Every paper referenced, with why/where. Update in the same change that uses it. |
 
 ## Environment
 
 Conda env **`thesis`** (Python 3.14) — shared with the main thesis repo. Adds `snntorch`,
-`v2e`. `nengo` already present. Pinned in `requirements.txt`.
+`v2e`. `nengo` already present. Pinned in `requirements.txt`. Run scripts with the env's
+own interpreter (`D:\Programs\Anaconda\envs\thesis\python.exe`); `conda run` swallows flags.
 
 Reuses code from the main thesis repo at `D:\Projects\Thesis` — `recording` (clip load/replay),
 `camera` (calibration), `pipeline` (`accumulator`, `time_surface`). `_thesis_path.py` puts that
@@ -56,25 +58,29 @@ Package `trajmem/`. One file, one job.
 | `data.py` | Load a clip (recorded `.aedat4` or simulated) → uniform `Clip` object: events + true trajectory + deviation times. |
 | `trajectories.py` | Analytic path specs (circle, ellipse, figure-8, Lissajous) + scripted deviations → exact position-vs-time. Pure math. |
 | `simulate.py` | v2e wrapper: `TrajectorySpec` + camera config → synthetic event stream + exact ground truth. |
-| `frontend.py` | Events → model input: `frames` (Stage 1), `raw` spike tensor (Stage 2), `position` centroid (baseline/fallback). |
-| `model.py` | `TrajectoryMemory` interface + provisional NumPy reservoir. Two swappable jobs: localiser ("where now") and memory ("where next / is this normal"). The framework-agnostic boundary. |
-| `baseline.py` | Non-SNN comparators (Kalman with periodic model, Fourier fit). Same interface as `model.py`. |
-| `metrics.py` | Prediction error, deviation-detection ROC + latency, lock-on time. |
-| `experiment.py` | Harness: build corpus → pretrain on sim → freeze → evaluate on real → results table. |
-| `scripts/make_sim_dataset.py` | Batch-generate pretraining clips. |
-| `scripts/run_experiment.py` | CLI over `experiment.py`. |
+| `frontend.py` | Events → model input: `to_frames` (Stage 1), `to_raw` (Stage 2, stub), `to_position` centroid (baseline/fallback). |
+| `model.py` | `Localiser` + `TrajectoryMemory` protocols. Two swappable jobs: localiser ("where now") and memory ("where next / is this normal"). The framework-agnostic boundary. |
+| `baseline.py` | Non-SNN comparators (`PeriodicKalman`, `HarmonicFit`). Same interface as `model.py`. |
+| `metrics.py` | Prediction error, lock-on time, deviation AUC / latency / false alarms. |
+| `experiment.py` | `evaluate_clip` (the one loop every method goes through), `score_trace`, clip sets, `run_set`, `make_memory`. |
+| `scripts/` | `make_sim_dataset`, `match_sim_real`, `run_experiment`, `check_localiser`, `replay_gt`, `make_tracks`, `make_frames`, `corpus_summary`, the `mark_*` labelling tools. `README.md` lists the commands. |
 
 ## Key conventions
 
 - **Comments and code stay minimal.** A comment explains a non-obvious *why* in a line or two.
   No large comment blocks, no narrating past decisions or alternatives tried, no changelog prose
-  in source. History belongs in git and `PLAN.md`, not in `.py` files. Prefer clear names and
-  small functions over explanatory comments.
+  in source. History belongs in git, not in `.py` files. Prefer clear names and small
+  functions over explanatory comments.
 - **Framework choice is deferred** (decision gate G-F in `PLAN.md`). Everything SNN goes behind
   `model.py`'s interface so the choice can change without touching the rest.
-- **Ground truth is analytic where possible** — driven motion (motor, pendulum, fan) has a known
-  path; only hand-moved clips need labelling.
-- **Pretrain on simulation, test on real.** Report numbers on held-out real clips only.
+- **Ground truth**: exact from the spec on simulated clips (the apparent, lens-distorted
+  position); hand-labels + interpolation on every real clip, motor-driven ones included.
+- **Pretrain on simulation, test on real.** Real clips are never trained on; development
+  clips are looked at while building, held-out clips are scored once.
+- **Markdown stays minimal and current-state.** No dated narrative, no "was X, now Y", no
+  changelog; history lives in git. A doc says what is, what is open, and where things are.
+- **SNN design is decided together** — framework, architecture, training, parameters.
+  Alone, Claude does plumbing, tooling and bookkeeping.
 - **Never hand-author a calibration file.** Load the main repo's calibration through `camera`.
 
 ## Answering in sessions

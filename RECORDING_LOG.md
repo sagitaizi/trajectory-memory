@@ -1,13 +1,9 @@
 # Recording Log — 2026-09-10
 
-Clips captured this session, with verification and the measurements `RECORDING_PLAN.md`
-asks for. Clips live in `corpus/real/` (gitignored); this log is tracked.
-
-Layout: `corpus/real/<group>/<slug>/<slug>.aedat4` — one directory per clip, holding
-its `.aedat4` + `.params.yaml` (+ later hand-labels, notes). Deviation clips go under
-`<group>/break/`.
-
-Verify a clip with:  `bash scripts/check <group>/<slug>.aedat4`
+Every real clip: setup, event rate, what it shows, label status. Clips live in
+`corpus/real/<group>/<slug>/<slug>.aedat4` (git-ignored) with a `.params.yaml` side-car and,
+once labelled, `.labels.csv` / `.deviation.json` (tracked). Which clips are development or
+held-out: `corpus/sets.yaml`.
 
 ## Status
 
@@ -48,23 +44,15 @@ predict than a clean circle. GT = hand-labels + interpolation, not analytic.
 
 ## Clips — Setup 4a (motor-swept camera, printed square on blank wall)
 
-Ego-motion clips: the SNN target is the apparent motion of the *static* square as the
-pan-tilt rig sweeps a repeating path. GT was to be encoder ticks (`.motors.csv`, ~1270
-rows / ~32 Hz) through the calibration, and that was the reason to over-record this
-setup. **It did not hold** — the calibration understates the sweep by ~1.27x (pan) and
-~1.29x (tilt), measured 2026-09-12 by `scripts/measure_px_per_tick.py`; see
-`PAPER_PROGRESS.md`. GT for 4a is now hand-labels + interpolation, like every other
-setup. **Scan params are not in `.params.yaml`** —
-recorded here per clip (`axis / period s / range`). `--scan` triangle-wave geometry:
-pan over `period`, tilt over `1.6×period` for `both`, tilt phase-locked at `period`
-for `diag`/`antidiag` (the `diag` axis mode was added this session). All clips 40 s
-unless noted, `--desensitize` **not** used. Span ≈ `range × 2048` (pan) / `range ×
-600` (tilt) ticks; ~15–16° pan peak-to-peak at range 0.1.
+Ego-motion clips: the target is a static printed square and the pan-tilt rig sweeps a
+repeating path, so the whole scene moves. Ground truth is hand-labels like every other
+setup (the encoder track does not reproduce the sweep through the calibration; the
+`.motors.csv` side-cars remain). Scan parameters are not in `.params.yaml`, so they are
+recorded here per clip (`axis / period s / range`): triangle waves, pan over `period`, tilt
+over `1.6×period` for `both`, tilt phase-locked at `period` for `diag`/`antidiag`. All
+clips 40 s; motors slew to the start for the first ~0.2 s, trimmed on load.
 
-**Frame check for the whole 4a set still pending** (square in frame, events on the
-square vs bare wall).
-
-### Plain sweeps (18)
+## Plain sweeps (18)
 
 | Clip | axis / period / range | Rate | Span (pan/tilt ticks) | Notes |
 |---|---|---|---|---|

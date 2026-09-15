@@ -1,216 +1,126 @@
 # Plan
 
-Phased plan for the SNN trajectory-memory paper. Start here; `TIMELINE.md` has the dates,
-`docs/implementation-plan.md` has the architecture, `PAPER_PROGRESS.md` has what is writable
-in the manuscript right now.
+Current state of the work, by phase. `TIMELINE.md` has the dates, `docs/implementation-plan.md`
+the architecture, `PAPER_PROGRESS.md` what is writable in the manuscript.
 
 ## What this is
 
 A spiking network that, offline, learns a target's repetitive trajectory from event-camera
-input, predicts it ahead, and flags deviations. Pretrain on simulation, freeze, test on real
-recordings. Contribution framing (per Dr. Ezra Tsur): the spiking dynamics *solve* the
-prediction problem — not "the same task on a different network."
+input, predicts it a short horizon ahead, and flags deviations. Pretrain on simulation,
+freeze, test on real recordings. The claim (per Dr. Ezra Tsur): the spiking dynamics *solve*
+the prediction — not "the same task on a different network." Closest prior work (Debat et al.
+2021, the 2025 event ping-pong paper) uses a static camera, ballistic motion, offline batch
+training and no deviation signal; the gap is a repetitive path learned online-style from a
+freely moving real target, with a break signal.
 
-Novelty rests on the combination, not any one part. Closest prior work — Debat et al. 2021 and
-the 2025 event ping-pong paper — does event-SNN trajectory prediction with a **static camera,
-constrained ballistic motion, offline batch, no deviation detection**. The gap: a repetitive
-path learned online-style from a freely-moving real target, with a break signal, as predictive
-inference.
+## Status
 
-## Next session (2026-09-16 night, for the morning)
-
-Everything below the SNN core is in place; what is left is the part to decide together:
-**framework (G-F), localiser and memory architecture, training, parameters.** On the table:
-
-- **Corpus finding to settle first (10 min)**: the classical centroid, run over all 100 sim
-  clips (`corpus/sim/tracks.npz`), is 10.8 px median but fails (>100 px) on ~10 % of clips —
-  every one a clip whose *string* is as bright as or brighter than the target
-  (string/target intensity ratio 1.2 on failures vs 0.65 where it works). The ranges
-  overlap: `string_intensity` 60–150 vs `fg_intensity` 80–200. In reality the brush is the
-  bright thing. Options: (a) draw the string as a fraction of the target's intensity
-  (say 0.3–0.8×) and regenerate the ~25 affected clips (~40 min, `make_sim_dataset` resumes
-  after deleting them); (b) keep them as hard cases for a learned localiser. Same mechanism
-  as the pendulum's 27–43 px upward offset on real clips — the string pulls the centroid.
-- **G-F facts** are collected under "Decision gates" below (what is installed, GPU state,
-  input data ready, the baseline bar).
-- **Localiser bar**: the classical centroid (`scripts/check_localiser.py --set development`)
-  is 5.7 px on the fan, ~22 px on the wall target with losses (p90 93 px on `loop_01`), and a
-  *constant* 27–43 px vertical offset on the pendulum (label convention, 1–3 px sideways).
-- **Memory bar**: Kalman / harmonic at 100 ms on the development set, pooled median 24.2 /
-  32.6 px (`runs/results/development_*.csv`); ~3 px on simulated clips with exact truth.
-- **Open policy question for §IV-D**: how to treat the pendulum's constant label offset.
-- **Environment action** (one line, not done overnight because the shared env was in use):
-  a CUDA torch for this Python now exists — `pip install torch==2.14.0+cu126 --index-url
-  https://download.pytorch.org/whl/cu126` — the laptop's RTX 3060 (6 GB) is otherwise idle;
-  v2e also runs on torch, so regenerate nothing while switching.
-- Uncommitted on purpose, for review: `paper/main.tex` (starting-point comments in every
-  unblocked section, on top of Sagi's own edits), `PAPER_PROGRESS.md`, `paper/refs.bib`.
-
-## Current status
-
-| Phase | Status |
+| Phase | State |
 |---|---|
-| A — Data | 🟨 Real corpus recorded (54 clips), sim corpus generated (100 clips), development set labelled; **held-out labelling is the open work** |
-| B — Frontend + baseline | ✅ Done 2026-09-16; first numbers below |
-| C — Trajectory memory (Stage 1, frames) | ⬜ The goal |
-| D — Deviation detection | ⬜ In scope |
-| E — Raw events (Stage 2) | ⬜ Upside only |
-| F — Paper | ⬜ Draft due 2026-10-01 |
+| A — Data | 🟨 Real corpus recorded and split; development set labelled; sim corpus generated. **Open: label the held-out clips.** |
+| B — Frontend + baselines | ✅ |
+| C — Trajectory memory, Stage 1 | ⬜ **Next.** Framework and architecture to be decided together (G-F). |
+| D — Deviation detection | ⬜ Scoring exists; thresholds must be chosen on development clips. |
+| E — Raw events, Stage 2 | ⬜ Only if Stage 1 lands. |
+| F — Paper | 🟨 Written as sections unlock; draft due 2026-10-01. |
 
-## Phases
+## A — Data
 
-### A — Data
-- `trajectories.py`: analytic path specs + scripted deviations.
-- `simulate.py`: v2e wrapper using the main repo's calibration + measured contrast thresholds.
-- `data.py`: uniform `Clip` loader for recorded and simulated clips.
-- Real corpus recorded 2026-09-10 (`RECORDING_LOG.md`): 54 clips over fan, pendulum,
-  motor-swept wall (4a) and hand-moved wall (4b). 14 carry a deviation.
-- **Ground truth is hand-labels + interpolation for every setup**, 4a included. The
-  encoder ground truth 4a was recorded for does not hold — see `PAPER_PROGRESS.md`,
-  "The 4a encoder ground truth was abandoned".
-- Marking tools, one per side-car: `scripts/mark_labels.py` → `.labels.csv` (the path),
-  `scripts/mark_breaks.py` → `.deviation.json` (break times),
-  `scripts/mark_anchors.py` → `.anchor.json` (4a only, now unused by default).
-  `scripts/replay_gt.py` draws a clip's ground truth over it to check the result.
-- **Open:** labelling is the critical path — nothing in B, C or D can be evaluated until
-  the development set below carries ground truth. Interval per group, measured on
-  `small_01` by subsampling its dense marks: the pendulum needs **0.1 s** (0.2 s already
-  costs 18 px at the 95th percentile on a 281 px swing); the 4a triangle sweeps are exact
-  along each leg at 0.5 s; 4b loops ~0.25 s; fan ~0.15 s.
-- **Real-clip split (decided 2026-09-13).** Real clips are never trained on. The split is
-  between clips used *while building* and clips scored *once, after the freeze*:
+- **Real corpus**: 54 clips (`RECORDING_LOG.md`), four setups — fan (brush on a string, a
+  rigid ellipse), string pendulum, hand-moved wall target (4b, marginal SNR), motor-swept
+  scene (4a, the whole scene moves). 14 carry a deviation. Ground truth is hand-labels +
+  interpolation for every setup (`scripts/mark_labels.py`, `mark_breaks.py`; check with
+  `replay_gt.py`). Mark spacing: pendulum 0.1 s, fan 0.15 s, 4b 0.25 s, 4a 0.5 s.
+- **Split** (`corpus/sets.yaml`). Real clips are never trained on. Development clips are
+  looked at freely while building; held-out clips are labelled last and scored once.
 
   | Set | Pendulum | Fan | 4b | 4a |
   |---|---|---|---|---|
-  | **Development** — label first, look freely | `small_01` ✅ `wide_02` `wide_break` | `fan_brush_slow_02` | `loop_01` `loop_break_01` | — |
-  | **Held-out** — label last, run once | `small_03` `wide_01` `small_break` | `fan_brush_fast_01` `fan_string_01` `fan_brush_break_01` | `loop_03` `loop_break_02` (frame check pending) | `scan_pan_slow_01` `scan_both_slow_01` `scan_diag_break_01` |
+  | Development ✅ labelled | `small_01` `wide_02` (from 6 s) `wide_break` | `fan_brush_slow_02` | `loop_01` `loop_break_01` (+ its two segments) | — |
+  | Held-out | `small_03` `wide_01` `small_break` | `fan_brush_fast_01` `fan_string_01` `fan_brush_break_01` | `loop_03` `loop_break_02` | `scan_pan_slow_01` `scan_both_slow_01` `scan_diag_break_01` |
 
-  Six development, eleven held-out, ~2,900 marks in all. 4b sits in development because
-  its marginal SNR is where the localiser will be stressed. 4a is kept as a *different*
-  condition — the whole scene moves, not just the target — worth one row in §V.
-  A clip can serve more than once: `loop_break_01` is a diagonal sweep, then a break,
-  then a horizontal sweep — two repetitive segments and a deviation with a known path
-  on both sides. Using segments needs a time-window slice of `Clip` (events rebased,
-  `gt` and break times shifted) — the same thing that trims `wide_02`'s 5 s settling
-  transient — to be added to `data.py` when Phase B starts consuming clips.
-  Everything else in the corpus is spare. Excluded on purpose: `fan_brush_slow_01`
-  (10× rate ramp), `fan_blade_01` (extended object), `fan_two_strings_01` (two targets —
-  out of scope), `updown_02` (singleton), `loop_02` (leaves frame), `scan_pan_fast_02`
-  (motor could not track), `scan_pan_slow_break_02` (scan params unrecorded),
-  `scan_tilt_fast_break_01` (19.5 s). Promoting a spare clip later is fine; promoting a
-  held-out clip to development after seeing a result on it is not.
-- **Sim matched to real (2026-09-15).** `scripts/match_sim_real.py` fits an ellipse to
-  `fan_brush_slow_02`'s labels, simulates it, and scores event rate, ON fraction, blob
-  footprint and noise floor against the real clip; all four now agree within 10 %
-  (`materials/02-methods/simulation-with-v2e.md`). `params.yaml` carries the matched values.
-- **Simulated corpus ✅** (`scripts/make_sim_dataset.py`, generated 2026-09-16): 100 clips x
-  15 s in `corpus/sim/` with a `manifest.csv`; 14.7 GB; summary table in
-  `materials/02-methods/simulation-with-v2e.md`. ~1.5–2 min per clip at 650 fps. Each clip draws a
-  random path (circle, ellipse, straight sweep, figure-8, Lissajous; period 0.8-4 s; half
-  with one scripted deviation in the middle third; 30 % exact, the rest with small smooth
-  imperfections), a random target (disc to brush-like, half on a string) and its own camera
-  settings from `sim.randomise`. Clip i depends only on (seed, i), so a killed run resumes —
-  which also means stale clips must be deleted by hand before a regeneration.
-  Ground truth on simulated clips is the target's **apparent** (lens-distorted) position,
-  the same thing hand-labels record on real clips — the ideal path would put a
-  lens-shaped offset of up to ~50 px in the corners between the two.
-  First run was discarded: v2e's photoreceptor filter left an event trail behind fast
-  targets; it is now off (`materials/02-methods/simulation-with-v2e.md`).
-- **Done when:** a simulated clip and a real clip load through the same path ✅; sim events
-  resemble the real DVXplorer stream on a matched trajectory ✅; enough real clips
-  carry ground truth to evaluate on (development set ✅, held-out pending).
-- **Unlocks:** §IV-A's contrast-threshold and noise holes; clears the §IV-B ground-truth caveat.
+  Promoting a spare clip is fine; promoting a held-out clip after seeing a result on it is not.
+- **Simulated corpus**: 100 clips × 15 s in `corpus/sim/` (`scripts/make_sim_dataset.py`,
+  seed-reproducible, resumable). v2e through the calibrated DVXplorer lens model, matched
+  to `fan_brush_slow_02` on rate, polarity, footprint, trail and noise floor
+  (`scripts/match_sim_real.py`; table in `materials/02-methods/simulation-with-v2e.md`).
+  Per clip: random path (five families, T 0.8–4 s, half with a scripted break, 35 % exact
+  and the rest with small smooth imperfections), random target (disc to brush, texture,
+  half on a string) and camera settings. Ground truth is the target's *apparent*
+  (lens-distorted) position — what hand-labels record. `corpus/sim/tracks.npz` holds the
+  measured and true position per 5 ms window for every clip; `scripts/make_frames.py`
+  writes frame sets at a chosen window and downsample.
+- **Known**: on ~10 % of sim clips the string is as bright as the target and the classical
+  centroid locks onto it (>100 px). This happens in real life too (the pendulum's string is
+  the brightest line in its frames), so the clips stay — a learned localiser must handle it.
 
-### B — Frontend + baseline ✅
-- `frontend.py`: `to_frames` (ON/OFF count frames, optional block downsample; time
-  surfaces via the main repo's `pipeline.time_surface`), `to_position` (dense-cell
-  centroid, robust to noise and to a string). `to_raw` waits for E.
+## B — Frontend + baselines ✅
+
+- `frontend.py`: ON/OFF count frames (optional downsample), time surfaces (main repo's
+  `pipeline.time_surface`), and a dense-cell centroid track robust to noise and to a string.
 - `baseline.py`: `PeriodicKalman` (harmonic state, normalised-innovation surprise) and
-  `HarmonicFit` (sliding least-squares harmonics); both estimate the period from a 3 s
-  warm-up and keep it. `data.slice_clip` cuts a time window into a clip of its own.
-- `metrics.py` per `materials/02-methods/metrics.md`; `experiment.evaluate_clip` is the
-  one loop every method goes through; `scripts/run_experiment.py` prints the scorecard;
-  `scripts/replay_gt.py --model kalman` draws a memory's output live over the clip.
-- **First numbers** (5 ms windows, 100 ms horizon, px, median over the steady part):
+  `HarmonicFit` (sliding least-squares harmonics). Both estimate the period from a 5 s warm-up.
+- `metrics.py`, `experiment.py` (`evaluate_clip` is the one loop every method goes through),
+  `scripts/run_experiment.py --set development`, `scripts/replay_gt.py --model kalman`.
+- **Numbers**, 5 ms windows, 100 ms horizon, px median (`runs/results/development_*.csv`):
 
-  | Clip | Localiser vs labels | Kalman | Harmonic | Note |
-  |---|---|---|---|---|
-  | matched sim (fan ellipse) | 3.0 | 2.6 | 3.1 | exact ground truth |
-  | `fan_brush_slow_02` | 5.7 | 7.9 | 7.2 | labels carry ~4.5 px themselves |
-  | `pendulum/small_01` | 27.5 | 26.2 | 31.1 | almost all a constant −27 px vertical offset between the event centroid and the marked brush centre; 4 px sideways |
-  | `pendulum/wide_break` | — | 42.0 | 44.8 | break at 13.2 s: Kalman AUC 0.83, latency 1.4 s; harmonic AUC 0.56 |
+  | Clip | Centroid vs labels | Kalman | Harmonic |
+  |---|---|---|---|
+  | sim (exact truth) | 3.0 | 2.6 | 3.1 |
+  | `fan_brush_slow_02` | 5.7 | 8.0 | 7.3 |
+  | `small_01` | 27.5 | 26.1 | 28.8 |
+  | `loop_01` | 21.7 (p90 93) | 55.8 | 55.3 |
+  | `loop_break_01` | 22.1 | 22.3 (AUC 0.75) | 18.9 (AUC 0.81) |
+  | `wide_break` | 46.3 | 41.3 (AUC 0.86) | 42.2 (AUC 0.67) |
+  | pooled (8 entries) | — | 24.2 | 32.6 |
 
-  The pendulum's offset is a labelling-convention gap, not tracking error; it sets a
-  floor on any pendulum prediction error scored against the labels and needs a stated
-  treatment in §IV-D (score against the frontend's own track, or subtract the offset).
-  The false-alarm column of the scorecard is circular until D picks thresholds on
-  development clips.
-- **Done when:** the classical baseline predicts a clean simulated circle within a stated
-  tolerance ✅ (2.6 px at 100 ms); the metrics reproduce on a fixed clip ✅.
-- **Unlocks:** §III-B's window values; §IV-C's tuned baseline settings.
+  The pendulum numbers are a *constant* vertical offset of 27–43 px between the event
+  centroid and the marked brush centre (1–3 px sideways) — a labelling convention, and a
+  floor under any pendulum error scored against labels. How to treat it is an open §IV-D
+  choice: subtract the per-clip offset, or score prediction against the frontend's own
+  track and report localisation separately.
 
-### C — Trajectory memory, Stage 1 (the goal)
-- `model.py`: `TrajectoryMemory` interface; provisional NumPy reservoir; frame localiser.
-- Pretrain on simulated trajectories, freeze, evaluate on held-out real clips.
-- Localiser and memory are separate pieces behind one interface (see G-F).
+## C — Trajectory memory, Stage 1 (the goal)
+
+- `model.py`: `Localiser` + `TrajectoryMemory` protocols; the SNN registers in
+  `experiment.make_memory` and is scored and watched with the same tools as the baselines.
+- Pretrain on the sim corpus, freeze, evaluate on development clips while building, on
+  held-out clips once.
 - **Done when:** on real repetitive clips, Stage 1 prediction error beats the classical
-  baseline *or* matches it with a stated event-native/latency argument; lock-on within N cycles.
-- **Unlocks:** §III-C, §III-D, and the Stage 1 rows of §V.
+  baseline *or* matches it with a stated event-native/latency argument; lock-on within N
+  cycles. Bar: Kalman 24.2 px pooled (8.0 on the fan), ~3 px on sim.
 
-### D — Deviation detection
-- Deviation score = prediction error against the learned path, with a threshold model.
-- Score on clips with a scripted mid-recording change (ROC, time-to-detect).
-- **Done when:** detection latency and false-positive rate are reported on real deviation clips.
-- **Unlocks:** §III-E and the deviation rows of §V.
+## D — Deviation detection
 
-### E — Raw events, Stage 2 (upside)
-- `frontend.raw`: fine-grained spike-tensor binning.
-- End-to-end model variant behind the same interface.
-- **Done when:** Stage 2 runs end-to-end on real clips with a prediction-error number, even if
-  worse than Stage 1.
-- **Unlocks:** the Stage 2 row of §V.
+- Score = prediction error against the learned path; a flag is `hold_n` steps above a
+  threshold chosen on development clips and applied unchanged to held-out ones.
+- **Done when:** AUC, latency and false-alarm rate reported on real break clips.
 
-### F — Paper
-Per-section status lives in `PAPER_PROGRESS.md`; sections get written as phases unlock them,
-not all at the end.
+## E — Raw events, Stage 2 (upside)
 
-- Results table: baseline vs Stage 1 (vs Stage 2 if reached), prediction + deviation.
-- External check: one public dataset (EventVOT or EV-IMO2) sequence, generalisation only.
-- 8 pages, IEEE format. Draft to supervisor 2026-10-01.
+- `frontend.to_raw` (1 ms bins) and an end-to-end variant behind the same interface.
+- **Done when:** it runs on real clips with a prediction-error number, even if worse.
 
-## Decision gates
+## F — Paper
 
-### G-F — framework for the SNN core (OPEN)
-Deferred deliberately. Resolve after a short bake-off on simulated trajectories. Needs a
-machine, so it cannot be settled away from the desk. **Unlocks:** naming the framework
-in §III-C and §III-D.
+Per-section status in `PAPER_PROGRESS.md`. Results table: baseline vs Stage 1 (vs Stage 2),
+prediction + deviation; one external-dataset generalisation check; 8 pages IEEE.
 
-**Facts gathered 2026-09-16** (no decision taken):
-- Installed in `thesis`: `snntorch 1.0.0`, `nengo 4.1.0`, `torch 2.14.0+cpu` (10 threads),
-  `scipy`, `numpy 2.4`. Not installed: SpikingJelly, Norse, Lava, nengo-dl, sklearn.
-- GPU: RTX 3060 Laptop, 6 GB, driver 596 — unused, torch is the CPU wheel. A
-  `torch==2.14.0+cu126` wheel for Python 3.14 is now on the PyTorch index (was not on
-  2026-09-10). Not installed yet; see "Next session".
-- Inputs ready: `corpus/sim/tracks.npz` (measured + true position per 5 ms window, all
-  clips; `scripts/make_tracks.py`) for the memory core; `scripts/make_frames.py --downsample d`
-  for the localiser (uint8 ON/OFF counts; 8× → 2×60×80 per 5 ms, ~29 MB per clip). 100 clips
-  × 3,000 steps = 300 k position steps; half the clips carry a break.
-- One evaluation loop for every candidate: `experiment.evaluate_clip` / `run_set`, the same
-  `TrajectoryMemory` interface the baselines implement (`fit / observe / predict /
-  deviation_score / reset`), so a candidate is scored by `run_experiment.py --set development`
-  and watched with `replay_gt.py --model` as soon as it exists.
-- Bar to reach on the development set (100 ms): Kalman 24.2 px pooled (8.0 on the fan),
-  break AUC 0.75–0.86. On simulated clips: ~3 px.
+## Decision gate G-F — framework for the SNN core (OPEN)
 
-- **Memory core** (low-D path → prediction): reservoir/LSM + online readout, or Legendre Memory
-  Unit (Nengo), or surrogate-gradient spiking RNN (snnTorch).
-- **Localiser** (frame → position): topographic, so likely a small spiking conv / WTA in
-  snnTorch or SpikingJelly — NEF is the wrong shape for this part.
-- Raw-event handling narrows it: no CPU/GPU framework is truly asynchronous; frames and raw
-  events both push toward snnTorch/SpikingJelly or a custom reservoir, not Nengo.
-- Provisional NumPy reservoir stands in until this closes so the pipeline runs.
+Decided together, after a short bake-off on simulated tracks. Unlocks §III-C/D.
+
+- **Candidates.** Memory core: reservoir/LSM + online readout, Legendre Memory Unit (Nengo),
+  or surrogate-gradient spiking RNN (snnTorch). Localiser: topographic, so a small spiking
+  conv / WTA (snnTorch); NEF is the wrong shape for it. Raw events push toward
+  snnTorch/SpikingJelly or a custom reservoir rather than Nengo.
+- **Installed**: `snntorch 1.0.0`, `nengo 4.1.0`, `torch 2.14` (CUDA build being installed;
+  RTX 3060, 6 GB). Not installed: SpikingJelly, Norse, Lava, nengo-dl.
+- **Inputs ready**: `corpus/sim/tracks.npz` (300 k position steps, half the clips with a
+  break); frame sets via `make_frames.py --downsample d` (8× → 2×60×80 per 5 ms).
+- **One evaluation loop** for every candidate: `run_experiment.py --set development`.
 
 ## Out of scope (future work)
-- Re-learning a new pattern after a break.
-- Attention-span / habituation across multiple objects; the human eye-tracking comparison.
-- Feeding predictions back to the pan-tilt rig (closed loop).
+
+Re-learning a new pattern after a break; attention across multiple objects; closing the loop
+to the pan-tilt rig.
