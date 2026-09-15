@@ -1,0 +1,80 @@
+import numpy as np
+import pytest
+
+from trajmem.metrics import deviation_roc, lock_on_time, prediction_error
+
+
+# --- prediction error -----------------------------------------------------------
+
+def test_prediction_error_summarises_the_distance_per_step():
+    pred = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 3.0], [np.nan, 0.0]])
+    gt = np.array([[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
+    r = prediction_error(pred, gt)
+    assert np.allclose(r["errors"], [0.0, 1.0, 3.0, np.nan], equal_nan=True)
+    assert r["median"] == 1.0 and r["mean"] == pytest.approx(4 / 3) and r["n"] == 3
+    assert r["iqr"] == pytest.approx(np.percentile([0, 1, 3], 75) - np.percentile([0, 1, 3], 25))
+
+
+def test_prediction_error_ignores_steps_with_unknown_ground_truth():
+    pred = np.array([[1.0, 0.0], [1.0, 0.0]])
+    gt = np.array([[0.0, 0.0], [np.nan, np.nan]])
+    assert prediction_error(pred, gt)["n"] == 1
+
+
+# --- lock-on --------------------------------------------------------------------
+
+def test_lock_on_is_the_first_time_error_stays_under_tolerance():
+    errors = np.array([5, 4, 3, 0.5, 2, 0.5, 0.4, 0.3, 0.2, 0.1])
+    assert lock_on_time(errors, tol=1.0, dt=0.1) == pytest.approx(0.5)     # step 5, not step 3
+
+
+def test_lock_on_is_infinite_when_it_never_settles():
+    assert lock_on_time(np.array([5, 0.5, 5, 0.5, 5]), tol=1.0, dt=0.1) == np.inf
+
+
+def test_lock_on_skips_unknown_steps():
+    errors = np.array([5, np.nan, 0.5, np.nan, 0.5])
+    assert lock_on_time(errors, tol=1.0, dt=0.1) == pytest.approx(0.2)
+
+
+# --- deviation detection --------------------------------------------------------
+
+def a_score_trace(dt=0.1, t_break=5.0, n=100, rise=3.0, noise=0.0, seed=0):
+    rng = np.random.default_rng(seed)
+    t = np.arange(n) * dt
+    s = rng.normal(0, 1, n) * noise + np.where(t >= t_break, rise, 0.0)
+    return s, t
+
+
+def test_deviation_roc_is_perfect_for_a_clean_step():
+    s, t = a_score_trace()
+    r = deviation_roc(s, t, [5.0], hold_n=3)
+    assert r["auc"] == pytest.approx(1.0)
+    assert r["latency_s"] == pytest.approx(0.2)        # three steps held above threshold
+    assert r["fp_per_min"] == 0.0
+
+
+def test_deviation_roc_is_chance_for_pure_noise():
+    s, t = a_score_trace(rise=0.0, noise=1.0)
+    r = deviation_roc(s, t, [5.0])
+    assert 0.35 < r["auc"] < 0.65
+
+
+def test_deviation_roc_counts_false_alarms_on_a_clip_without_a_break():
+    s, t = a_score_trace(rise=0.0, noise=1.0, n=600)     # one minute
+    s[100:110] = 10.0                                    # one sustained spurious burst
+    r = deviation_roc(s, t, [], threshold=5.0, hold_n=3)
+    assert np.isnan(r["auc"]) and np.isnan(r["latency_s"])
+    assert r["fp_per_min"] == pytest.approx(1.0)
+
+
+def test_deviation_roc_latency_is_unbounded_when_never_flagged():
+    s, t = a_score_trace(rise=0.0)
+    assert deviation_roc(s, t, [5.0], threshold=1.0)["latency_s"] == np.inf
+
+
+def test_deviation_roc_default_threshold_sits_above_the_pre_break_scores():
+    s, t = a_score_trace(noise=0.5, rise=5.0)
+    r = deviation_roc(s, t, [5.0])
+    assert r["threshold"] >= np.percentile(s[t < 5.0], 99) - 1e-9
+    assert r["latency_s"] < 1.0
