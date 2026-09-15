@@ -197,3 +197,33 @@ def test_an_elongated_target_on_a_string_hangs_along_it():
     frame = render_frames(spec, cfg)[0]
     ys, xs = np.where(frame == cfg["blob"]["fg_intensity"])
     assert np.ptp(ys) > np.ptp(xs)                                # long axis along the string
+
+
+def test_texture_puts_structure_inside_the_target_and_none_outside():
+    base = {**SIM_CFG, "resolution": [160, 120],
+            "blob": {**SIM_CFG["blob"], "radius_px": 10, "aspect": 2.0, "angle": 0.0}}
+    spec = TrajectorySpec(shape="circle", size=(0.0, 0.0), period_s=1.0)
+    plain = render_frames(spec, base)[0]
+    cfg = {**base, "blob": {**base["blob"], "texture": {"depth": 0.5, "scale_px": 2, "seed": 3}}}
+    textured = render_frames(spec, cfg)[0]
+    bg, fg = base["blob"]["bg_intensity"], base["blob"]["fg_intensity"]
+    inside = plain == fg
+    assert (textured[~inside] == plain[~inside]).all()           # footprint unchanged
+    assert textured[inside].std() > 0.15 * fg                    # varied inside
+    assert abs(textured[inside].mean() - fg) < 0.15 * fg         # around the same brightness
+    assert textured[inside].min() > bg                           # still brighter than the background
+
+
+def test_texture_turns_rigidly_with_the_target():
+    cfg = {**SIM_CFG, "resolution": [160, 120],
+           "blob": {**SIM_CFG["blob"], "radius_px": 10, "aspect": 2.0, "angle": 0.0,
+                    "texture": {"depth": 0.5, "scale_px": 2, "seed": 3}}}
+    spec = TrajectorySpec(shape="circle", size=(0.0, 0.0), period_s=1.0)
+    at0 = render_frames(spec, cfg)[0]
+    at90 = render_frames(spec, {**cfg, "blob": {**cfg["blob"], "angle": np.pi / 2}})[0]
+    r = 24
+    crop0, crop90 = at0[60 - r:61 + r, 80 - r:81 + r], at90[60 - r:61 + r, 80 - r:81 + r]
+    turned = np.rot90(crop0, k=-1)                               # +90 deg in image coords
+    inside = (turned > cfg["blob"]["bg_intensity"]) & (crop90 > cfg["blob"]["bg_intensity"])
+    assert inside.sum() > 400
+    assert np.abs(turned[inside] - crop90[inside]).mean() < 0.05 * cfg["blob"]["fg_intensity"]

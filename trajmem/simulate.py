@@ -29,7 +29,9 @@ def render_frames(spec: TrajectorySpec, cfg, intrinsics=None) -> np.ndarray:
 
     The blob is an ellipse of semi-axes (radius * aspect, radius) at `angle`, and an
     optional `string` is a line from a fixed pivot to it, drawn underneath; a target
-    on a string hangs along it, as the brush targets in the real corpus do.
+    on a string hangs along it, as the brush targets in the real corpus do. An
+    optional `texture` fills the body with a fixed pattern that moves rigidly with
+    it, so events fire inside the target too, as they do on a real brush.
     """
     import cv2
 
@@ -51,14 +53,40 @@ def render_frames(spec: TrajectorySpec, cfg, intrinsics=None) -> np.ndarray:
     fg = float(blob["fg_intensity"])
     string = blob.get("string")
     pivot = None if not string else np.array(string["pivot"], dtype=float) * (w, h)
+    patch = _texture_patch(blob.get("texture"), axes, fg, float(blob["bg_intensity"]))
     for i in range(n):
         centre = (round(px[i, 0]), round(px[i, 1]))
         if pivot is not None:
             cv2.line(frames[i], (round(pivot[0]), round(pivot[1])), centre,
                      float(string["intensity"]), int(string["thickness_px"]))
             angle_deg = np.degrees(np.arctan2(px[i, 1] - pivot[1], px[i, 0] - pivot[0]))
-        cv2.ellipse(frames[i], centre, axes, angle_deg, 0, 360, fg, thickness=-1)
+        if patch is None:
+            cv2.ellipse(frames[i], centre, axes, angle_deg, 0, 360, fg, thickness=-1)
+            continue
+        mask = np.zeros((h, w), dtype=np.uint8)
+        cv2.ellipse(mask, centre, axes, angle_deg, 0, 360, 1, thickness=-1)
+        # getRotationMatrix2D turns the other way from cv2.ellipse's angle
+        mid = (patch.shape[0] - 1) / 2                          # odd side: a pixel centre
+        m = cv2.getRotationMatrix2D((mid, mid), -angle_deg, 1.0)
+        m[:, 2] += (px[i, 0] - mid, px[i, 1] - mid)
+        warped = cv2.warpAffine(patch, m, (w, h), flags=cv2.INTER_LINEAR, borderValue=fg)
+        frames[i][mask > 0] = warped[mask > 0]
     return frames
+
+
+def _texture_patch(texture, axes, fg: float, bg: float):
+    """Blurred noise around `fg`, big enough to cover the ellipse at any angle; or None."""
+    if not texture or texture["depth"] <= 0:
+        return None
+    import cv2
+
+    side = 2 * axes[0] + 5
+    rng = np.random.default_rng(texture.get("seed", 0))
+    noise = cv2.GaussianBlur(rng.standard_normal((side, side)).astype(np.float32),
+                             (0, 0), float(texture["scale_px"]))
+    noise /= noise.std()                                       # depth is the relative spread
+    patch = fg * (1.0 + float(texture["depth"]) * noise)
+    return np.clip(patch, bg + 1.0, 255.0).astype(np.float32)   # never darker than the ground
 
 
 def load_intrinsics(camera_cfg=None):

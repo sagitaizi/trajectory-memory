@@ -50,16 +50,18 @@ the first 5 s, within 60 px of the ground truth and outside it:
 
 | | real | sim |
 |---|---|---|
-| target event rate (ev/s) | 82.0 k | 82.0 k |
-| ON fraction | 0.509 | 0.505 |
-| footprint: median event distance from gt (px) | 18.2 | 17.9 |
-| trail: 90th pct of distance behind the target (px) | 19.6 | 17.4 |
-| noise far from target (ev/px/s) | 0.291 | 0.292 |
+| target event rate (ev/s) | 82.0 k | 84.5 k |
+| ON fraction | 0.509 | 0.504 |
+| footprint: median event distance from gt (px) | 18.2 | 18.4 |
+| trail: 90th pct of distance behind the target (px) | 19.6 | 17.1 |
+| noise floor: median 32-px tile far from target (ev/px/s) | 0.105 | 0.088 |
 
-Reached with blob radius 18 px, background 30 / blob 115 (8-bit), thresholds 0.2,
-sigma 0.03, shot noise 0.33 Hz/px, **photoreceptor filter off** (`params.yaml`).
-Starting values (radius 12, 64/128, noise 0.01) were 4.5x short on target rate and
-36x short on noise.
+Reached with blob radius 18 px, texture depth 0.4, background 30 / blob 90 (8-bit),
+thresholds 0.2, sigma 0.03, shot noise 0.1 Hz/px, **photoreceptor filter off**
+(`params.yaml`). Starting values (radius 12, 64/128, noise 0.01) were 4.5x short on
+target rate. The noise floor is the *median tile* rate on purpose: the real far-field
+is very uneven (hot pixels, flicker, the string; 95th-percentile tiles run 1-8 ev/px/s),
+and matching the mean had put a flat 0.29 everywhere, 3x the real floor.
 
 **Why the filter is off.** v2e scales the photoreceptor time constant by 275/(I+20),
 so with a dark background (I = 30) the trailing edge of the blob decays with tau ~ 29 ms
@@ -76,9 +78,11 @@ span both clips, and the renderer draws elongated targets and strings (below).
 for `scripts/replay_gt.py`.
 
 ## Domain randomisation (`scripts/make_sim_dataset.py`)
-Per clip, from `sim.randomise`: threshold, sigma, shot noise, blob contrast, size, aspect
-(1 = disc to 4 = brush), angle, an optional string to a pivot above the frame (the target
-then hangs along it), and the path -- shape, size, period, position, rotation, half with
+Per clip, from `sim.randomise`: threshold, sigma, shot noise, an optional photoreceptor
+lag (half the clips, 60-200 Hz), blob contrast, size, aspect (1 = disc to 4 = brush),
+angle, a body texture (flat to bristly, so events fire inside the target and it leaves
+a wake), an optional string to a pivot above the frame (the target then hangs along it),
+and the path -- shape, size, period, position, rotation, half with
 a scripted deviation. 30 % of paths are exact; the rest carry small smooth imperfections
 (`trajectories.Wobble`: amplitude beating, slow centre wander, period jitter, slow
 growth/decay), each drawn from a range starting at zero, so the corpus runs from perfect

@@ -5,8 +5,9 @@ matched camera model, each with exact ground truth.
 
 Every clip draws its own path (shape, size, period, position, angle; half get one
 scripted deviation in the middle third; most get small smooth imperfections, some
-stay perfect), its own target (aspect, angle, an optional string to a pivot) and
-its own camera settings, all from the `sim.randomise` ranges in params.yaml. Clip i depends only on (--seed, i), so a run
+stay perfect), its own target (aspect, angle, texture, an optional string to a pivot)
+and its own camera settings (thresholds, noise, an optional photoreceptor lag), all
+from the `sim.randomise` ranges in params.yaml. Clip i depends only on (--seed, i), so a run
 that is killed resumes by skipping the files already written. Watch a clip with
 `python scripts/replay_gt.py corpus/sim/sim_000.npz`.
 """
@@ -28,8 +29,8 @@ from trajmem.data import load_clip, load_sim, save_clip, sim_params  # noqa: E40
 from trajmem.trajectories import Deviation, TrajectorySpec, Wobble, sample  # noqa: E402
 
 MANIFEST_FIELDS = ("name", "shape", "period_s", "deviation", "deviation_t", "wobble", "seed",
-                   "pos_thres", "sigma_thres", "shot_noise_rate_hz", "fg_intensity", "radius_px",
-                   "aspect", "string")
+                   "pos_thres", "sigma_thres", "shot_noise_rate_hz", "cutoff_hz", "fg_intensity",
+                   "radius_px", "aspect", "string", "texture_depth")
 _SWITCH_TARGETS = ("circle", "ellipse", "figure8", "lissajous")
 
 
@@ -102,11 +103,16 @@ def random_sim_cfg(rng: np.random.Generator, sim_cfg: dict) -> dict:
     for key in ("pos_thres", "sigma_thres", "shot_noise_rate_hz"):
         cfg["v2e"][key] = float(rng.uniform(*ranges[key]))
     cfg["v2e"]["neg_thres"] = cfg["v2e"]["pos_thres"]
+    cfg["v2e"]["cutoff_hz"] = (float(rng.uniform(*ranges["cutoff_hz"]))
+                               if rng.uniform() < ranges["lag_fraction"] else 0.0)
     blob = cfg["blob"]
     blob["fg_intensity"] = float(rng.uniform(*ranges["fg_intensity"]))
     blob["radius_px"] = int(rng.integers(ranges["radius_px"][0], ranges["radius_px"][1] + 1))
     blob["aspect"] = float(rng.uniform(*ranges["aspect"]))
     blob["angle"] = float(rng.uniform(0, np.pi))
+    blob["texture"] = {"depth": float(rng.uniform(*ranges["texture_depth"])),
+                       "scale_px": float(rng.uniform(*ranges["texture_scale_px"])),
+                       "seed": int(rng.integers(0, 2**31))}
     blob["string"] = None
     if rng.uniform() < ranges["string_fraction"]:
         lo, hi = ranges["string_thickness_px"]
@@ -132,10 +138,12 @@ def manifest_row(name: str, clip) -> dict:
         "pos_thres": f"{cfg['v2e']['pos_thres']:.4f}",
         "sigma_thres": f"{cfg['v2e']['sigma_thres']:.4f}",
         "shot_noise_rate_hz": f"{cfg['v2e']['shot_noise_rate_hz']:.4f}",
+        "cutoff_hz": f"{cfg['v2e']['cutoff_hz']:.0f}",
         "fg_intensity": f"{cfg['blob']['fg_intensity']:.1f}",
         "radius_px": cfg["blob"]["radius_px"],
         "aspect": f"{cfg['blob']['aspect']:.2f}",
         "string": "yes" if cfg["blob"].get("string") else "",
+        "texture_depth": f"{cfg['blob']['texture']['depth']:.2f}",
     }
 
 

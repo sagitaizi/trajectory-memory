@@ -33,6 +33,8 @@ def event_stats(clip: Clip, resolution, radius_px: float) -> dict:
 
     `trail_px` is how far behind the target, along its direction of motion, the
     near events reach (90th percentile) -- a lagging photoreceptor shows up here.
+    `noise_rate_per_px` is the *typical* far-from-target rate: the median over
+    32 px tiles, so hot pixels, flicker and stray structure do not inflate it.
     Events at instants where gt is unknown (NaN) are left out of everything.
     """
     w, h = resolution
@@ -54,12 +56,15 @@ def event_stats(clip: Clip, resolution, radius_px: float) -> dict:
     behind = np.clip(-along, 0.0, None)
 
     seconds = clip.duration_us / 1e6
+    tile = 32
+    tiles = np.bincount((ev["y"][far] // tile) * (w // tile) + ev["x"][far] // tile,
+                        minlength=(w // tile) * (h // tile))
     return {
         "target_rate": float(near.sum() / seconds),
         "on_fraction": float(ev["polarity"][near].mean()) if near.any() else float("nan"),
         "footprint_px": float(np.median(d[near])) if near.any() else float("nan"),
         "trail_px": float(np.percentile(behind, 90)) if moving.any() else float("nan"),
-        "noise_rate_per_px": float(far.sum() / seconds / (w * h - np.pi * radius_px ** 2)),
+        "noise_rate_per_px": float(np.median(tiles) / tile ** 2 / seconds),
     }
 
 

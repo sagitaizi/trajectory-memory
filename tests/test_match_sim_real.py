@@ -19,18 +19,30 @@ def still_gt(t):
 
 
 def test_event_stats_splits_target_from_noise_by_distance():
-    # 6 events on the target (3 px off centre), 4 far away, over one second
-    xs = [323] * 6 + [10, 20, 30, 40]
-    ys = [240] * 6 + [10, 20, 30, 40]
-    ts = np.linspace(0, 999_999, 10).astype(np.int64)
-    pols = [1, 1, 1, 1, 0, 0, 1, 1, 1, 1]
+    # 6 events on the target (3 px off centre) and a uniform floor of one event per
+    # pixel per second everywhere else, over one second
+    rng = np.random.default_rng(0)
+    n_noise = 640 * 480
+    nx, ny = rng.integers(0, 640, n_noise), rng.integers(0, 480, n_noise)
+    xs = np.concatenate([[323] * 6, nx])
+    ys = np.concatenate([[240] * 6, ny])
+    ts = np.sort(rng.integers(0, 1_000_000, len(xs))).astype(np.int64)
+    pols = np.concatenate([[1, 1, 1, 1, 0, 0], rng.integers(0, 2, n_noise)])
     clip = a_clip(xs, ys, ts, pols, still_gt)
 
     s = event_stats(clip, (640, 480), radius_px=50)
-    assert s["target_rate"] == 6.0
-    assert s["on_fraction"] == 4 / 6
-    assert s["footprint_px"] == 3.0
-    assert np.isclose(s["noise_rate_per_px"], 4 / (640 * 480 - np.pi * 50 ** 2))
+    assert abs(s["target_rate"] - (6.0 + np.pi * 50 ** 2)) < 300   # target + the floor inside the disc
+    assert np.isclose(s["noise_rate_per_px"], 1.0, atol=0.15)
+
+
+def test_noise_floor_is_the_typical_tile_not_the_hot_spots():
+    rng = np.random.default_rng(1)
+    n_noise = 640 * 480 // 10                                   # 0.1 ev/px/s everywhere
+    xs = list(rng.integers(0, 640, n_noise)) + [10] * 5000      # plus one hot pixel
+    ys = list(rng.integers(0, 480, n_noise)) + [10] * 5000
+    ts = np.sort(rng.integers(0, 1_000_000, len(xs))).astype(np.int64)
+    clip = a_clip(xs, ys, ts, [1] * len(xs), still_gt)
+    assert np.isclose(event_stats(clip, (640, 480), radius_px=50)["noise_rate_per_px"], 0.1, atol=0.03)
 
 
 def test_event_stats_skips_events_where_the_target_is_unknown():

@@ -33,6 +33,8 @@ SIM_CFG = {
         "shot_noise_rate_hz": [0.0, 0.1], "fg_intensity": [120, 220], "radius_px": [2, 5],
         "aspect": [1.0, 4.0],
         "string_fraction": 0.5, "string_intensity": [60, 150], "string_thickness_px": [1, 3],
+        "texture_depth": [0.0, 0.8], "texture_scale_px": [2.0, 8.0],
+        "lag_fraction": 0.5, "cutoff_hz": [60, 200],
         "path": PATH_CFG,
     },
 }
@@ -93,6 +95,16 @@ def test_random_sim_cfg_draws_shape_and_string():
         assert 60 <= st["intensity"] <= 150 and 1 <= st["thickness_px"] <= 3
 
 
+def test_random_sim_cfg_draws_texture_and_an_optional_lag():
+    cfgs = [random_sim_cfg(np.random.default_rng(i), SIM_CFG) for i in range(60)]
+    depths = [c["blob"]["texture"]["depth"] for c in cfgs]
+    assert min(depths) >= 0 and max(depths) <= 0.8 and np.std(depths) > 0.1
+    assert len({c["blob"]["texture"]["seed"] for c in cfgs}) > 30      # not one pattern
+    lagged = [c["v2e"]["cutoff_hz"] for c in cfgs if c["v2e"]["cutoff_hz"] > 0]
+    assert 15 <= len(lagged) <= 45
+    assert all(60 <= f <= 200 for f in lagged)
+
+
 def test_random_sim_cfg_draws_inside_the_ranges_and_keeps_thresholds_symmetric():
     cfg = random_sim_cfg(np.random.default_rng(0), SIM_CFG)
     r = SIM_CFG["randomise"]
@@ -118,7 +130,7 @@ def test_main_writes_clips_and_a_manifest_and_resumes(tmp_path):
         rows = list(csv.DictReader(fh))
     assert [r["name"] for r in rows] == ["sim_000", "sim_001"]
     assert {"shape", "period_s", "deviation", "deviation_t", "pos_thres", "radius_px",
-            "aspect", "string", "wobble"} <= rows[0].keys()
+            "aspect", "string", "wobble", "texture_depth", "cutoff_hz"} <= rows[0].keys()
 
     clip = load_clip(files[1])
     assert clip.gt is not None and len(clip.events) > 0
