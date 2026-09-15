@@ -22,7 +22,13 @@ trajectory-memory/
     experiment.py
   scripts/
     make_sim_dataset.py
-    run_experiment.py
+    run_experiment.py        CLI: one clip or --set; scorecard table + runs/results/*.csv
+    check_localiser.py       centroid vs hand-labels per clip
+    match_sim_real.py        sim-vs-real statistics on a labelled clip (v2e calibration)
+    make_tracks.py           corpus/sim/tracks.npz: measured + true positions per window
+    make_frames.py           corpus/sim/frames_<d>x_<w>us/: uint8 count images per window
+    corpus_summary.py        verify the corpus, print the §IV-A table
+    replay_gt.py             player; --model draws a memory's output live
   tests/
   corpus/                # recorded .aedat4 + generated sim clips + GT (gitignored)
   docs/
@@ -69,11 +75,16 @@ calibration), contrast threshold and noise. Ground truth is the spec, exact.
 `simulate`). Hand-labelled real clips: `attach_labels(clip, points)` interpolates sparse
 `(t, x, y)` marks into `gt`.
 
-### `frontend.py`
-`to_frames(clip, window_us) -> iterator[Frame]` — reuses `pipeline.accumulator` /
-`pipeline.time_surface`. Stage 1 input.
-`to_raw(clip, bin_us) -> iterator[SpikeTensor]` — fine spatial+temporal binning. Stage 2 input.
-`to_position(clip, window_us) -> iterator[(t, x, y)]` — classical centroid. Baseline/fallback.
+### `frontend.py` ✅
+`windows(clip, window_us)` — `(t_start_us, events)` per window, one search for all edges.
+`to_frames(clip, window_us, kind, downsample, tau_us) -> iterator[(t_us, frame)]` — `count`:
+ON/OFF count image `(2, H, W)` float32, block-summed by `downsample`; `surface`: the main
+repo's `pipeline.time_surface` (`(H, W)` in [0, 1]). `pipeline.accumulator` is not reused: it
+needs a `dv.EventStore`, our clips are NumPy arrays. Stage 1 input.
+`to_position(clip, window_us) -> iterator[(t_s, x, y)]` — dense-cell centroid: events per 16 px
+cell, cells with ≥ 30 % of the fullest, mean of their events; NaN when too few. Robust to
+sensor-wide noise and to a string. `t_s` is the window centre. Baseline/fallback.
+`to_raw(clip, bin_us)` — Stage 2 input, still a stub.
 
 ### `model.py`
 The framework-agnostic boundary.
@@ -98,18 +109,26 @@ Ships: `ReservoirMemory` (NumPy echo-state + ridge/RLS readout) and `CentroidLoc
 (wraps `frontend.to_position`). Framework-specific implementations (LMU, snnTorch) are added
 behind the same Protocols once G-F closes.
 
-### `baseline.py`
-`PeriodicKalman` and `HarmonicFit` — implement `TrajectoryMemory`. Non-SNN reference numbers.
+### `baseline.py` ✅
+`PeriodicKalman` (harmonic state per coordinate, normalised-innovation surprise) and
+`HarmonicFit` (sliding least-squares harmonics) — implement `TrajectoryMemory`; both take
+`dt_s` (one observation per window), estimate the period from a `warmup_s` (5 s) of
+observations with `trajectories.search_period` and keep it; a NaN observation is skipped.
+`fit()` is a no-op: they learn each clip from its own warm-up.
 
-### `metrics.py`
-`prediction_error(pred, gt)` — mean/median distance at the prediction horizon.
-`lock_on_time(errors, tol)` — time until error stays below `tol`.
-`deviation_roc(scores, deviation_times)` — ROC + median detection latency.
+### `metrics.py` ✅
+`prediction_error(pred, gt) -> {errors, median, iqr, mean, n}`.
+`lock_on_time(errors, tol, dt)` — first time after which the error stays under `tol`; inf if never.
+`deviation_roc(scores, times, deviation_times, threshold, hold_n) -> {threshold, auc,
+latency_s, fp_per_min}` — Mann–Whitney AUC; a flag is `hold_n` steps above threshold.
 
-### `experiment.py`
-`run(config) -> Report`. Build corpus (sim train split + real test split) → `model.fit` on sim
-tracks → freeze → stream each real clip through `model.step` → `metrics` → table + plots.
-Deterministic given a seed.
+### `experiment.py` ✅ (per-clip and per-set; the corpus-wide pretrain run comes with C)
+`Trace` — a memory's per-step output on one clip (`t, obs, pred, gt_ahead, score`).
+`evaluate_clip(memory, clip, window_us, horizon_s) -> Trace` — the one loop every method
+goes through. `score_trace(trace, clip, tol_px, settle_s) -> dict` — the three metrics.
+`load_set / open_set(name)` — `corpus/sets.yaml` entries, loaded and sliced.
+`run_set(make_memory, clips, ...) -> (rows, pooled)` — fresh memory per clip, medians pooled.
+`make_memory(name, dt_s, **params)` — `kalman` / `harmonic`; the SNN registers here.
 
 ## Data flow
 
