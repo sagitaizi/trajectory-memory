@@ -72,8 +72,14 @@ freely moving real target, with a break signal.
   | `loop_01` | 21.7 (p90 93) | 55.8 | 55.3 |
   | `loop_break_01` | 22.1 | 22.3 (AUC 0.75) | 18.9 (AUC 0.81) |
   | `wide_break` | 46.3 | 41.3 (AUC 0.86) | 42.2 (AUC 0.67) |
-  | pooled (8 entries) | — | 24.2 | 32.6 |
+  | pooled, development (8 entries) | — | 24.2 | 32.6 |
+  | pooled, all 100 sim clips | 10.8 | 25.1 | 30.8 |
+  | sim clips where the centroid tracks (49) | < 15 | 9.9 | 17.0 |
 
+  On sim the localiser is the bottleneck: on 39 of 88 clips the centroid is ≥ 15 px off
+  (the string) and the predictors follow it (55 px); with clean positions the Kalman is
+  ~10 px, 7 on exact paths. Both baselines use two harmonics, so 3:2 Lissajous paths score
+  worse (Kalman 39.5 px). Break detection on sim: AUC 0.91 / 0.86, latency 0.28 / 0.07 s.
   The pendulum numbers are a *constant* vertical offset of 27–43 px between the event
   centroid and the marked brush centre (1–3 px sideways) — a labelling convention, and a
   floor under any pendulum error scored against labels. How to treat it is an open §IV-D
