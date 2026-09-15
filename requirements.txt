@@ -3,14 +3,14 @@
 # numpy, pyyaml, nengo, dv_processing, opencv-python come from the base thesis env.
 #
 # Install:  python -m pip install -r requirements.txt
-# torch is the CPU-only wheel (no CUDA build for cp314 at install time).
+# torch is the CUDA 12.6 wheel from the PyTorch index; the plain PyPI wheel is CPU-only.
 
 # assumed present by the docs but were missing from the env
 scipy==1.18.1
 matplotlib==3.11.1
 
 # SNN training path (Stage 1 localiser, Stage 2)
-torch==2.14.0
+torch==2.14.0+cu126   # --index-url https://download.pytorch.org/whl/cu126 (RTX 3060)
 torchvision==0.29.0
 snntorch==1.0.0
 

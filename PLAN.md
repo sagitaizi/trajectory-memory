@@ -114,8 +114,8 @@ Decided together, after a short bake-off on simulated tracks. Unlocks §III-C/D.
   or surrogate-gradient spiking RNN (snnTorch). Localiser: topographic, so a small spiking
   conv / WTA (snnTorch); NEF is the wrong shape for it. Raw events push toward
   snnTorch/SpikingJelly or a custom reservoir rather than Nengo.
-- **Installed**: `snntorch 1.0.0`, `nengo 4.1.0`, `torch 2.14` (CUDA build being installed;
-  RTX 3060, 6 GB). Not installed: SpikingJelly, Norse, Lava, nengo-dl.
+- **Installed**: `snntorch 1.0.0`, `nengo 4.1.0`, `torch 2.14.0+cu126` on the RTX 3060
+  (6 GB). Not installed: SpikingJelly, Norse, Lava, nengo-dl.
 - **Inputs ready**: `corpus/sim/tracks.npz` (300 k position steps, half the clips with a
   break); frame sets via `make_frames.py --downsample d` (8× → 2×60×80 per 5 ms).
 - **One evaluation loop** for every candidate: `run_experiment.py --set development`.
