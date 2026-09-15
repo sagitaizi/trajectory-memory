@@ -159,15 +159,18 @@ def _run_v2e(frames, times_s, v2e_cfg, seed: int = 0) -> np.ndarray:
     emu = EventEmulator(seed=seed + 1, output_folder=None, dvs_h5=None, dvs_aedat2=None,
                         dvs_text=None, device="cpu", **params)
 
+    # each chunk is packed as it arrives: v2e's float64 rows are 32 bytes an event and a
+    # busy clip runs to 50 M events, which would not fit next to everything else
     chunks = []
     for frame, t in zip(frames, times_s):
         ev = emu.generate_events(np.ascontiguousarray(frame, dtype=np.float32), float(t))
         if ev is not None and len(ev):
-            chunks.append(np.asarray(ev))
-    if not chunks:
-        return np.empty(0, dtype=EVENT_DTYPE)
+            chunks.append(_pack(np.asarray(ev)))
+    return np.concatenate(chunks) if chunks else np.empty(0, dtype=EVENT_DTYPE)
 
-    raw = np.concatenate(chunks, axis=0)                 # (M, 4): [t_s, x, y, polarity]
+
+def _pack(raw: np.ndarray) -> np.ndarray:
+    """(M, 4) [t_s, x, y, polarity] rows -> EVENT_DTYPE."""
     out = np.empty(len(raw), dtype=EVENT_DTYPE)
     out["x"] = np.rint(raw[:, 1]).astype(np.int16)
     out["y"] = np.rint(raw[:, 2]).astype(np.int16)
