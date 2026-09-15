@@ -17,6 +17,26 @@ constrained ballistic motion, offline batch, no deviation detection**. The gap: 
 path learned online-style from a freely-moving real target, with a break signal, as predictive
 inference.
 
+## Next session (2026-09-16 night, for the morning)
+
+Everything below the SNN core is in place; what is left is the part to decide together:
+**framework (G-F), localiser and memory architecture, training, parameters.** On the table:
+
+- **G-F facts** are collected under "Decision gates" below (what is installed, GPU state,
+  input data ready, the baseline bar).
+- **Localiser bar**: the classical centroid (`scripts/check_localiser.py --set development`)
+  is 5.7 px on the fan, ~22 px on the wall target with losses (p90 93 px on `loop_01`), and a
+  *constant* 27–43 px vertical offset on the pendulum (label convention, 1–3 px sideways).
+- **Memory bar**: Kalman / harmonic at 100 ms on the development set, pooled median 24.2 /
+  32.6 px (`runs/results/development_*.csv`); ~3 px on simulated clips with exact truth.
+- **Open policy question for §IV-D**: how to treat the pendulum's constant label offset.
+- **Environment action** (one line, not done overnight because the shared env was in use):
+  a CUDA torch for this Python now exists — `pip install torch==2.14.0+cu126 --index-url
+  https://download.pytorch.org/whl/cu126` — the laptop's RTX 3060 (6 GB) is otherwise idle;
+  v2e also runs on torch, so regenerate nothing while switching.
+- Uncommitted on purpose, for review: `paper/main.tex` (starting-point comments in every
+  unblocked section, on top of Sagi's own edits), `PAPER_PROGRESS.md`, `paper/refs.bib`.
+
 ## Current status
 
 | Phase | Status |
@@ -151,9 +171,26 @@ not all at the end.
 ## Decision gates
 
 ### G-F — framework for the SNN core (OPEN)
-Deferred deliberately. Resolve by ~2026-09-13 after a short bake-off on simulated trajectories.
-Needs a machine, so it cannot be settled away from the desk. **Unlocks:** naming the framework
+Deferred deliberately. Resolve after a short bake-off on simulated trajectories. Needs a
+machine, so it cannot be settled away from the desk. **Unlocks:** naming the framework
 in §III-C and §III-D.
+
+**Facts gathered 2026-09-16** (no decision taken):
+- Installed in `thesis`: `snntorch 1.0.0`, `nengo 4.1.0`, `torch 2.14.0+cpu` (10 threads),
+  `scipy`, `numpy 2.4`. Not installed: SpikingJelly, Norse, Lava, nengo-dl, sklearn.
+- GPU: RTX 3060 Laptop, 6 GB, driver 596 — unused, torch is the CPU wheel. A
+  `torch==2.14.0+cu126` wheel for Python 3.14 is now on the PyTorch index (was not on
+  2026-09-10). Not installed yet; see "Next session".
+- Inputs ready: `corpus/sim/tracks.npz` (measured + true position per 5 ms window, all
+  clips; `scripts/make_tracks.py`) for the memory core; `scripts/make_frames.py --downsample d`
+  for the localiser (uint8 ON/OFF counts; 8× → 2×60×80 per 5 ms, ~29 MB per clip). 100 clips
+  × 3,000 steps = 300 k position steps; half the clips carry a break.
+- One evaluation loop for every candidate: `experiment.evaluate_clip` / `run_set`, the same
+  `TrajectoryMemory` interface the baselines implement (`fit / observe / predict /
+  deviation_score / reset`), so a candidate is scored by `run_experiment.py --set development`
+  and watched with `replay_gt.py --model` as soon as it exists.
+- Bar to reach on the development set (100 ms): Kalman 24.2 px pooled (8.0 on the fan),
+  break AUC 0.75–0.86. On simulated clips: ~3 px.
 
 - **Memory core** (low-D path → prediction): reservoir/LSM + online readout, or Legendre Memory
   Unit (Nengo), or surrogate-gradient spiking RNN (snnTorch).
