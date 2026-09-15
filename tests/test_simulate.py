@@ -227,3 +227,22 @@ def test_texture_turns_rigidly_with_the_target():
     inside = (turned > cfg["blob"]["bg_intensity"]) & (crop90 > cfg["blob"]["bg_intensity"])
     assert inside.sum() > 400
     assert np.abs(turned[inside] - crop90[inside]).mean() < 0.05 * cfg["blob"]["fg_intensity"]
+
+
+def test_iter_frames_yields_the_same_frames_one_at_a_time():
+    """simulate() streams frames into v2e: a 15 s clip at 650 fps would be ~12 GB stacked."""
+    from trajmem.simulate import iter_frames
+
+    stacked = render_frames(a_circle(), SIM_CFG)
+    streamed = list(iter_frames(a_circle(), SIM_CFG))
+    assert len(streamed) == len(stacked)
+    assert all(np.array_equal(a, b) for a, b in zip(streamed, stacked))
+    assert all(f.shape == stacked.shape[1:] for f in streamed)
+
+
+def test_seed_zero_is_reproducible_too():
+    """v2e treats seed 0 as 'unseeded'; the wrapper must not pass it through."""
+    cfg = {**SIM_CFG, "v2e": {**SIM_CFG["v2e"], "shot_noise_rate_hz": 5.0, "sigma_thres": 0.03}}
+    a = simulate(a_circle(), camera_cfg=None, sim_cfg=cfg, seed=0).events
+    b = simulate(a_circle(), camera_cfg=None, sim_cfg=cfg, seed=0).events
+    assert len(a) > 0 and np.array_equal(a, b)

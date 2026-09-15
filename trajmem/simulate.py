@@ -21,7 +21,13 @@ _V2E_REPO = Path(os.environ.get("V2E_REPO", Path(__file__).resolve().parents[2] 
 
 
 def render_frames(spec: TrajectorySpec, cfg, intrinsics=None) -> np.ndarray:
-    """Sampled path -> frame stack (T, H, W) float32: a blob on the path at cfg['fps'].
+    """`iter_frames` stacked into (T, H, W). For small clips and tests only: a full
+    clip at sensor resolution runs to gigabytes, which is why `simulate` streams."""
+    return np.stack(list(iter_frames(spec, cfg, intrinsics)))
+
+
+def iter_frames(spec: TrajectorySpec, cfg, intrinsics=None):
+    """Sampled path -> frames (H, W) float32, one at a time: a blob on the path at cfg['fps'].
 
     The analytic path lives in an ideal pinhole image of size cfg['resolution'];
     with `intrinsics` the blob is drawn at its lens-distorted pixel instead, so the
@@ -46,32 +52,33 @@ def render_frames(spec: TrajectorySpec, cfg, intrinsics=None) -> np.ndarray:
     blob = cfg["blob"]
 
     px = _path_pixels(spec, times, (w, h), intrinsics)
-    frames = np.full((n, h, w), float(blob["bg_intensity"]), dtype=np.float32)
+    bg = float(blob["bg_intensity"])
     radius = int(blob["radius_px"])
     axes = (max(1, round(radius * float(blob.get("aspect", 1.0)))), max(1, radius))
     angle_deg = np.degrees(float(blob.get("angle", 0.0)))
     fg = float(blob["fg_intensity"])
     string = blob.get("string")
     pivot = None if not string else np.array(string["pivot"], dtype=float) * (w, h)
-    patch = _texture_patch(blob.get("texture"), axes, fg, float(blob["bg_intensity"]))
+    patch = _texture_patch(blob.get("texture"), axes, fg, bg)
     for i in range(n):
+        frame = np.full((h, w), bg, dtype=np.float32)
         centre = (round(px[i, 0]), round(px[i, 1]))
         if pivot is not None:
-            cv2.line(frames[i], (round(pivot[0]), round(pivot[1])), centre,
+            cv2.line(frame, (round(pivot[0]), round(pivot[1])), centre,
                      float(string["intensity"]), int(string["thickness_px"]))
             angle_deg = np.degrees(np.arctan2(px[i, 1] - pivot[1], px[i, 0] - pivot[0]))
         if patch is None:
-            cv2.ellipse(frames[i], centre, axes, angle_deg, 0, 360, fg, thickness=-1)
-            continue
-        mask = np.zeros((h, w), dtype=np.uint8)
-        cv2.ellipse(mask, centre, axes, angle_deg, 0, 360, 1, thickness=-1)
-        # getRotationMatrix2D turns the other way from cv2.ellipse's angle
-        mid = (patch.shape[0] - 1) / 2                          # odd side: a pixel centre
-        m = cv2.getRotationMatrix2D((mid, mid), -angle_deg, 1.0)
-        m[:, 2] += (px[i, 0] - mid, px[i, 1] - mid)
-        warped = cv2.warpAffine(patch, m, (w, h), flags=cv2.INTER_LINEAR, borderValue=fg)
-        frames[i][mask > 0] = warped[mask > 0]
-    return frames
+            cv2.ellipse(frame, centre, axes, angle_deg, 0, 360, fg, thickness=-1)
+        else:
+            mask = np.zeros((h, w), dtype=np.uint8)
+            cv2.ellipse(mask, centre, axes, angle_deg, 0, 360, 1, thickness=-1)
+            # getRotationMatrix2D turns the other way from cv2.ellipse's angle
+            mid = (patch.shape[0] - 1) / 2                      # odd side: a pixel centre
+            m = cv2.getRotationMatrix2D((mid, mid), -angle_deg, 1.0)
+            m[:, 2] += (px[i, 0] - mid, px[i, 1] - mid)
+            warped = cv2.warpAffine(patch, m, (w, h), flags=cv2.INTER_LINEAR, borderValue=fg)
+            frame[mask > 0] = warped[mask > 0]
+        yield frame
 
 
 def _texture_patch(texture, axes, fg: float, bg: float):
@@ -137,8 +144,8 @@ _V2E_KEYS = ("pos_thres", "neg_thres", "sigma_thres", "cutoff_hz", "leak_rate_hz
              "refractory_period_s", "shot_noise_rate_hz")
 
 
-def _run_v2e(frames: np.ndarray, times_s, v2e_cfg, seed: int = 0) -> np.ndarray:
-    """Luminance frame stack -> events (EVENT_DTYPE) via v2ecore.emulator.EventEmulator."""
+def _run_v2e(frames, times_s, v2e_cfg, seed: int = 0) -> np.ndarray:
+    """Luminance frames (any iterable) -> events (EVENT_DTYPE) via v2ecore.emulator.EventEmulator."""
     if not _V2E_REPO.is_dir():
         raise RuntimeError(f"v2e source not found at {_V2E_REPO} (set V2E_REPO)")
     import sys
@@ -148,7 +155,8 @@ def _run_v2e(frames: np.ndarray, times_s, v2e_cfg, seed: int = 0) -> np.ndarray:
     from v2ecore.emulator import EventEmulator
 
     params = {k: v2e_cfg[k] for k in _V2E_KEYS if k in v2e_cfg}
-    emu = EventEmulator(seed=seed, output_folder=None, dvs_h5=None, dvs_aedat2=None,
+    # v2e takes seed 0 to mean "unseeded", so shift every seed off it
+    emu = EventEmulator(seed=seed + 1, output_folder=None, dvs_h5=None, dvs_aedat2=None,
                         dvs_text=None, device="cpu", **params)
 
     chunks = []
@@ -171,9 +179,10 @@ def _run_v2e(frames: np.ndarray, times_s, v2e_cfg, seed: int = 0) -> np.ndarray:
 def simulate(spec: TrajectorySpec, camera_cfg, sim_cfg, seed: int = 0) -> Clip:
     """Render `spec` through the DVXplorer model and return a Clip with exact ground truth."""
     intrinsics = load_intrinsics(camera_cfg) if camera_cfg is not None else None
-    frames = render_frames(spec, sim_cfg, intrinsics=intrinsics)
-    times = np.arange(len(frames)) / sim_cfg["fps"]
-    events = _run_v2e(frames, times, sim_cfg["v2e"], seed=seed)
+    n = int(round(sim_cfg["duration_s"] * sim_cfg["fps"]))
+    times = np.arange(n) / sim_cfg["fps"]
+    events = _run_v2e(iter_frames(spec, sim_cfg, intrinsics=intrinsics), times,
+                      sim_cfg["v2e"], seed=seed)
     resolution = tuple(sim_cfg["resolution"])
     return Clip(
         events=events,
