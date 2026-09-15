@@ -191,6 +191,29 @@ def _read_events(player) -> np.ndarray:
     return out
 
 
+def slice_clip(clip: Clip, t0_s: float, t1_s: float) -> Clip:
+    """The clip between t0 and t1 as a clip of its own: events rebased to zero, ground
+    truth and break times shifted. For a segment of a clip (`loop_break_01` is two
+    repetitive motions around a break) or to drop a settling transient.
+    """
+    if t1_s <= t0_s:
+        raise ValueError("window must run forwards")
+    lo, hi = int(t0_s * 1e6), int(t1_s * 1e6)
+    keep = clip.events[(clip.events["timestamp"] >= lo) & (clip.events["timestamp"] < hi)]
+    if len(keep) == 0:
+        raise ValueError(f"no events in [{t0_s}, {t1_s}) s")
+    keep = keep.copy()
+    keep["timestamp"] -= lo
+
+    whole_gt = clip.gt
+    gt = None if whole_gt is None else (lambda t: whole_gt(np.asarray(t, dtype=float) + t0_s))
+    return replace(
+        clip, events=keep, duration_us=hi - lo, gt=gt,
+        deviation_times=[t - t0_s for t in clip.deviation_times if t0_s <= t < t1_s],
+        meta={**clip.meta, "window_s": (float(t0_s), float(t1_s))},
+    )
+
+
 # --- ground truth ------------------------------------------------------------
 
 def label_gt(points, max_gap_s: float | None = None) -> Callable:

@@ -522,3 +522,53 @@ def test_an_explicitly_given_anchor_still_forces_the_encoder_ground_truth():
         assert "labels" not in clip.meta
     finally:
         sidecar.unlink(missing_ok=True)
+
+
+# --- slicing ------------------------------------------------------------------
+
+def a_labelled_clip():
+    ev = some_events(np.arange(0, 10_000_000, 250_000))          # one event every 0.25 s
+    marks = [(t, 0.1 * t, 0.5) for t in range(0, 11)]             # x runs with time
+    clip = Clip(events=ev, duration_us=10_000_000, gt=None, deviation_times=[2.0, 7.5],
+                source="sim", meta={"resolution": (640, 480)})
+    return attach_labels(clip, marks)
+
+
+def test_slice_clip_keeps_the_window_and_rebases_the_clock():
+    from trajmem.data import slice_clip
+
+    part = slice_clip(a_labelled_clip(), 3.0, 6.0)
+    assert part.duration_us == 3_000_000
+    assert part.events["timestamp"][0] == 0
+    assert part.events["timestamp"][-1] < 3_000_000
+    assert len(part.events) == 12                                 # 3 s at 4 per second
+
+
+def test_slice_clip_shifts_ground_truth_and_break_times():
+    from trajmem.data import slice_clip
+
+    whole = a_labelled_clip()
+    part = slice_clip(whole, 3.0, 6.0)
+    assert np.allclose(part.gt(0.0), whole.gt(3.0))
+    assert np.allclose(part.gt([1.0, 2.5]), whole.gt([4.0, 5.5]))
+    assert part.deviation_times == []                             # 2.0 and 7.5 fall outside
+    assert slice_clip(whole, 1.0, 8.0).deviation_times == [1.0, 6.5]
+
+
+def test_slice_clip_leaves_the_original_and_records_the_window():
+    from trajmem.data import slice_clip
+
+    whole = a_labelled_clip()
+    part = slice_clip(whole, 3.0, 6.0)
+    assert whole.duration_us == 10_000_000 and whole.events["timestamp"][0] == 0
+    assert part.meta["window_s"] == (3.0, 6.0)
+    assert part.meta["resolution"] == (640, 480)
+
+
+def test_slice_clip_rejects_an_empty_or_backwards_window():
+    from trajmem.data import slice_clip
+
+    with pytest.raises(ValueError):
+        slice_clip(a_labelled_clip(), 6.0, 3.0)
+    with pytest.raises(ValueError):
+        slice_clip(a_labelled_clip(), 20.0, 25.0)
