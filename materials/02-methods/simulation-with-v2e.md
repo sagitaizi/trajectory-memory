@@ -88,3 +88,22 @@ a scripted deviation. 30 % of paths are exact; the rest carry small smooth imper
 growth/decay), each drawn from a range starting at zero, so the corpus runs from perfect
 to clearly imperfect without any of it looking like a deviation. A model trained across
 the spread transfers to real data far better than one trained on one idealised setting.
+
+## The corpus (generated 2026-09-16, `corpus/sim/`, `scripts/corpus_summary.py`)
+| | |
+|---|---|
+| Clips | 100, 15 s each, 650 fps render, seed-reproducible (`make_sim_dataset.py --seed 0`) |
+| Shapes | circle 16, ellipse 21, figure-8 22, Lissajous 18, straight sweep 23 |
+| Period | 0.83–3.88 s (median 2.41) |
+| With a scripted break | 48 (drift 9, shrink 14, speed change 13, shape switch 12), in the middle third |
+| Exact path / with imperfections | 35 / 65 |
+| Target on a string | 52 |
+| Photoreceptor lag (60–200 Hz) | 52 |
+| Events per clip | 0.5–86.9 M (median 7.7 M) |
+| On disk | 14.7 GB (6–1129 MB per clip) |
+
+Every clip loads and its ground truth is finite inside the frame at start, middle and end.
+The manifest (`corpus/sim/manifest.csv`) records each clip's draw. The heaviest clips are
+fast circles with a large textured target at a low threshold (up to 5.8 M ev/s); they are
+realistic (the real pendulum runs 1.5 M ev/s) but memory-hungry, which is why v2e's chunks
+are packed as they arrive.

@@ -22,6 +22,15 @@ inference.
 Everything below the SNN core is in place; what is left is the part to decide together:
 **framework (G-F), localiser and memory architecture, training, parameters.** On the table:
 
+- **Corpus finding to settle first (10 min)**: the classical centroid, run over all 100 sim
+  clips (`corpus/sim/tracks.npz`), is 10.8 px median but fails (>100 px) on ~10 % of clips —
+  every one a clip whose *string* is as bright as or brighter than the target
+  (string/target intensity ratio 1.2 on failures vs 0.65 where it works). The ranges
+  overlap: `string_intensity` 60–150 vs `fg_intensity` 80–200. In reality the brush is the
+  bright thing. Options: (a) draw the string as a fraction of the target's intensity
+  (say 0.3–0.8×) and regenerate the ~25 affected clips (~40 min, `make_sim_dataset` resumes
+  after deleting them); (b) keep them as hard cases for a learned localiser. Same mechanism
+  as the pendulum's 27–43 px upward offset on real clips — the string pulls the centroid.
 - **G-F facts** are collected under "Decision gates" below (what is installed, GPU state,
   input data ready, the baseline bar).
 - **Localiser bar**: the classical centroid (`scripts/check_localiser.py --set development`)
@@ -41,7 +50,7 @@ Everything below the SNN core is in place; what is left is the part to decide to
 
 | Phase | Status |
 |---|---|
-| A — Data | 🟨 Corpus recorded (54 clips) and code in place; **labelling is the open work** |
+| A — Data | 🟨 Real corpus recorded (54 clips), sim corpus generated (100 clips), development set labelled; **held-out labelling is the open work** |
 | B — Frontend + baseline | ✅ Done 2026-09-16; first numbers below |
 | C — Trajectory memory (Stage 1, frames) | ⬜ The goal |
 | D — Deviation detection | ⬜ In scope |
@@ -94,8 +103,9 @@ Everything below the SNN core is in place; what is left is the part to decide to
   `fan_brush_slow_02`'s labels, simulates it, and scores event rate, ON fraction, blob
   footprint and noise floor against the real clip; all four now agree within 10 %
   (`materials/02-methods/simulation-with-v2e.md`). `params.yaml` carries the matched values.
-- **Simulated corpus** (`scripts/make_sim_dataset.py`, started 2026-09-15): 100 clips x 15 s
-  into `corpus/sim/` with a `manifest.csv`, ~2-3 min per clip at 650 fps. Each clip draws a
+- **Simulated corpus ✅** (`scripts/make_sim_dataset.py`, generated 2026-09-16): 100 clips x
+  15 s in `corpus/sim/` with a `manifest.csv`; 14.7 GB; summary table in
+  `materials/02-methods/simulation-with-v2e.md`. ~1.5–2 min per clip at 650 fps. Each clip draws a
   random path (circle, ellipse, straight sweep, figure-8, Lissajous; period 0.8-4 s; half
   with one scripted deviation in the middle third; 30 % exact, the rest with small smooth
   imperfections), a random target (disc to brush-like, half on a string) and its own camera
