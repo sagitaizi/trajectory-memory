@@ -71,7 +71,7 @@ def test_position_finds_the_dense_cluster_not_the_mean():
     nx, ny = rng.uniform(0, 64, n), rng.uniform(0, 48, n)                      # as much noise
     ev = events_at(np.clip(np.r_[tx, nx], 0, 63), np.clip(np.r_[ty, ny], 0, 47),
                    rng.integers(0, 5000, 2 * n))
-    (t, x, y), = list(to_position(a_clip(ev, 5000), 5000, radius_px=8))
+    (t, x, y), = list(to_position(a_clip(ev, 5000), 5000))
     assert t == pytest.approx(0.0025)                                          # window centre, s
     assert abs(x * 64 - 12) < 1.5 and abs(y * 48 - 30) < 1.5
     mean_x = np.r_[tx, nx].mean()

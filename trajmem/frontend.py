@@ -11,10 +11,13 @@ from .data import Clip
 
 def windows(clip: Clip, window_us: int):
     """(t_start_us, events) for consecutive windows tiling the clip; the last may be short."""
-    ts = clip.events["timestamp"]
-    for t0 in range(0, clip.duration_us, window_us):
-        lo, hi = np.searchsorted(ts, [t0, t0 + window_us])
-        yield t0, clip.events[lo:hi]
+    starts = np.arange(0, clip.duration_us, window_us)
+    # one search over a contiguous copy: the field view is strided, and searching it
+    # per window would copy every timestamp every time
+    edges = np.searchsorted(np.ascontiguousarray(clip.events["timestamp"]),
+                            np.append(starts, starts[-1] + window_us))
+    for t0, lo, hi in zip(starts, edges[:-1], edges[1:]):
+        yield int(t0), clip.events[lo:hi]
 
 
 def to_frames(clip: Clip, window_us: int, kind: str = "count", downsample: int = 1,
@@ -48,36 +51,26 @@ def _count_frame(ev, w: int, h: int, downsample: int) -> np.ndarray:
 
 
 def to_position(clip: Clip, window_us: int, min_events: int = 5, cell_px: int = 16,
-                radius_px: float = 24.0):
+                frac: float = 0.3):
     """(t_s, x, y) per window, normalised to the sensor; NaN where there is too little.
 
-    The target is the *densest* patch, not the mean of all events: noise events are
-    spread over the whole sensor and would drag a mean toward its centre. So: the
-    fullest `cell_px` cell, then the mean of the events within `radius_px` of it.
-    `t_s` is the window's centre, the instant the window's events best stand for.
+    The target is where events are *dense*, not the mean of all of them: noise is
+    spread over the whole sensor and would drag a mean toward its middle, and a
+    string above a hanging target is long but thin. So: count events per `cell_px`
+    cell, keep the cells holding at least `frac` of the fullest one, and average the
+    events in those. `t_s` is the window's centre, the instant its events stand for.
     """
     w, h = clip.meta["resolution"]
+    nx, ny = -(-w // cell_px), -(-h // cell_px)
     for t0, ev in windows(clip, window_us):
         t_s = (t0 + window_us / 2) / 1e6
         if len(ev) < min_events:
             yield t_s, np.nan, np.nan
             continue
-        xs, ys = ev["x"].astype(float), ev["y"].astype(float)
-        cx, cy = _densest_cell(xs, ys, w, h, cell_px)
-        for _ in range(2):                                   # re-centre once: the cell is coarse
-            near = np.hypot(xs - cx, ys - cy) <= radius_px
-            if near.sum() < min_events:
-                break
-            cx, cy = xs[near].mean(), ys[near].mean()
-        yield (t_s, np.nan, np.nan) if near.sum() < min_events else (t_s, float(cx / w), float(cy / h))
-
-
-def _densest_cell(xs, ys, w, h, cell_px):
-    nx = -(-w // cell_px)
-    counts = np.bincount((ys // cell_px).astype(np.intp) * nx + (xs // cell_px).astype(np.intp),
-                         minlength=nx * -(-h // cell_px))
-    k = int(np.argmax(counts))
-    return (k % nx + 0.5) * cell_px, (k // nx + 0.5) * cell_px
+        cx, cy = (ev["x"] // cell_px).astype(np.intp), (ev["y"] // cell_px).astype(np.intp)
+        counts = np.bincount(cy * nx + cx, minlength=nx * ny)
+        keep = (counts >= frac * counts.max())[cy * nx + cx]
+        yield t_s, float(ev["x"][keep].mean() / w), float(ev["y"][keep].mean() / h)
 
 
 def to_raw(clip: Clip, bin_us: int):
