@@ -572,3 +572,24 @@ def test_slice_clip_rejects_an_empty_or_backwards_window():
         slice_clip(a_labelled_clip(), 6.0, 3.0)
     with pytest.raises(ValueError):
         slice_clip(a_labelled_clip(), 20.0, 25.0)
+
+
+def test_a_sliced_labelled_clip_survives_a_save_and_reload(tmp_path):
+    from trajmem.data import load_clip, save_clip, slice_clip
+
+    whole = a_labelled_clip()
+    part = slice_clip(whole, 3.0, 6.0)
+    back = load_clip(save_clip(part, tmp_path / "part"))
+    t = np.array([0.0, 1.0, 2.5])
+    assert np.allclose(back.gt(t), whole.gt(t + 3.0))
+    assert back.deviation_times == part.deviation_times
+
+
+def test_a_sliced_sim_clip_refuses_to_be_saved_rather_than_lose_its_truth(tmp_path):
+    from trajmem.data import save_clip, slice_clip
+
+    spec = TrajectorySpec(shape="circle", size=(0.2, 0.2), period_s=1.0)
+    clip = Clip(events=some_events([0, 500_000, 1_500_000]), duration_us=2_000_000,
+                gt=lambda t: sample(spec, t), meta={"spec": spec, "resolution": (64, 48)})
+    with pytest.raises(ValueError, match="slice"):
+        save_clip(slice_clip(clip, 0.5, 2.0), tmp_path / "part")

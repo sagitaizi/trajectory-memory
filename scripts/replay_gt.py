@@ -323,6 +323,7 @@ def main() -> None:
     p.add_argument("--model", metavar="NAME", help="draw a memory's live output (kalman, harmonic)")
     p.add_argument("--horizon", type=float, default=0.1, help="model prediction horizon (s)")
     p.add_argument("--window-us", type=int, default=5000, help="model input window")
+    p.add_argument("--warmup", type=float, default=5.0, help="model period warm-up (s)")
     p.add_argument("--save", nargs="?", const="", metavar="PATH",
                    help="write a video instead of opening a window "
                         "(default runs/replay/<slug>.mp4)")
@@ -338,7 +339,7 @@ def main() -> None:
     if args.model:
         from trajmem.experiment import evaluate_clip, make_memory
 
-        memory = make_memory(args.model, dt_s=args.window_us / 1e6)
+        memory = make_memory(args.model, dt_s=args.window_us / 1e6, warmup_s=args.warmup)
         trace = evaluate_clip(memory, clip, args.window_us, args.horizon)
         overlay = ModelOverlay(trace, clip.meta["resolution"], args.model)
         label = f"{label} + {args.model}"

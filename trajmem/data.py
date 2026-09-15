@@ -207,10 +207,15 @@ def slice_clip(clip: Clip, t0_s: float, t1_s: float) -> Clip:
 
     whole_gt = clip.gt
     gt = None if whole_gt is None else (lambda t: whole_gt(np.asarray(t, dtype=float) + t0_s))
+    # meta must still describe what gt generates: labels shift, a spec or anchor cannot
+    meta = {k: v for k, v in clip.meta.items() if k not in ("spec", "anchor")}
+    if "labels" in meta:
+        meta["labels"] = [(t - t0_s, x, y) for t, x, y in meta["labels"]]   # all, so the ends interpolate
+    meta["window_s"] = (float(t0_s), float(t1_s))
     return replace(
         clip, events=keep, duration_us=hi - lo, gt=gt,
         deviation_times=[t - t0_s for t in clip.deviation_times if t0_s <= t < t1_s],
-        meta={**clip.meta, "window_s": (float(t0_s), float(t1_s))},
+        meta=meta,
     )
 
 
@@ -394,6 +399,9 @@ def load_sim(spec, sim_cfg=None, seed: int = 0, distort: bool = True) -> Clip:
 
 def save_clip(clip: Clip, path) -> Path:
     """Cache a clip to .npz. `gt` is stored as whatever generates it, not sampled."""
+    if clip.gt is not None and not any(k in clip.meta for k in ("spec", "labels", "anchor")):
+        raise ValueError("this clip's ground truth cannot be rebuilt on load "
+                         "(a slice of an analytic or anchored clip); keep it in memory")
     path = Path(path)
     if path.suffix != ".npz":
         path = path.with_name(path.name + ".npz")     # np.savez appends it; agree with it
@@ -422,7 +430,8 @@ def load_clip(path) -> Clip:
 
         spec = meta["spec"]
         if meta.get("distorted"):
-            clip.gt = apparent_gt(spec, meta["resolution"], load_intrinsics())
+            intrinsics = load_intrinsics({"calibration": meta.get("calibration")})
+            clip.gt = apparent_gt(spec, meta["resolution"], intrinsics)
         else:
             clip.gt = lambda t: sample(spec, t)
     elif "labels" in meta:

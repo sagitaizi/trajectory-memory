@@ -58,10 +58,20 @@ def random_spec(rng: np.random.Generator, path_cfg: dict, duration_s: float) -> 
             deviations=_random_deviations(rng, path_cfg, duration_s, shape),
             wobble=_random_wobble(rng, path_cfg["wobble"]),
         )
-        pos = sample(spec, np.linspace(0, duration_s, int(200 * duration_s) + 1))
-        if pos.min() >= margin and pos.max() <= 1 - margin:
+        t = np.linspace(0, duration_s, int(200 * duration_s) + 1)
+        pos = sample(spec, t)
+        if pos.min() >= margin and pos.max() <= 1 - margin and _deviation_shows(spec, t, pos):
             return spec
     raise RuntimeError("could not draw a path that stays inside the frame")
+
+
+def _deviation_shows(spec, t, pos, min_shift=0.01) -> bool:
+    """A break must move the path: a circle switched to an ellipse is the same path."""
+    if not spec.deviations:
+        return True
+    plain = sample(TrajectorySpec(**{**spec.__dict__, "deviations": []}), t)
+    after = t >= spec.deviations[0].at_t
+    return bool(np.abs(pos[after] - plain[after]).max() > min_shift)
 
 
 def _random_deviations(rng, path_cfg, duration_s, shape) -> list[Deviation]:

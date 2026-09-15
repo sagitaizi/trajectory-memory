@@ -6,7 +6,7 @@ import yaml
 
 from scripts.make_sim_dataset import main, random_sim_cfg, random_spec
 from trajmem.data import load_clip
-from trajmem.trajectories import sample
+from trajmem.trajectories import TrajectorySpec, sample
 
 PATH_CFG = {
     "shapes": ["circle", "ellipse", "sweep", "figure8", "lissajous"],
@@ -143,3 +143,15 @@ def test_main_writes_clips_and_a_manifest_and_resumes(tmp_path):
     assert (out / "sim_002.npz").exists()
     with open(out / "manifest.csv", newline="") as fh:
         assert len(list(csv.DictReader(fh))) == 3
+
+
+def test_every_scripted_deviation_actually_changes_the_path():
+    """A circle switched to an ellipse, or a sweep to an ellipse, is the same path."""
+    t = np.linspace(0, 12.0, 1201)
+    for i in range(300):
+        spec = random_spec(np.random.default_rng(i), PATH_CFG, duration_s=12.0)
+        if not spec.deviations:
+            continue
+        plain = TrajectorySpec(**{**spec.__dict__, "deviations": []})
+        after = t >= spec.deviations[0].at_t
+        assert np.abs(sample(spec, t)[after] - sample(plain, t)[after]).max() > 0.01, (i, spec)

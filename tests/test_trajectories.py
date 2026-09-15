@@ -271,3 +271,12 @@ def test_phase_jitter_averages_out_over_its_own_period():
     spec.wobble = Wobble(phase_depth=0.2, phase_period_s=3.0)
     assert not np.allclose(sample(spec, 0.7), sample(plain, 0.7))
     assert np.allclose(sample(spec, 3.0), sample(plain, 3.0), atol=1e-9)
+
+
+def test_search_period_reaches_beyond_the_span_of_the_marks():
+    from trajmem.trajectories import search_period
+
+    for period in (3.5, 4.0, 5.0):
+        spec = TrajectorySpec(shape="ellipse", size=(0.2, 0.12), period_s=period)
+        t = np.arange(0, 3.0, 0.005)                     # under one cycle
+        assert np.isclose(search_period(t, sample(spec, t)), period, rtol=0.03)

@@ -246,3 +246,19 @@ def test_seed_zero_is_reproducible_too():
     a = simulate(a_circle(), camera_cfg=None, sim_cfg=cfg, seed=0).events
     b = simulate(a_circle(), camera_cfg=None, sim_cfg=cfg, seed=0).events
     assert len(a) > 0 and np.array_equal(a, b)
+
+
+def test_a_reloaded_sim_clip_rebuilds_its_truth_with_the_calibration_it_was_rendered_with(tmp_path, monkeypatch):
+    import trajmem.data as data
+    from trajmem.data import load_clip, save_clip
+
+    cfg = {**SIM_CFG, "resolution": [640, 480], "duration_s": 0.02}
+    clip = simulate(a_circle(), camera_cfg={"calibration": None}, sim_cfg=cfg)
+    assert clip.meta["distorted"] and "calibration" in clip.meta
+    seen = []
+    real = data.load_intrinsics if hasattr(data, "load_intrinsics") else None
+    from trajmem import simulate as sim_module
+    monkeypatch.setattr(sim_module, "load_intrinsics",
+                        lambda camera_cfg=None: seen.append(camera_cfg) or load_intrinsics())
+    load_clip(save_clip(clip, tmp_path / "c")).gt(0.0)
+    assert seen == [{"calibration": None}]

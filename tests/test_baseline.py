@@ -42,7 +42,7 @@ def test_prediction_error_grows_with_horizon_but_stays_small(make):
         m.reset()
         out = run(m, t, xy, horizon_s=h, start_s=5.0)
         errs[h] = np.median(np.hypot(*(out[:, 1:3] - sample(spec, out[:, 0] + h)).T))
-    assert errs[0.05] <= errs[0.2] < 0.03
+    assert errs[0.05] <= errs[0.2] + 1e-9 and errs[0.2] < 0.03
 
 
 @pytest.mark.parametrize("make", [lambda: PeriodicKalman(dt_s=DT), lambda: HarmonicFit(dt_s=DT)])
@@ -83,3 +83,12 @@ def test_reset_forgets_everything(make):
     m.reset()
     assert np.isnan(m.predict(0.1)).all()
     assert m.period_s is None
+
+
+@pytest.mark.parametrize("make", [lambda: PeriodicKalman(dt_s=DT), lambda: HarmonicFit(dt_s=DT)])
+def test_predicts_a_slow_path_whose_period_exceeds_the_warmup(make):
+    spec = TrajectorySpec(shape="ellipse", size=(0.2, 0.12), period_s=4.0, rotation=0.4)
+    t = np.arange(0, 16.0, DT) + DT / 2
+    out = run(make(), t, sample(spec, t), horizon_s=0.1, start_s=8.0)
+    err = np.hypot(*(out[:, 1:3] - sample(spec, out[:, 0] + 0.1)).T)
+    assert np.median(err) < 0.01

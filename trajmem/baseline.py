@@ -1,7 +1,8 @@
 """Non-SNN comparators. Same TrajectoryMemory interface as model.py.
 
 Both take one position per step of `dt_s`, estimate the period from the first
-`warmup_s` of observations and keep it, then predict ahead and score surprise.
+`warmup_s` of observations and keep it, then predict ahead and score surprise. The
+warm-up must cover at least about a cycle; real clips run up to 4 s periods.
 A NaN observation (target unseen) is skipped. Positions are in normalised image
 coordinates, like every Clip's ground truth.
 """
@@ -15,7 +16,7 @@ from .trajectories import search_period
 class _Periodic:
     """Shared plumbing: the observation buffer, the warm-up, the surprise smoothing."""
 
-    def __init__(self, dt_s: float, warmup_s: float = 3.0, n_harmonics: int = 2,
+    def __init__(self, dt_s: float, warmup_s: float = 5.0, n_harmonics: int = 2,
                  score_tau_s: float = 0.1):
         self.dt_s, self.warmup_s, self.n_harmonics = dt_s, warmup_s, n_harmonics
         self.score_alpha = dt_s / score_tau_s
@@ -68,7 +69,7 @@ class HarmonicFit(_Periodic):
     fit said it would be, relative to the fit's own residual spread.
     """
 
-    def __init__(self, dt_s: float, warmup_s: float = 3.0, n_harmonics: int = 2,
+    def __init__(self, dt_s: float, warmup_s: float = 5.0, n_harmonics: int = 2,
                  window_periods: float = 3.0, score_tau_s: float = 0.1):
         self.window_periods = window_periods
         super().__init__(dt_s, warmup_s, n_harmonics, score_tau_s)
@@ -106,7 +107,7 @@ class PeriodicKalman(_Periodic):
     innovation (chi-squared with two degrees of freedom when the model holds).
     """
 
-    def __init__(self, dt_s: float, warmup_s: float = 3.0, n_harmonics: int = 2,
+    def __init__(self, dt_s: float, warmup_s: float = 5.0, n_harmonics: int = 2,
                  process_noise: float = 1e-6, measurement_noise: float = 1e-4,
                  score_tau_s: float = 0.1):
         self.q, self.r = process_noise, measurement_noise

@@ -191,5 +191,6 @@ def simulate(spec: TrajectorySpec, camera_cfg, sim_cfg, seed: int = 0) -> Clip:
         deviation_times=[d.at_t for d in spec.deviations],
         source="sim",
         meta={"spec": spec, "seed": seed, "resolution": resolution,
-              "distorted": intrinsics is not None},
+              "distorted": intrinsics is not None,
+              "calibration": (camera_cfg or {}).get("calibration")},
     )

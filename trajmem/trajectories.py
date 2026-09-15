@@ -178,9 +178,10 @@ def _harmonic_fit(t, xy, period_s):
 
 
 def search_period(t, xy) -> float:
-    """Period with the smallest harmonic-fit residual: a frequency grid, then a fine pass."""
+    """Period with the smallest harmonic-fit residual: a frequency grid, then a fine pass.
+    Periods up to twice the span of the marks are in reach, so under a cycle will do."""
     span = t.max() - t.min()
-    f_lo, f_hi = 1.0 / span, 0.5 / np.median(np.diff(np.sort(t)))
+    f_lo, f_hi = 0.5 / span, 0.5 / np.median(np.diff(np.sort(t)))
     step = 1.0 / (8.0 * span)
     coarse = np.arange(f_lo, f_hi, step)
     best = coarse[np.argmin([_harmonic_fit(t, xy, 1.0 / f)[1] for f in coarse])]

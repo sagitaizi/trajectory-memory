@@ -46,7 +46,8 @@ def main(argv=None) -> None:
     p.add_argument("--window-us", type=int, default=5000)
     p.add_argument("--horizon", type=float, default=0.1, help="prediction horizon (s)")
     p.add_argument("--tol-px", type=float, default=15.0, help="lock-on tolerance")
-    p.add_argument("--settle", type=float, default=4.0, help="ignore errors before this (s)")
+    p.add_argument("--warmup", type=float, default=5.0, help="period estimated from this much (s)")
+    p.add_argument("--settle", type=float, default=6.0, help="ignore errors before this (s)")
     p.add_argument("--slice", nargs=2, type=float, metavar=("T0", "T1"), help="time window (s)")
     args = p.parse_args(argv)
 
@@ -57,7 +58,7 @@ def main(argv=None) -> None:
     print(f"{'memory':10} {'err_med':>8} {'err_iqr':>8} {'lock_on_s':>9} {'auc':>7} "
           f"{'latency_s':>9} {'fp/min':>8} {'unseen':>8}")
     for name in names:
-        memory = make_memory(name, dt_s=args.window_us / 1e6)
+        memory = make_memory(name, dt_s=args.window_us / 1e6, warmup_s=args.warmup)
         trace = evaluate_clip(memory, clip, args.window_us, args.horizon)
         print(row(name, score_trace(trace, clip, args.tol_px, args.settle)))
 
