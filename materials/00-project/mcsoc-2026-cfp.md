@@ -20,7 +20,10 @@ Conference site: https://mcsoc-forum.org/site/
 
 ## Format
 - IEEE Conference Proceedings style (`\documentclass[conference]{IEEEtran}`), two-column.
-- **8 pages including references** (supervisor's limit; CFP text itself doesn't state one).
+- **8 pages including references** (supervisor's limit). The submission page states the same:
+  Regular papers up to 8 pages, +50 USD per extra page, max 2 extra; Short papers strictly 4.
+- **Single-blind** review — author names and affiliations stay on the paper.
+- IEEE copyright notice required on the camera-ready (not at submission).
 - Paper categories: Regular, Short, Presentation-Only.
 - Published in IEEE Xplore + IEEE CS Digital Library; indexed EI Compendex, Scopus, ISI.
 - Standard IEEE peer review. Best Paper and Best Student Paper awards.

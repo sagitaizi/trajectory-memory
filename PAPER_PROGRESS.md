@@ -50,30 +50,34 @@ says which phase fills them.
 - **III-E** — `materials/01-literature/deviation-and-novelty.md`.
 - **III-F** — `PLAN.md`: pretrain on simulation, freeze, test on real.
 - **IV-A** — `materials/02-methods/simulation-with-v2e.md`; `trajmem/simulate.py`; `params.yaml`.
-- **IV-B, Fig. 2** — `RECORDING_LOG.md`; `RECORDING_PLAN.md`; `corpus/real/`.
+- **IV-B, Fig. 2** — `RECORDING_LOG.md`; `corpus/sets.yaml`; `corpus/real/`.
 - **IV-C** — `materials/02-methods/{kalman-periodic,rhythmic-dmp}.md`;
   `materials/01-literature/classical-baselines.md`.
 - **IV-D** — `materials/02-methods/metrics.md`.
 - **Fig. 1** — `docs/implementation-plan.md`.
 
-Every paper cited needs an entry in `BIBLIOGRAPHY.md` and `paper/refs.bib` in the same change.
+Every paper cited needs an entry in `BIBLIOGRAPHY.md` in the same change. `paper/refs.bib` is
+Sagi's, managed outside the repo; the state it was in when he took it over is
+`materials/01-literature/refs-snapshot-2026-09-14.bib` (18 entries, 9 marked `verify`).
 
 ## Writable right now
 
-In suggested order — biggest and most independent first:
+In suggested order. Introduction goes first: it fixes what the paper claims, and Related Work
+exists to position those claims — so §II is easier once §I is down.
 
-1. **§II Related Work.** The largest chunk that results can never change. The six notes in
+1. **§I Introduction.** Motivation, problem, why spiking, contributions. Expand the abstract
+   placeholder and `PLAN.md`'s "What this is"; write the contributions as the claims you
+   intend to support and revisit once results exist.
+2. **§II Related Work.** The largest chunk that results can never change. The six notes in
    `materials/01-literature/` carry the pipelines, the numbers, and the gap statement.
-2. **§IV-B Real Recordings.** The session already happened; `RECORDING_LOG.md` has the setups,
+3. **§IV-B Real Recordings.** The session already happened; `RECORDING_LOG.md` has the setups,
    clip counts and durations. **Caveat:** every clip's ground truth is hand-labels plus
    interpolation, including the `wall/` (4a) clips — do not claim exact encoder ground truth
    for them. See "The 4a encoder ground truth was abandoned" below.
-3. **§III-A Problem Setup.** Definitions only: position over time, what counts as repetition,
+4. **§III-A Problem Setup.** Definitions only: position over time, what counts as repetition,
    the prediction horizon, what "deviation" means formally.
-4. **§IV-D Metrics.** Definitions, not values: prediction error at the horizon, lock-on time,
+5. **§IV-D Metrics.** Definitions, not values: prediction error at the horizon, lock-on time,
    deviation ROC, median detection latency.
-5. **§I Introduction.** Motivation, problem, why spiking, contributions. Write the
-   contributions as the claims you intend to support; revisit once results exist.
 6. **§III-F Protocol.** Pretrain on simulation, freeze, evaluate on held-out real clips.
 7. **Fig. 1.** Block diagram: events → frontend → localiser → memory → prediction + deviation.
    Won't change unless G-F renames a block.

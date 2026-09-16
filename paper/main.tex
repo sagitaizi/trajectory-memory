@@ -31,7 +31,7 @@ sagisagi229000@gmail.com}
 \IEEEauthorblockA{\textit{Neuro-Biomorphic Engineering Lab} \\
 \textit{The Open University of Israel}\\
 Ra'anana, Israel \\
-elishai@example.com}
+elishai85@gmail.com}
 }
 
 \maketitle
@@ -39,16 +39,16 @@ elishai@example.com}
 \begin{abstract}
 %% ~150--230 words, one paragraph, no citations, no custom macros.
 %% State: problem, gap, what we do, how it is evaluated, headline result, why it matters.
-Placeholder. Event cameras report per-pixel brightness changes with microsecond latency,
-making them a natural sensor for anticipating fast, repetitive target motion. We present a
-spiking network that observes a target moving in a repeating path, builds a memory of that
-path online, predicts its position a short horizon ahead, and signals when the motion stops
-matching the learned pattern. The network is pretrained on trajectories rendered through a
-calibrated event-camera simulator and evaluated, with frozen weights, on real recordings of
-fan-driven, pendulum, hand-moved, and motor-driven motion. We report prediction error,
-lock-on time, and deviation-detection latency against classical periodic baselines. The
-contribution is a spiking formulation of trajectory anticipation as predictive inference,
-positioned as a component of a low-latency neuromorphic tracking pipeline.
+% Placeholder. Event cameras report per-pixel brightness changes with microsecond latency,
+% making them a natural sensor for anticipating fast, repetitive target motion. We present a
+% spiking network that observes a target moving in a repeating path, builds a memory of that
+% path online, predicts its position a short horizon ahead, and signals when the motion stops
+% matching the learned pattern. The network is pretrained on trajectories rendered through a
+% calibrated event-camera simulator and evaluated, with frozen weights, on real recordings of
+% fan-driven, pendulum, hand-moved, and motor-driven motion. We report prediction error,
+% lock-on time, and deviation-detection latency against classical periodic baselines. The
+% contribution is a spiking formulation of trajectory anticipation as predictive inference,
+% positioned as a component of a low-latency neuromorphic tracking pipeline.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -57,35 +57,118 @@ novelty detection, neuromorphic vision
 \end{IEEEkeywords}
 
 \section{Introduction}
-
-% Motivation: low-latency closed-loop tracking; anticipation beats reaction; event vision.
-% The specific problem: a target repeating a path; learn it, predict it, notice when it breaks.
-% Why spiking: event-native processing, dynamics-as-computation, path to on-chip deployment.
-% Contributions (bulleted):
-\begin{itemize}
-  \item A spiking trajectory-memory network that learns a repetitive target path online and
-        predicts it a short horizon ahead.
-  \item A deviation signal derived from prediction error that flags when motion leaves the
-        learned pattern.
-  \item An evaluation protocol: simulator pretraining with a calibrated camera model,
-        frozen-weight testing on real driven-motion recordings, against periodic baselines.
-\end{itemize}
+Sight is by far the dominant sense humans use to perceive the world around them \cite{Gallego2022Event}. The retina, a thin sheet of tissue in the eye, converts raw light into nerve signals that the brain then interprets as visual images. It must extract all essential features from an ever-changing reality under varying lighting conditions. Individual neurons in the retina are about a million times slower than electronic devices, operate with far less precision, and consume ten-millionth as much power, yet the retina outperforms even our most powerful computers \cite{Mahowald1991The}.
+% DIRECTION (decided 2026-09-17): the subject is anticipation/memory, not sight. The
+% paragraph above (biological vision is efficient) will be REWRITTEN so prediction is the
+% subject from the first line; its facts and citations are kept as one clause. Final
+% wording of anything that says HOW our network embodies prediction waits for Phase C.
+%
+% P1 -- Anticipation, not reaction. Biological vision does not wait for the image: the
+% retina already fires ahead of a moving object \cite{Berry1999Anticipation} and adapts to
+% predict the scene, passing on what departs from expectation \cite{Hosoya2005Dynamic};
+% the brain is widely described as a prediction machine that models what comes next and
+% attends to what deviates \cite{Rao1999Predictive,Friston2010The,Clark2013Whatever,
+% Keller2018Predictive}; memory, in that picture, is a model that runs ahead of the senses
+% \cite{Hawkins2004On}. One clause: it does this with parts a million times slower and
+% ten-millionth the power of electronics \cite{Mahowald1991The}.
+%   (bib entries for these seven are NOT yet in refs.bib -- add when writing:
+%    Berry, Brivanlou, Jordan, Meister, Nature 398:334-338, 1999, doi 10.1038/18678;
+%    Hosoya, Baccus, Meister, Nature 436:71-77, 2005; Rao & Ballard, Nat. Neurosci.
+%    2(1):79-87, 1999; Friston, Nat. Rev. Neurosci. 11:127-138, 2010; Clark, Behav. Brain
+%    Sci. 36(3):181-204, 2013; Keller & Mrsic-Flogel, Neuron 100(2):424-435, 2018;
+%    Hawkins & Blakeslee, On Intelligence, Times Books, 2004.)
+%
+% P1b -- The engineering counterpart. Event cameras report per-pixel change with
+% microsecond latency \cite{Gallego2022Event} and spiking networks compute in the same
+% currency, so the biological strategy is buildable in silicon -- yet the pipelines built
+% on them still react: locate, then extrapolate. A target that repeats its motion is
+% exactly the case where anticipation is possible.
+%
+% P2 -- The problem, plainly. A single target repeats a path; from the event stream alone,
+% learn that path, predict the target's position a short horizon ahead, and signal when the
+% motion stops matching -- hard because the target is real and freely moving, the path is
+% acquired online rather than from a labelled batch, and the break signal must come from the
+% same model that predicts \cite{debat2021event,pingpong2025egocentric}.
+%
+% P3 -- Why spiking. Events are spikes, so a spiking network can consume them without a
+% framing step; the network's own dynamics carry the learned pattern and produce the
+% prediction, rather than a separate regressor on top; and the result maps onto neuromorphic
+% hardware -- the claim is event-native operation and dynamics-as-predictor, not better
+% accuracy than a periodic Kalman filter on clean motion.
+%
+% P4 -- What we do. A pipeline of event front end, localiser, and trajectory memory produces a
+% short-horizon prediction and a deviation score from prediction error; it is pretrained on
+% trajectories rendered through a calibrated event-camera simulator \cite{hu2021v2e} and
+% evaluated with frozen weights on real recordings against classical periodic baselines.
+%
+% P5 -- Contributions (bulleted) and a one-sentence roadmap of the paper:
+%   - a spiking trajectory-memory network that learns a repetitive target path online and
+%     predicts it a short horizon ahead;
+%   - a deviation signal derived from prediction error that flags when motion leaves the
+%     learned pattern;
+%   - an evaluation protocol: simulator pretraining with a calibrated camera model,
+%     frozen-weight testing on real recordings, against periodic baselines.
 
 \section{Related Work}
-% Event-based SNN trajectory prediction (Debat et al.; recent event ping-pong; N-DriverMotion).
-% Sequence memory / dynamical prediction in spiking networks (LMU, FORCE, reservoirs, e-prop).
-% Deviation / novelty detection with spiking networks; habituation and inhibitory plasticity.
-% Classical repetitive-trajectory learning (rhythmic DMP) and trajectory-anomaly detection.
-% Gap: repetitive path, learned online from a freely moving real target, with a break signal.
+% Budget ~1 column, at most 1.25. Write the gap sentence (P5) first; make every paragraph
+% lead to it. Not here: attention / Itti--Koch (Discussion), external datasets (Experimental
+% Setup), deep-learning trajectory surveys (one sentence at most, or cut).
+%
+% P1 -- Event-based trajectory prediction with SNNs. The closest systems predict where a ball
+% will land from an event stream \cite{debat2021event,pingpong2025egocentric} or learn driver
+% motion on neuromorphic hardware \cite{ndrivermotion2024}, but all of them share a static
+% camera, one-shot ballistic motion, offline batch training, and no signal when the motion
+% changes.
+%
+% P2 -- Sequence memory and dynamical prediction in spiking networks. Reservoirs trained with
+% FORCE \cite{sussillo2009generating,nicola2017supervised}, the Legendre Memory Unit
+% \cite{voelker2019lmu}, and local learning rules for recurrent SNNs
+% \cite{bellec2020eprop,gilra2017predicting,kim2018learning} let a spiking network hold and
+% reproduce a periodic low-dimensional signal -- the lineage of "the dynamics solve the
+% prediction" -- but are demonstrated on abstract signals, never driven by a real sensor.
+%
+% P3 -- Novelty and deviation detection with spiking networks. Inhibitory plasticity
+% \cite{schulz2021novelty} and short-term synaptic depression make familiar input quiet and
+% leave novel input loud, and engineered SNN detectors handle generic time series
+% \cite{vacuumspiker2025}, but novelty there means stimulus identity, not departure from a
+% learned spatial motion pattern.
+%
+% P4 -- Classical repetitive-trajectory learning: the baselines. Rhythmic dynamic movement
+% primitives \cite{ijspeert2002rhythmic,saveriano2023dmp}, a Kalman filter with a periodic
+% motion model, and harmonic regression learn and reproduce a repeated path well and may beat
+% a spiking network on raw accuracy for clean periodic motion; the claim here is event-native
+% operation, online acquisition, and a neuromorphic deployment path, not better numbers.
+%
+% P5 -- The gap. No published system learns a repetitive path from a freely moving real target
+% through an event camera, predicts it a short horizon ahead, and signals when the motion
+% stops matching -- one or two sentences, or fold into the end of P1 if space is tight.
 
 \section{Method}
 
 \subsection{Problem Setup}
 % Target position over time; repetition; prediction horizon; deviation definition.
+% Start: p(t) = target position in normalised image coordinates. Repetitive means
+% p(t+T) ~ p(t) for an unknown period T (real clips: 1.0--4.0 s; sim: 0.8--4.0 s), up to
+% small smooth imperfections (amplitude beating, slow centre wander, period jitter) that
+% must NOT count as deviations. Task: from events alone, emit p^(t+h) for a fixed horizon
+% (h = 100 ms headline; 50 ms also reported) and a scalar deviation score s(t). A
+% deviation is the motion leaving the learned path -- sudden (push, turn, shrink, speed
+% change) or slow (drift). Offline: no camera control, nothing in the loop. Re-learning a
+% new path after a break is out of scope (say so here, once). Source: trajmem/trajectories.py.
 
 \subsection{Event Input}
 % The funnel: Stage 1 accumulated event frames; Stage 2 raw events end-to-end.
 % Representations used; time window; polarity handling.
+% Start: an event is (x, y, t, p). Stage 1 input = a window of dt = 5 ms accumulated into
+% an ON/OFF count image (2 x H x W), optionally block-downsampled; a decaying time surface
+% is available too. The window is the latency knob -- name it as such. The classical
+% fallback localiser (also what the baselines eat): count events per 16 px cell, keep the
+% cells with >= 30% of the fullest, average their events -- robust to sensor-wide noise and
+% to a string above the target. Its accuracy vs hand-labels at 5 ms: fan 5.7 px median;
+% pendulum 27--43 px, almost all a CONSTANT vertical offset (label convention, see IV-B/IV-D);
+% wall target ~22 px with occasional losses (p90 93 px on loop_01, the marginal-SNR clip).
+% Stage 2 (1 ms bins) only if reached. Source: trajmem/frontend.py,
+% scripts/check_localiser.py --set development, materials/02-methods/event-representations.md.
 
 \subsection{Localiser}
 % Frame -> target position estimate. Spiking, topographic. Fallback: classical centroid.
@@ -100,22 +183,81 @@ novelty detection, neuromorphic vision
 
 \subsection{Training and Evaluation Protocol}
 % Pretrain on simulated trajectories; freeze; evaluate on held-out real recordings only.
+% Start: three rules. (1) Training data is simulated only (100 clips x 15 s, IV-A).
+% (2) Weights are frozen before any real clip is scored. (3) Real clips split into six
+% development clips, looked at freely while building, and eleven held-out clips, labelled
+% last and scored once (table in PLAN.md; corpus/sets.yaml). The period is never given:
+% every method, baseline or spiking, estimates it from the first 5 s of a clip (warm-up)
+% and keeps it, so predictions and scores start after warm-up and a speed change counts as
+% a deviation. Every method sees identical inputs through one evaluation loop
+% (trajmem/experiment.py). Detection thresholds are chosen on development clips and
+% applied unchanged to held-out ones.
 
 \section{Experimental Setup}
 
 \subsection{Event-Camera Simulator}
 % v2e configured with the DVXplorer intrinsics, lens distortion, contrast threshold, noise.
 % Trajectory families: circle, ellipse, figure-eight, Lissajous; scripted deviations.
+% Start: v2e's EventEmulator (Hu, Liu, Delbruck 2021) fed a 650 fps render of a target on
+% an analytic path, DVXplorer 640x480 through the calibrated lens model; ground truth is the
+% target's APPARENT (distorted) position, the same thing hand-labels record. Matched to the
+% real fan clip on five statistics (real vs sim): target rate 82.0k vs 84.5k ev/s, ON
+% fraction 0.509 vs 0.504, blob footprint 18.2 vs 18.4 px, trail behind the target 19.6 vs
+% 17.1 px, noise floor 0.105 vs 0.088 ev/px/s (median 32 px tile). Photoreceptor filter off:
+% v2e scales its time constant by intensity and left a 60--90 ms event trail behind fast
+% targets that the real camera does not show. Per-clip domain randomisation: thresholds
+% 0.15--0.30, sigma 0.01--0.06, shot noise 0.03--0.5 Hz/px, contrast, radius 8--30 px, aspect
+% 1--4 (disc to brush), a string to a pivot (half the clips), body texture, an optional
+% 60--200 Hz lag (half); paths from five families (circle, ellipse, straight sweep,
+% figure-8, Lissajous), T 0.8--4 s, half with one scripted deviation in the middle third,
+% 30% exact and the rest with small smooth imperfections. Corpus summary table: see
+% materials/02-methods/simulation-with-v2e.md (added once the 100 clips are generated).
 
 \subsection{Real Recordings}
 % Four regimes: ceiling-fan (circular), string pendulum, hand-moved, motor-driven on a blank
 % wall (exact encoder ground truth via calibration). Single high-contrast target; daylight.
+% NOTE the line above is stale: the encoder ground truth was abandoned (PAPER_PROGRESS.md);
+% ALL ground truth is hand-labels + linear interpolation, every setup, 4a included.
+% Start: 54 clips recorded 2026-09-10 (RECORDING_LOG.md), 14 with a deviation; evaluated on
+% 6 development + 11 held-out (PLAN.md table). Per regime, give period / amplitude / rate:
+% fan brush on a string, a rigid 74x46 px ellipse, T = 1.19 s, 165k ev/s; pendulum brush,
+% T = 1.18--1.27 s, 135--430 px swings, 0.6--1.5M ev/s, with a visible string; hand-moved
+% wall target: straight sweeps of ~160 px at T = 1.8 s and 1.0 s, 0.3--1M ev/s, marginal
+% SNR; motor-swept scene (4a): the whole scene moves, T = 1--4 s, reported as a separate
+% condition. Labelling: one mark per 0.1 s (pendulum), 0.15 s (fan), 0.25 s (wall target);
+% the fan labels sit 4.5 px (median) from a fitted ellipse. Convention caveat to state: the
+% marked point is the brush centre, which sits 27--43 px below the event centroid on the
+% pendulum -- how that is handled belongs in IV-D. Fig. 2: one accumulated frame per
+% setup, from scripts/replay_gt.py --save.
 
 \subsection{Baselines}
 % Periodic Kalman filter; harmonic / Fourier fit; rhythmic dynamic movement primitive.
+% Start (two are implemented, trajmem/baseline.py; the DMP only if it gets built):
+% (1) Kalman filter with a harmonic state per coordinate, [mean, (c_k, d_k) k = 1, 2],
+% each pair rotating at k*omega per step; q = 1e-6, r = 1e-4 (normalised units); the
+% prediction is the same rotation carried to t+h; surprise = normalised innovation, smoothed
+% with tau = 100 ms. (2) Sliding least-squares harmonic fit (2 harmonics, last 3 periods),
+% evaluated at t+h; surprise = distance of the new observation from the previous fit,
+% relative to that fit's residual spread. Both estimate T from a 5 s warm-up by residual
+% search and keep it. Development-set numbers at 100 ms (runs/results/development_*.csv,
+% Kalman / harmonic, px median): fan 8.0 / 7.3; pendulum 26--48 (label offset dominates);
+% wall target 19--56; pooled 24.2 / 32.6. Simulated clips with exact truth: ~3 px. Breaks:
+% wide_break AUC 0.86 / 0.67, loop_break_01 0.75 / 0.81. Frame these as the accuracy bar the
+% spiking version must meet on clean motion, per the claim in the Introduction.
 
 \subsection{Metrics}
 % Prediction error at the horizon; lock-on time; deviation-detection ROC and median latency.
+% Start (definitions as implemented in trajmem/metrics.py, after materials/02-methods/
+% metrics.md): error = Euclidean distance in px between p^(t+h) and truth at t+h, on steady
+% steps (after settling, before any break), reported as median and IQR per clip and pooled
+% as the median of per-clip medians; lock-on = first time after which the error stays under
+% a tolerance for the rest of the clip, in seconds and in cycles, tolerance stated per
+% regime; deviation: positives are steps at or after the break, AUC is Mann--Whitney over
+% the score, a flag is three consecutive steps above threshold, latency is the first flag
+% after the break, false alarms are flags per minute on negatives. Say that thresholds are
+% picked on development clips and frozen (III-F). Decide and state here how the pendulum's
+% constant label offset is handled: subtract the per-clip median offset, or score prediction
+% against the frontend's own track and report localisation against labels separately.
 
 \section{Results}
 % Table: baseline vs Stage 1 (vs Stage 2 if reached), prediction and deviation.
@@ -131,6 +273,10 @@ novelty detection, neuromorphic vision
 
 \section*{Acknowledgment}
 % Supervision, lab, funding.
+% Start: one or two sentences -- Dr. Elishai Ezra Tsur's supervision; the Neuro-Biomorphic
+% Engineering Lab (Open University of Israel) for the DVXplorer and the pan-tilt rig; any
+% funding line the lab requires. No reviewers-thanks in the submitted version (double-blind
+% check: confirm with the CFP whether author names must be removed at submission).
 
 \label{sec:impl}
 % If space allows, a short implementation-notes paragraph or move framework details here.
