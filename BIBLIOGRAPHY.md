@@ -74,6 +74,79 @@ manuscript.
   method reference for the reservoir readout.
 - **Where:** `model.py`.
 
+## Multiple timescales — fast detail, slow structure
+
+Note: `materials/01-literature/multi-timescale-memory.md`. All entries there back the choice
+between one mixed-τ recurrent layer and a fast→slow layer split for the memory core (Phase C).
+
+### Yamashita & Tani, 2008 — "Emergence of Functional Hierarchy in a Multiple Timescale Neural Network Model: A Humanoid Robot Experiment"
+- *PLoS Computational Biology* 4(11):e1000220.
+- **Why:** the MTRNN — input → fast recurrent layer (τ = 5) → slow recurrent layer (τ = 70),
+  trained by BPTT. Fast units learn movement primitives, slow units their sequence; equal
+  time constants perform significantly worse. The reference for a fast→slow split.
+- **Where:** memory-core architecture decision, Phase C.
+
+### Perez-Nieves, Leung, Dragotti & Goodman, 2021 — "Neural heterogeneity promotes robust learning"
+- *Nature Communications* 12:5791.
+- **Why:** recurrent SNNs with gamma-distributed, learnable membrane time constants beat
+  homogeneous ones on temporal tasks and are more robust. Justifies mixed τ within a layer.
+- **Where:** memory-core initialisation, Phase C.
+
+### Zheng et al., 2024 — "Temporal dendritic heterogeneity incorporated with spiking neural networks for learning multi-timescale dynamics"
+- *Nature Communications* 15:277.
+- **Why:** several learnable timing factors per neuron (dendritic branches) for
+  multi-timescale tasks; the stronger form of within-layer heterogeneity.
+- **Where:** memory-core alternative, Phase C.
+
+### Bellec, Salaj, Subramoney, Legenstein & Maass, 2018 — "Long short-term memory and learning-to-learn in networks of spiking neurons"
+- *NeurIPS* 31.
+- **Why:** LSNN — an adaptive threshold decaying over seconds gives LIF networks long memory
+  without long membrane constants. Alternative slow variable to a slow layer.
+- **Where:** memory-core alternative, Phase C.
+
+### Yin, Corradi & Bohté, 2021 — "Accurate and efficient time-domain classification with adaptive spiking recurrent neural networks"
+- *Nature Machine Intelligence* 3:905–913.
+- **Why:** LSNN with learnable membrane *and* adaptation time constants per neuron; the
+  snnTorch-style recipe for multi-timescale recurrent SNNs.
+- **Where:** memory-core alternative, Phase C.
+
+### Hasson, Yang, Vallines, Heeger & Rubin, 2008 — "A hierarchy of temporal receptive windows in human cortex"
+- *Journal of Neuroscience* 28(10):2539–2550.
+- **Why:** cortex integrates over progressively longer windows from sensory to higher areas.
+  Biological grounding for fast-feeds-slow.
+- **Where:** discussion / architecture rationale.
+
+### Murray et al., 2014 — "A hierarchy of intrinsic timescales across primate cortex"
+- *Nature Neuroscience* 17:1661–1663.
+- **Why:** single-neuron intrinsic timescales (autocorrelation decay) rise along the cortical
+  hierarchy, ~50 ms sensory to ~300 ms prefrontal. The numbers behind the fast/slow ratio.
+- **Where:** discussion / architecture rationale.
+
+### Kiebel, Daunizeau & Friston, 2008 — "A hierarchy of time-scales and the brain"
+- *PLoS Computational Biology* 4(11):e1000209.
+- **Why:** the computational argument: slow levels set the parameters of fast levels'
+  predictions. Our path head (slow) and horizon heads (fast) in one sentence.
+- **Where:** discussion / architecture rationale.
+
+### Barnes & Asselman, 1991 — "The mechanism of prediction in human smooth pursuit eye movements"
+- *Journal of Physiology* 439:439–461.
+- **Why:** humans tracking a periodic target lock on within a few cycles and then anticipate
+  it from a stored velocity/timing memory. The behavioural version of our task.
+- **Where:** introduction / motivation.
+
+### Kettner et al., 1997 — "Prediction of complex two-dimensional trajectories by a cerebellar model of smooth pursuit eye movement"
+- *Journal of Neurophysiology* 77(4):2115–2130.
+- **Why:** cerebellar model with delay-line inputs and delayed-error learning predicts
+  sum-of-sines and circular targets like monkeys do, and after a perturbation keeps following
+  the learned path for ~80 ms — the prediction-error signature of a break.
+- **Where:** architecture rationale; deviation-signal framing.
+
+### Cerminara, Apps & Marple-Horvat, 2009 — "An internal model of a moving visual target in the lateral cerebellum"
+- *Journal of Physiology* 587(2):429–442.
+- **Why:** Purkinje cells encode the target's motion as an internal model, not the visual
+  input as such. Direct evidence for a neural trajectory memory.
+- **Where:** introduction / motivation.
+
 ## Deviation / novelty detection
 
 ### Schulz et al., 2021 — "The generation of cortical novelty responses through inhibitory plasticity"

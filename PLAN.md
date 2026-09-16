@@ -19,7 +19,7 @@ freely moving real target, with a break signal.
 |---|---|
 | A — Data | 🟨 Real corpus recorded and split; development set labelled; sim corpus generated. **Open: label the held-out clips.** |
 | B — Frontend + baselines | ✅ |
-| C — Trajectory memory, Stage 1 | ⬜ **Next.** Framework: snnTorch (G-F, provisional); architecture and training to be decided together. |
+| C — Trajectory memory, Stage 1 | 🟨 **In progress.** Design decided (below); building the network, the training script and the first sim numbers. |
 | D — Deviation detection | ⬜ Scoring exists; thresholds must be chosen on development clips. |
 | E — Raw events, Stage 2 | ⬜ Only if Stage 1 lands. |
 | F — Paper | 🟨 Written as sections unlock; draft due 2026-10-01. |
@@ -93,6 +93,22 @@ freely moving real target, with a break signal.
   `experiment.make_memory` and is scored and watched with the same tools as the baselines.
 - Pretrain on the sim corpus, freeze, evaluate on development clips while building, on
   held-out clips once.
+- **Design** (decided 2026-09-16; rationale in `materials/01-literature/multi-timescale-memory.md`):
+  - *Input*: place cells per axis — 32 overlapping Gaussian tuning curves along x and 32
+    along y (64 inputs); the encoder is a swappable class so a 2-D grid can replace it.
+  - *Core*: two recurrent LIF layers. Fast layer (membrane τ 20–50 ms) takes the input;
+    slow layer (τ ~300–700 ms) takes input only from the fast layer and feeds back to it.
+    Time constants spread within each layer and learnable. Single mixed-τ layer and fixed
+    random weights (reservoir) are the ablations.
+  - *Readout*: linear, from a 50 ms low-pass of the spikes. Horizon heads (x, y) at 25 / 50 /
+    100 / 200 ms from the fast layer; path head from the slow layer — period, phase as
+    (cos, sin), mean + 3 harmonics per axis (17 numbers), exact targets from sim ground truth.
+  - *Deviation score*: immediate = smoothed error of the 100 ms head against what arrives;
+    structural = error of the position reconstructed from the path head; each scaled by its
+    on-pattern level on development clips; the score is the larger of the two.
+  - *Training*: surrogate-gradient BPTT in snnTorch, own loop, 5 s chunks with state carried
+    over; loss masked before the first cycle and after a scripted break; 90 sim clips train,
+    10 validate. e-prop (local, plausible) is future work.
 - **Done when:** on real repetitive clips, Stage 1 prediction error beats the classical
   baseline *or* matches it with a stated event-native/latency argument; lock-on within N
   cycles. Bar: Kalman 24.2 px pooled (8.0 on the fan), ~3 px on sim.
