@@ -160,3 +160,17 @@ class SpikingLmu:
     def decode(self, act: torch.Tensor) -> torch.Tensor:
         """Filtered rates (B, N) -> represented state (B, C, q)."""
         return (act @ self.w.decoders.T).reshape(act.shape[0], self.w.n_channels, self.w.q)
+
+
+def state_radii(positions, q: int, theta: float, dt: float, margin: float = 1.25) -> np.ndarray:
+    """What each state dimension must represent: the 99th percentile of |m| over the exact
+    LMU run on `positions` (list of (T, 2) arrays, already centred), times a margin. (D,)"""
+    lmu = ExactLmu(q, theta, dt, n_channels=2)
+    peaks = []
+    for u in positions:
+        st = lmu.init_state(1)
+        for i in range(len(u)):
+            st = lmu.step(u[None, i], st)
+            if i % 10 == 0:
+                peaks.append(np.abs(st[0]).reshape(-1))
+    return np.maximum(np.percentile(np.array(peaks), 99, axis=0) * margin, 0.05)

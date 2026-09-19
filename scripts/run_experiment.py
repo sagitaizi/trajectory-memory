@@ -12,7 +12,8 @@ added; the table is also written to runs/results/<set>_<memory>.csv.
 Prediction error is in pixels at the horizon, on the steady part of the clip before
 any break; path error is how far the memory's own picture of one cycle sits from the
 true cycle (px, same steps; `last` over the final cycle before any break) and `period`
-the memory's period over the true one; lock-on is
+the memory's period over the true one; `blank` the error while the observations were
+hidden with --blank (single clip); lock-on is
 seconds until the prediction error stays under --tol-px, path lock-on the same for the
 path error; the deviation numbers follow trajmem.metrics.deviation_roc. --subtract-offset removes each clip's
 constant label-vs-centroid offset first (the pendulum labels sit 27-43 px below the
@@ -46,9 +47,9 @@ def open_clip(path, window=None):
 
 
 HEADER = (f"{'':26} {'err_med':>8} {'err_iqr':>8} {'lock_on_s':>9} {'path_med':>8} {'path_last':>9} "
-          f"{'path_lock':>9} {'period':>7} {'auc':>7} {'latency_s':>9} {'fp/min':>8} {'unseen':>8} {'offset_px':>14}")
+          f"{'path_lock':>9} {'period':>7} {'blank':>7} {'auc':>7} {'latency_s':>9} {'fp/min':>8} {'unseen':>8} {'offset_px':>14}")
 CSV_FIELDS = ("set", "memory", "clip", "err_median_px", "err_iqr_px", "lock_on_s", "path_median_px",
-              "path_last_px", "path_lock_on_s", "period_ratio", "auc", "latency_s", "fp_per_min", "unseen_fraction",
+              "path_last_px", "path_lock_on_s", "period_ratio", "blank_px", "auc", "latency_s", "fp_per_min", "unseen_fraction",
               "offset_x_px", "offset_y_px")
 
 
@@ -57,7 +58,7 @@ def row(name: str, r: dict) -> str:
     ox, oy = r.get("offset_px", (0.0, 0.0))
     return (f"{name:26} {e['median']:8.1f} {e['iqr']:8.1f} {r['lock_on_s']:9.2f} "
             f"{p['median']:8.1f} {p['last']:9.1f} {r['path_lock_on_s']:9.2f} {r['period_ratio']:7.2f} "
-            f"{d['auc']:7.2f} {d['latency_s']:9.2f} {d['fp_per_min']:8.2f} {r['unseen_fraction']:8.1%} "
+            f"{r['blank_px']:7.1f} {d['auc']:7.2f} {d['latency_s']:9.2f} {d['fp_per_min']:8.2f} {r['unseen_fraction']:8.1%} "
             f"{ox:+6.1f} {oy:+6.1f}")
 
 
@@ -67,7 +68,7 @@ def csv_row(set_name: str, memory: str, r: dict) -> dict:
     return {"set": set_name, "memory": memory, "clip": r["name"], "err_median_px": e["median"],
             "err_iqr_px": e["iqr"], "lock_on_s": r["lock_on_s"], "path_median_px": p["median"],
             "path_last_px": p["last"], "path_lock_on_s": r["path_lock_on_s"],
-            "period_ratio": r["period_ratio"], "auc": d["auc"],
+            "period_ratio": r["period_ratio"], "blank_px": r["blank_px"], "auc": d["auc"],
             "latency_s": d["latency_s"], "fp_per_min": d["fp_per_min"],
             "unseen_fraction": r["unseen_fraction"], "offset_x_px": ox, "offset_y_px": oy}
 
@@ -111,6 +112,8 @@ def main(argv=None) -> None:
     p.add_argument("--subtract-offset", action="store_true",
                    help="remove each clip's constant label-vs-centroid offset before scoring (reported)")
     p.add_argument("--slice", nargs=2, type=float, metavar=("T0", "T1"), help="time window (s)")
+    p.add_argument("--blank", nargs=2, type=float, metavar=("T0", "T1"),
+                   help="hide the observations in this window (s): does the memory run on its own?")
     args = p.parse_args(argv)
 
     names = BASELINES if args.memory == "all" else (args.memory,)
@@ -125,7 +128,7 @@ def main(argv=None) -> None:
     print(HEADER)
     for name in names:
         memory = make_memory(name, dt_s=args.window_us / 1e6, warmup_s=args.warmup, checkpoint=args.checkpoint)
-        trace = evaluate_clip(memory, clip, args.window_us, args.horizon)
+        trace = evaluate_clip(memory, clip, args.window_us, args.horizon, blank=args.blank)
         print(row(name, score_trace(trace, clip, args.tol_px, args.settle, subtract_offset=args.subtract_offset)))
 
 

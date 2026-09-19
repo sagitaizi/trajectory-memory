@@ -33,18 +33,24 @@ class Trace:
     window_us: int
     period: np.ndarray = None      # (N,) the memory's period, s; NaN = none yet
     cycles: np.ndarray = None      # (N, CYCLE_POINTS, 2) the memory's path over one true period; NaN = none yet
+    blank: tuple | None = None     # (t0, t1) where the observations were hidden from the memory
 
 
 def make_memory(name: str, dt_s: float, **params):
     """A fresh memory by name. The baselines take their own params (`warmup_s`, ...); the
-    SNN is loaded from `checkpoint` (default runs/memory/snn.pt, from train_memory.py)
-    and ignores the rest."""
+    SNN is loaded from `checkpoint` (default runs/memory/snn.pt, from train_memory.py;
+    the checkpoint's `arch` picks the class) and ignores the rest."""
     from .baseline import HarmonicFit, PeriodicKalman
 
     if name == "snn":
-        from .snn import SpikingMemory
+        import torch
 
-        return SpikingMemory.load(params.get("checkpoint") or SNN_CHECKPOINT, params.get("device"), dt_s)
+        from .snn import SpikingMemory
+        from .snn_lmu import LmuMemory
+
+        path = params.get("checkpoint") or SNN_CHECKPOINT
+        arch = torch.load(Path(path), map_location="cpu", weights_only=False).get("arch", "two_layer")
+        return {"two_layer": SpikingMemory, "lmu": LmuMemory}[arch].load(path, params.get("device"), dt_s)
     kinds = {"kalman": PeriodicKalman, "harmonic": HarmonicFit}
     if name not in kinds:
         raise ValueError(f"unknown memory {name!r}; one of {sorted(kinds) + ['snn']}")
@@ -77,11 +83,15 @@ def reference_cycle(clip: Clip, n: int = CYCLE_POINTS, n_harmonics: int = 3,
     return np.column_stack(cols) @ coef
 
 
-def evaluate_clip(memory, clip: Clip, window_us: int, horizon_s: float) -> Trace:
+def evaluate_clip(memory, clip: Clip, window_us: int, horizon_s: float, blank=None) -> Trace:
+    """Stream the clip through the memory. With `blank` = (t0, t1) the observations in
+    that window are hidden (NaN), the test of a memory that runs on its own."""
     memory.reset()
     period_s = clip_period(clip) if clip.gt is not None else np.nan
     rows, periods, cycles = [], [], []
     for t, x, y in to_position(clip, window_us):
+        if blank is not None and blank[0] <= t < blank[1]:
+            x = y = np.nan
         memory.observe(x, y)
         rows.append((t, x, y, *memory.predict(horizon_s), memory.deviation_score()))
         periods.append(memory.period())
@@ -93,7 +103,8 @@ def evaluate_clip(memory, clip: Clip, window_us: int, horizon_s: float) -> Trace
     if clip.gt is not None and inside.any():
         gt[inside] = np.atleast_2d(clip.gt(ahead[inside]))
     return Trace(t=a[:, 0], obs=a[:, 1:3], pred=a[:, 3:5], gt_ahead=gt, score=a[:, 5],
-                 horizon_s=horizon_s, window_us=window_us, period=np.array(periods), cycles=np.array(cycles))
+                 horizon_s=horizon_s, window_us=window_us, period=np.array(periods), cycles=np.array(cycles),
+                 blank=blank)
 
 
 def remembered_path(memory, period_s: float, n: int = CYCLE_POINTS) -> np.ndarray:
@@ -104,6 +115,15 @@ def remembered_path(memory, period_s: float, n: int = CYCLE_POINTS) -> np.ndarra
         return np.full((n, 2), np.nan)
     points = memory.path_points(np.arange(n) / n * period_s / p)
     return np.full((n, 2), np.nan) if points is None else np.asarray(points, dtype=float)
+
+
+def _blank_px(trace: Trace, err_all: np.ndarray) -> float:
+    """Median prediction error on the steps whose observation was hidden."""
+    if trace.blank is None:
+        return np.nan
+    inside = (trace.t >= trace.blank[0]) & (trace.t < trace.blank[1])
+    e = err_all[inside]
+    return float(np.nanmedian(e)) if np.isfinite(e).any() else np.nan
 
 
 def label_offset(trace: Trace, clip: Clip, settle_s: float = 0.0) -> np.ndarray:
@@ -149,6 +169,7 @@ def score_trace(trace: Trace, clip: Clip, tol_px: float, settle_s: float = 0.0,
         "path_px": {"median": float(np.nanmedian(path[steady])) if np.isfinite(path[steady]).any() else np.nan,
                     "last": float(np.nanmedian(path[on_path])) if np.isfinite(path[on_path]).any() else np.nan},
         "period_ratio": float(np.nanmedian(ratio)) if np.isfinite(ratio).any() else np.nan,
+        "blank_px": _blank_px(trace, err_all),
         "offset_px": (offset * scale).tolist(),
         "lock_on_s": lock_on_time(err_all[before_break], tol_px, dt),
         "path_lock_on_s": lock_on_time(path[trace.t < t_break], tol_px, dt),
@@ -229,6 +250,7 @@ def pool(rows: list[dict]) -> dict:
         "path_px": {"median": med(r["path_px"]["median"] for r in rows),
                     "last": med(r["path_px"]["last"] for r in rows)},
         "period_ratio": med(r["period_ratio"] for r in rows),
+        "blank_px": med(r["blank_px"] for r in rows),
         "lock_on_s": med(locks),
         "never_locked": int(sum(np.isinf(x) for x in locks)),
         "path_lock_on_s": med(r["path_lock_on_s"] for r in rows),

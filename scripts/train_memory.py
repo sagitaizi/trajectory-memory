@@ -66,6 +66,12 @@ def main(argv=None) -> None:
     p.add_argument("--anchor-tau-s", type=float, default=0.0, help="smoothing of the anchor position (s)")
     p.add_argument("--heads-from", default="fast", choices=("fast", "both", "split"),
                    help="which layer the horizon heads read; split = 25/50 ms fast, 100/200 ms slow")
+    p.add_argument("--arch", default="two_layer", choices=("two_layer", "lmu"),
+                   help="learned slow layer (two_layer) or the fixed LMU window memory (lmu)")
+    p.add_argument("--blank-prob", type=float, default=0.5, help="lmu: fraction of chunks with a hidden stretch")
+    p.add_argument("--lmu-q", type=int, default=24, help="lmu: Legendre order per axis")
+    p.add_argument("--lmu-n", type=int, default=200, help="lmu: neurons per state dimension")
+    p.add_argument("--lmu-theta", type=float, default=4.0, help="lmu: window (s)")
     p.add_argument("--schedule", default="none", choices=("none", "cosine"), help="learning-rate schedule")
     p.add_argument("--max-obs-err-px", type=float, default=15.0)
     p.add_argument("--include-locked", action="store_true", help="string-locked clips too, truth standing in")
@@ -88,9 +94,19 @@ def main(argv=None) -> None:
     print(f"{len(tracks)} tracks, {len(kept)} with the centroid within {args.max_obs_err_px} px of the "
           f"truth; {len(train)} training after --include-locked/--augment, {len(val)} validation; "
           f"dt {dt_s * 1e3:.1f} ms; {len(tracks[0].t)} steps each")
-    memory = SpikingMemory(dt_s=dt_s, device=args.device, n_per_axis=args.n_per_axis,
-                           n_fast=args.n_fast, n_slow=args.n_slow, anchor_tau_s=args.anchor_tau_s,
-                           heads_from=args.heads_from, seed=args.seed)
+    if args.arch == "lmu":
+        from trajmem.snn_lmu import LmuMemory
+
+        memory = LmuMemory(dt_s=dt_s, device=args.device, n_per_axis=args.n_per_axis, n_fast=args.n_fast,
+                           anchor_tau_s=args.anchor_tau_s, q=args.lmu_q, n_per_dim=args.lmu_n,
+                           theta_s=args.lmu_theta, seed=args.seed)
+        memory.set_radii_from(train)
+        fit_extra = {"blank_prob": args.blank_prob}
+    else:
+        memory = SpikingMemory(dt_s=dt_s, device=args.device, n_per_axis=args.n_per_axis,
+                               n_fast=args.n_fast, n_slow=args.n_slow, anchor_tau_s=args.anchor_tau_s,
+                               heads_from=args.heads_from, seed=args.seed)
+        fit_extra = {}
 
     t0 = time.time()
 
@@ -105,7 +121,7 @@ def main(argv=None) -> None:
 
     log = memory.fit(train, val_tracks=val, epochs=args.epochs, chunk_s=args.chunk_s, batch=args.batch,
                      lr=args.lr, path_weight=args.path_weight, seed=args.seed, schedule=args.schedule,
-                     path_loss=args.path_loss, log_fn=show)
+                     path_loss=args.path_loss, log_fn=show, **fit_extra)
     out = memory.save(out)
     out.with_suffix(".partial.pt").unlink(missing_ok=True)
     best = min((e for e in log if np.isfinite(e["val_loss"])), key=lambda e: e["val_loss"])

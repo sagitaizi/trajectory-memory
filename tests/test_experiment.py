@@ -126,7 +126,7 @@ def test_pool_keeps_misses_and_counts_them():
 
     def row(name, latency, lock):
         return {"name": name, "error_px": {"median": 1.0, "iqr": 0.1}, "lock_on_s": lock,
-                "path_px": {"median": 2.0, "last": 1.5}, "path_lock_on_s": lock, "period_ratio": 1.0,
+                "path_px": {"median": 2.0, "last": 1.5}, "path_lock_on_s": lock, "period_ratio": 1.0, "blank_px": np.nan,
                 "deviation": {"auc": 0.9, "latency_s": latency, "fp_per_min": 0.0}, "unseen_fraction": 0.0}
     pooled = pool([row("a", 0.3, 1.0), row("b", np.inf, np.inf), row("c", 0.4, 2.0), row("d", np.inf, 3.0)])
     assert pooled["deviation"]["latency_s"] == np.inf            # half the breaks were missed
@@ -222,3 +222,22 @@ def test_remembered_path_covers_one_true_period_whatever_the_memory_thinks_the_p
             return None
 
     assert np.isnan(remembered_path(Nothing(), 1.0, n=8)).all()
+
+
+def test_make_memory_picks_the_class_from_the_checkpoint(tmp_path):
+    from trajmem.snn_lmu import LmuMemory
+
+    LmuMemory(dt_s=0.005, q=4, n_per_dim=10, theta_s=1.0, n_per_axis=4, n_fast=8).save(tmp_path / "l.pt")
+    assert isinstance(make_memory("snn", dt_s=0.005, checkpoint=tmp_path / "l.pt"), LmuMemory)
+
+
+def test_evaluate_clip_can_hide_a_window_and_score_the_error_inside_it():
+    clip = a_clip_of_events(a_spec())
+    trace = evaluate_clip(HarmonicFit(dt_s=0.005, warmup_s=3.0), clip, window_us=5000, horizon_s=0.1,
+                          blank=(5.0, 5.5))
+    inside = (trace.t >= 5.0) & (trace.t < 5.5)
+    assert np.isnan(trace.obs[inside]).all() and np.isfinite(trace.obs[~inside]).all()
+    r = score_trace(trace, clip, tol_px=10.0, settle_s=4.0)
+    assert 0 < r["blank_px"] < 10.0                                 # HarmonicFit extrapolates through it
+    assert np.isnan(score_trace(evaluate_clip(HarmonicFit(dt_s=0.005, warmup_s=3.0), clip, 5000, 0.1),
+                                clip, 10.0, 4.0)["blank_px"])
