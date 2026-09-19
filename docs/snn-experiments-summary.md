@@ -140,16 +140,21 @@ blank the network drifts (52–65 px). So: the memory now clearly holds more of 
 than the learned slow layer ever did, and it is not yet near the baselines on either
 number. The night's goal — beating the baselines across the board — was not reached.
 
-**What limits the path, measured.** A readout fitted offline from a *perfect* window:
-linear 61 px, small MLP 34 px. The network's linear head (61 → 56 px) is already doing
-what a linear map can. The population's neurons each see one dimension of the window, so
-a linear readout cannot form products across dimensions — and estimating a period needs
-them. A run with a nonlinear path head (reads the LMU and the fast layer through a hidden
-layer) is in progress: `runs/memory/train_lmu_mlp.log`, `lmu_mlp.pt` when done.
+**What limits the path, measured (midday).** A head fitted offline on a *perfect*
+window: linear 61 px, small MLP 34 px. The same MLP on the *spiking* window: 46 px at
+best. The classical period search + harmonic fit on the window reconstructed from a
+perfect state: **5.9 px** — that is the harmonic baseline living inside the memory — but
+on the spiking state it collapses (74–86 px): each state dimension carries a 2–4 %
+systematic error, and rebuilding a 4 s window weights all 24 Legendre orders equally, so
+that error becomes ~90 px at every lag. Time-averaging does not help (not fast noise);
+neither do 4× more neurons nor the discrete-time NEF mapping. **The fidelity of the
+spiking window is now the binding constraint**, and the readouts (linear, MLP, with or
+without training blanks, in-loop or offline) all land at 54–59 px because of it. Four LMU
+runs (`lmu_quick`, `lmu_mlp`, `lmu_noblank`, and run 9 stopped early) agree.
 
-**Next, in order.** (1) Read the MLP-head result: if the path drops well below 56, the
-spiking form of that nonlinearity (fast layer as the hidden layer, or a small dedicated
-spiking layer) is the design step. (2) Get prediction back: ablate the training blanks,
-the LMU→fast input and the `seen` cell (each is a flag); then the full recipe (flips,
-40 epochs). (3) Through blanks, feed the window's own "one cycle ago" position instead of
-the 25 ms head.
+**Next, in order.** (1) A representation whose reconstruction tolerates the neurons'
+error: shorter window with fewer orders (θ 2 s, q 12), or a bank of short windows read
+for period, or 2-D ensembles per pair of orders — a design question for Sagi. (2) Get
+prediction back with the two-layer recipe (flips, 40 epochs): every LMU run so far is 12
+epochs without augmentation, so 32 px vs 17 is not yet a like-for-like comparison. (3)
+Through blanks, feed the window's own "one cycle ago" position instead of the 25 ms head.

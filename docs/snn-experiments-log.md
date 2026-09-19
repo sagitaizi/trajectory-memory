@@ -373,3 +373,19 @@ window, not the readout, is now the binding constraint on the path.
 
 `LmuMemory.fit(path_pretrain_steps=N)` fits the path head offline on the recorded window
 and freezes it (`--path-pretrain-steps`); not yet used in a full run.
+
+**Run 10 final (`lmu_noblank.pt`)**: val 100 ms 26.0 px, path 54.0 px (the lowest of the
+LMU runs); development set 33.2 px prediction / 58.9 px path / period 1.45 (fan 40,
+`loop_01` 25). No blanks in training ≈ blanks (run 7: 32.0 / 58.3): neither number is
+limited by the blanks. The four LMU runs agree within noise on both numbers.
+
+**Standing at the end of the session (2026-09-19, 13:30).** Path on real clips 55–59 px
+(learned slow layer 66, Kalman 14); prediction 32–33 px (two-layer best 17.4, Kalman
+14.7; all LMU runs are 12 epochs without flips, the two-layer's best was 40 epochs with
+flips). Checkpoints: `lmu_quick.pt` (linear head, blanks), `lmu_mlp.pt`, `lmu_noblank.pt`
+(decoded-window MLP head, no blanks). Next: (1) the fidelity of the spiking window is the
+lever for the path — more neurons per dimension scale slowly, so the question is the
+representation (e.g. lower q with a shorter θ, or a 2-D ensemble per Legendre order pair,
+or reading period from a *bank of shorter windows*); (2) the prediction side needs the
+two-layer recipe (flips, 40 epochs) before it can be compared; (3) through blanks, feed
+the window's own one-period-back position.

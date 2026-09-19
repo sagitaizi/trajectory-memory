@@ -168,11 +168,14 @@ freely moving real target, with a break signal.
   moved the path to ~72 px and routing the long horizons through the slow layer changed
   nothing (`docs/snn-experiments-log.md`, run 6) — hence the LMU core above. First LMU
   run (12 epochs, `runs/memory/lmu_quick.pt`): path **58 px** on the development set (fan
-  30, `loop_01` 29), prediction 32 px; sim validation path 56 px. A perfect window read
-  linearly gives 61 px, read by a small MLP 34 px — the readout's nonlinearity is the
-  next lever (run 8, `--path-from both --path-readout mlp`, in progress). **Open: path
-  readout nonlinearity; prediction regressed (32 vs 17) — ablate blanks / LMU→fast /
-  `seen`; self-feeding through blanks drifts (52–65 px in a 1 s blank).**
+  30, `loop_01` 29), prediction 32 px; sim validation path 56 px. Four LMU runs (linear /
+  MLP heads, with / without blanks) all land at 54–59 px path and 32–33 px prediction.
+  Offline: a perfect window read by the classical period search gives **5.9 px**, the
+  spiking window 74–86 — the population's 2–4 % state error, amplified over 24 Legendre
+  orders, is the binding constraint. **Open: a window representation that tolerates that
+  error (shorter θ / fewer orders, a bank of short windows, 2-D ensembles); prediction
+  needs the two-layer recipe (flips, 40 epochs) before a fair comparison; self-feeding
+  through blanks drifts (52–65 px in a 1 s blank).**
 - **Done when:** on real repetitive clips, Stage 1 prediction error beats the classical
   baseline *or* matches it with a stated event-native/latency argument; lock-on within N
   cycles. Bar: Kalman 24.2 px pooled (8.0 on the fan), ~3 px on sim.
