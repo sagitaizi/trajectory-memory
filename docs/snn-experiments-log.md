@@ -254,3 +254,44 @@ layer actually holding the cycle. Candidates for the next session, in order of c
 longer effective memory via adaptive thresholds (LSNN, Bellec 2018) in the slow layer;
 training the path head first (curriculum); more and more varied simulated clips (the
 generator is seed-reproducible; overfitting is the binding constraint).
+
+## Run 6 — the path-shape metric, the geometric loss, and routing (2026-09-19)
+
+**Metric first.** `metrics.path_shape_error` scores the memory's own picture of one cycle
+against the true cycle (px, best phase shift, sampled over one *true* period so the shape
+is judged apart from the period, which is reported as `P / T`). Development set,
+offset-subtracted, path median px / period ratio: Kalman 14.0 / 1.00, Harmonic 10.3 /
+1.00, `snn_anchor20` **64.4 / 1.83**. On clean sim clips: Kalman 1.5–9 px, SNN 30–65 px.
+The learned slow layer's path head held nothing usable; the prediction numbers came from
+short-term extrapolation. (Found and fixed on the way: `search_period`'s divisor tie was
+absolute and lost to centroid noise, so the baselines ran at 2T or 3T on some clips; it is
+now relative, 2 % of the best residual.)
+
+**Geometric path loss** (px of the drawn cycle at 16 phases / 50 + phase pair squared error
++ relative period squared error, weight 1.0; `--path-loss mse` keeps the old form): 12
+epochs, 200-clip corpus, locked clips in, no flips, anchor 20 ms. Validation path px
+120 → 70 (mean-path baseline 120), 100 ms 19.5 → 22 px (the heads compete for the fast
+layer). The checkpoint selection then used the 100 ms error alone and kept epoch 2;
+`fit` now selects by total validation loss.
+
+**Routing** (`heads_from="split"`: 100/200 ms heads read the slow layer only), same
+settings, side by side with the fast-only twin:
+
+| | val 100 ms | val path px | dev pred | dev path | dev period |
+|---|---|---|---|---|---|
+| fast | 23.6 | 71.6 | 28.1 | 65.9 | 1.32 |
+| split | 26.5 | 71.8 | 30.3 | 66.3 | 1.47 |
+
+Same wall at ~72 px whichever way the cycle is asked for. Diagnosis: the slow layer's only
+seconds-long variable is the adaptive threshold — a leaky spike count that records
+occupancy, not a sequence; nothing in the network represents the recent trajectory.
+
+**Decided (with Sagi, 2026-09-19): a hand-set window memory** — a spiking Legendre Memory
+Unit built by Nengo and simulated in torch — replaces the learned slow layer
+(`trajmem/lmu.py`, `trajmem/snn_lmu.py`; design in
+`docs/superpowers/specs/2026-09-19-lmu-memory-design.md`). Sizing by measurement: q = 24
+per axis over θ = 4 s reconstructs the position one period back to 0.5 px median / 3.8 px
+p90 on the sim paths (q = 16: p90 35 px); 200 LIF neurons per state dimension with 1 ms
+sub-steps track the exact LMU to 5 % of the signal (100 neurons, or 2.5 ms sub-steps,
+drift). The population costs ~10 ms per network step whatever its size — kernel launch
+overhead — so training runs at batch 32.
