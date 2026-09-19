@@ -158,7 +158,7 @@ class TwoLayerNet(nn.Module):
                  tau_fast=(0.01, 0.025), tau_slow=(0.3, 0.7), readout_tau_s: float = 0.015,
                  n_horizons: int = len(HORIZONS_S), n_cells: int = 32, n_path: int = N_PATH,
                  heads_from: str = "fast", slow_kind: str = "adaptive", tau_adapt=(0.5, 4.0),
-                 adapt_scale: float = 1.8, seed: int = 0):
+                 adapt_scale: float = 1.8, n_short: int = 2, seed: int = 0):
         super().__init__()
         gen = torch.Generator().manual_seed(seed)
         grad = surrogate.fast_sigmoid(slope=25)
@@ -174,8 +174,14 @@ class TwoLayerNet(nn.Module):
         self.w_sf = nn.Linear(n_slow, n_fast, bias=False)
         self.w_fs = nn.Linear(n_fast, n_slow)
         self.w_ss = nn.Linear(n_slow, n_slow, bias=False)
-        self.heads_from = heads_from                        # "fast" or "both" layers
-        self.read_h = nn.Linear(n_fast + (n_slow if heads_from == "both" else 0), n_horizons * 2 * n_cells)
+        # "fast": every head reads the fast layer; "both": the two concatenated; "split": the
+        # first `n_short` horizons read the fast layer, the rest the slow layer only.
+        if heads_from not in ("fast", "both", "split"):
+            raise ValueError(f"heads_from {heads_from!r}: fast, both or split")
+        self.heads_from, self.n_short = heads_from, n_short if heads_from == "split" else n_horizons
+        self.read_h = nn.Linear(n_fast + (n_slow if heads_from == "both" else 0), self.n_short * 2 * n_cells)
+        if heads_from == "split":
+            self.read_hs = nn.Linear(n_slow, (n_horizons - n_short) * 2 * n_cells)
         self.read_p = nn.Linear(n_slow, n_path)
         self.n_horizons, self.n_cells = n_horizons, n_cells
         self.alpha = math.exp(-dt_s / readout_tau_s)
@@ -208,6 +214,13 @@ class TwoLayerNet(nn.Module):
         spk, mem_s = self.slow(cur, mem_s)
         return spk, mem_s, adapt_s
 
+    def _read_heads(self, r_f, r_s):
+        if self.heads_from == "both":
+            return self.read_h(torch.cat([r_f, r_s], dim=-1))
+        if self.heads_from == "split":
+            return torch.cat([self.read_h(r_f), self.read_hs(r_s)], dim=-1)
+        return self.read_h(r_f)
+
     def forward(self, x: torch.Tensor, state=None):
         """x: (T, B, n_in) -> head cells (T, B, n_horizons, 2, n_cells), path (T, B, n_path),
         state. The pass's mean firing rates stay in `self.rates`, with gradient."""
@@ -219,7 +232,7 @@ class TwoLayerNet(nn.Module):
             spk_s, mem_s, adapt_s = self._slow_step(self.w_fs(spk_f) + self.w_ss(spk_s), mem_s, adapt_s)
             r_f = self.alpha * r_f + (1.0 - self.alpha) * spk_f
             r_s = self.alpha * r_s + (1.0 - self.alpha) * spk_s
-            heads.append(self.read_h(torch.cat([r_f, r_s], dim=-1) if self.heads_from == "both" else r_f))
+            heads.append(self._read_heads(r_f, r_s))
             paths.append(self.read_p(r_s))
             rate_f, rate_s = rate_f + spk_f.mean(), rate_s + spk_s.mean()
         self.rates = (rate_f / T, rate_s / T)
@@ -307,7 +320,7 @@ class SpikingMemory:
         n_in = self.pos_enc.n_out + self.vel_enc.n_out
         self.net = TwoLayerNet(n_in, n_fast, n_slow, dt_s, tau_fast, tau_slow, readout_tau_s,
                                len(self.horizons_s), n_per_axis, N_PATH, heads_from, slow_kind, tau_adapt,
-                               adapt_scale, seed).to(self.device)
+                               adapt_scale, sum(h <= 0.05 for h in self.horizons_s), seed).to(self.device)
         self.path_mean, self.path_std = np.zeros(N_PATH), np.ones(N_PATH)
         self.path_loss = "geometric"
         self.scales = (1.0, 1.0)                     # on-pattern level of (immediate, structural), px
@@ -508,8 +521,9 @@ class SpikingMemory:
             val_fraction: float = 0.1, lr: float = 1e-3, path_weight: float = 1.0, seed: int = 0,
             schedule: str = "none", weight_decay: float = 0.0, val_tracks: list[Track] | None = None,
             path_loss: str = "geometric", log_fn=None) -> list[dict]:
-        """Train on `tracks` (a held-back fraction validates and picks the best epoch, or
-        `val_tracks` if given), then set the deviation scales on the validation tracks.
+        """Train on `tracks` (a held-back fraction validates and picks the best epoch by
+        total validation loss, or `val_tracks` if given), then set the deviation scales on
+        the validation tracks.
         `schedule` "cosine" decays the learning rate to zero over the epochs; `path_loss`
         as in `_loss`. Returns the per-epoch log."""
         if path_loss not in ("geometric", "mse"):
@@ -546,7 +560,7 @@ class SpikingMemory:
             log.append(entry)
             if log_fn:
                 log_fn(entry)
-            return val_px
+            return loss[0]
 
         validate(0, np.nan)
         for epoch in range(1, epochs + 1):
@@ -559,8 +573,8 @@ class SpikingMemory:
                     losses.append(self._run_chunks(arrays, idx, chunk, path_weight, optimiser)[0][0])
             if scheduler is not None:
                 scheduler.step()
-            val_px = validate(epoch, float(np.mean(losses)))
-            score = val_px if np.isfinite(val_px) else -epoch                 # no validation: keep the last
+            val_loss = validate(epoch, float(np.mean(losses)))
+            score = val_loss if np.isfinite(val_loss) else -epoch             # no validation: keep the last
             if score < best[0]:
                 best = (score, {k: v.detach().clone() for k, v in self.net.state_dict().items()})
         if best[1] is not None:

@@ -271,3 +271,15 @@ def test_geometric_path_loss_is_zero_on_the_targets_and_logs_path_px():
     yh, mh = torch.zeros(1, 1, len(m.horizons_s), 2), torch.zeros(1, 1, len(m.horizons_s), dtype=torch.bool)
     _, _, lp, px = m._loss(cells, yp, yh, mh, yp, mp, path_weight=1.0)
     assert lp == pytest.approx(0.0, abs=1e-4) and px == pytest.approx(0.0, abs=1e-2)
+
+
+def test_split_routing_reads_short_horizons_from_the_fast_layer_and_long_from_the_slow():
+    torch.manual_seed(0)
+    net = TwoLayerNet(n_in=10, n_fast=16, n_slow=8, heads_from="split", n_horizons=4, n_cells=6, n_short=2)
+    assert net.read_h.out_features == 2 * 2 * 6 and net.read_hs.out_features == 2 * 2 * 6
+    heads, path, _ = net(torch.rand(5, 3, 10))
+    assert heads.shape == (5, 3, 4, 2, 6) and path.shape == (5, 3, N_PATH)
+    m = tiny_memory(heads_from="split")
+    assert m.net.n_short == 2                              # 25 and 50 ms
+    with pytest.raises(ValueError):
+        TwoLayerNet(n_in=10, n_fast=16, n_slow=8, heads_from="sideways")

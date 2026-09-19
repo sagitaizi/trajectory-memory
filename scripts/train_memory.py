@@ -64,6 +64,8 @@ def main(argv=None) -> None:
     p.add_argument("--path-loss", default="geometric", choices=("geometric", "mse"),
                    help="px of the drawn cycle + phase + period (geometric), or MSE on the raw numbers")
     p.add_argument("--anchor-tau-s", type=float, default=0.0, help="smoothing of the anchor position (s)")
+    p.add_argument("--heads-from", default="fast", choices=("fast", "both", "split"),
+                   help="which layer the horizon heads read; split = 25/50 ms fast, 100/200 ms slow")
     p.add_argument("--schedule", default="none", choices=("none", "cosine"), help="learning-rate schedule")
     p.add_argument("--max-obs-err-px", type=float, default=15.0)
     p.add_argument("--include-locked", action="store_true", help="string-locked clips too, truth standing in")
@@ -87,7 +89,8 @@ def main(argv=None) -> None:
           f"truth; {len(train)} training after --include-locked/--augment, {len(val)} validation; "
           f"dt {dt_s * 1e3:.1f} ms; {len(tracks[0].t)} steps each")
     memory = SpikingMemory(dt_s=dt_s, device=args.device, n_per_axis=args.n_per_axis,
-                           n_fast=args.n_fast, n_slow=args.n_slow, anchor_tau_s=args.anchor_tau_s, seed=args.seed)
+                           n_fast=args.n_fast, n_slow=args.n_slow, anchor_tau_s=args.anchor_tau_s,
+                           heads_from=args.heads_from, seed=args.seed)
 
     t0 = time.time()
 
@@ -105,8 +108,9 @@ def main(argv=None) -> None:
                      path_loss=args.path_loss, log_fn=show)
     out = memory.save(out)
     out.with_suffix(".partial.pt").unlink(missing_ok=True)
-    best = min((e for e in log if np.isfinite(e["val_px"])), key=lambda e: e["val_px"])
-    print(f"best epoch {best['epoch']}: val 100 ms {best['val_px']:.1f} px; deviation scales "
+    best = min((e for e in log if np.isfinite(e["val_loss"])), key=lambda e: e["val_loss"])
+    print(f"best epoch {best['epoch']} (val loss {best['val_loss']:.3f}): val 100 ms {best['val_px']:.1f} px, "
+          f"path {best['val_path_px']:.1f} px; deviation scales "
           f"{memory.scales[0]:.1f} / {memory.scales[1]:.1f} px; wrote {out}")
     with open(out.with_suffix(".csv"), "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=list(log[0]))
