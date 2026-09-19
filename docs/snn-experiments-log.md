@@ -331,3 +331,10 @@ flips is also short of the two-layer's best recipe. (2) Self-feeding drifts thro
 blanks: feed the LMU's own delay readout at lag = period ("where it was one cycle ago")
 instead of the 25 ms head — the window already contains it. (3) The spiking version of
 whatever nonlinearity the MLP proves necessary.
+
+**Run 8 (`lmu_mlp`, `--path-from both --path-readout mlp`)**: val 100 ms 26.4 px, path
+54.6 px — within a pixel of the linear head (55.7). A hidden layer over the 512 random
+features of the spike rates (plus the fast layer) does not find what the offline MLP
+found on the exact state (34 px). Run 9 (`lmu_state`, `--path-from state`: the path head
+reads the window as Nengo's decoders read it, 48 numbers, scaled by the radii) started
+11:45 to separate the substrate from the head.
