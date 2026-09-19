@@ -235,7 +235,7 @@ class LmuMemory(SpikingMemory):
             with torch.set_grad_enabled(optimiser is not None):
                 cells, path, ref, state, rate = self._run(obs[sl], state)
                 yh = torch.stack([torch.roll(gt, -k, 0)[sl] - ref for k in shifts], dim=2)      # (T, B, H, 2)
-                self.net.rates, self.net.last_rates = (rate,), (float(rate), 0.0)
+                self.net.rates, self.net.last_rates = (rate,), (float(rate.detach()), 0.0)
                 loss, lh, lp, path_px = self._loss(cells, path, torch.nan_to_num(yh), mh[sl], yp[sl], mp[sl], path_weight)
                 heads = self._decode(cells)
             if optimiser is not None:

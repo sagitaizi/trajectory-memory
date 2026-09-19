@@ -39,8 +39,24 @@ manuscript.
 ### Voelker, Kajić & Eliasmith, 2019 — "Legendre Memory Units"
 - *NeurIPS 2019*.
 - **Why:** NEF-derived, provably optimal rolling memory of a time signal; beats LSTM on chaotic
-  time-series prediction; runs on Loihi. Candidate for the memory core.
-- **Where:** `model.py` (LMU implementation, if G-F picks it); decision gate G-F.
+  time-series prediction; runs on Loihi. The memory core of `snn_lmu.LmuMemory`: the Legendre
+  matrices, the delay readout, and the window-holds-the-cycle argument.
+- **Where:** `lmu.py`; `PLAN.md` §C; the paper's method section.
+
+### Voelker & Eliasmith, 2018 — "Improving spiking dynamical networks: accurate delays, higher-order synapses, and time cells"
+- *Neural Computation* 30(3):569–609.
+- **Why:** the spiking implementation of the delay network (the LMU's predecessor) with the NEF:
+  how a population of LIF neurons with a first-order synapse realises the linear dynamics, and
+  that its neurons show hippocampal time-cell tuning — the biological reading of the window
+  memory.
+- **Where:** `lmu.py` (`build_population`: NEF principle 3 with a lowpass synapse); the
+  plausibility argument in `docs/superpowers/specs/2026-09-19-lmu-memory-design.md`.
+
+### MacDonald, Lepage, Eden & Eichenbaum, 2011 — "Hippocampal 'time cells' bridge the gap in memory for discontiguous events"
+- *Neuron* 71(4):737–749.
+- **Why:** neurons firing in sequence at successive lags after an event — the brain's version
+  of a delay line, which the LMU population reproduces.
+- **Where:** plausibility of the hand-set window memory.
 
 ### Sussillo & Abbott, 2009 — "Generating Coherent Patterns of Activity from Chaotic Neural Networks"
 - *Neuron* 63(4):544–557. FORCE learning.
