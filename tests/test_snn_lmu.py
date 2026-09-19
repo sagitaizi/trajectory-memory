@@ -83,7 +83,7 @@ def test_checkpoint_round_trip_keeps_the_predictions(tmp_path):
     assert m2.q == 6 and m2.n_per_dim == 30 and m2.theta_s == 1.5
 
 
-@pytest.mark.parametrize("path_from,path_readout", [("both", "linear"), ("lmu", "mlp")])
+@pytest.mark.parametrize("path_from,path_readout", [("both", "linear"), ("lmu", "mlp"), ("state", "mlp")])
 def test_path_head_options_run_and_round_trip(tmp_path, path_from, path_readout):
     m = tiny_memory(path_from=path_from, path_readout=path_readout)
     m.reset()

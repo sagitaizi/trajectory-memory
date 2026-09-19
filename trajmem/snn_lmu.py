@@ -31,9 +31,10 @@ class LmuNet(nn.Module):
 
     def __init__(self, n_in: int, n_fast: int, n_lmu: int, dt_s: float, tau_fast, readout_tau_s: float,
                  n_horizons: int, n_cells: int, n_path: int, n_short: int, seed: int = 0,
-                 n_features: int = LMU_FEATURES, path_from: str = "lmu", path_readout: str = "linear"):
+                 n_features: int = LMU_FEATURES, path_from: str = "lmu", path_readout: str = "linear",
+                 n_state: int = 0):
         super().__init__()
-        if path_from not in ("lmu", "both") or path_readout not in ("linear", "mlp"):
+        if path_from not in ("lmu", "both", "state") or path_readout not in ("linear", "mlp"):
             raise ValueError(f"path_from {path_from!r} / path_readout {path_readout!r}")
         gen = torch.Generator().manual_seed(seed)
         grad = surrogate.fast_sigmoid(slope=25)
@@ -49,7 +50,8 @@ class LmuNet(nn.Module):
         # A linear readout of one-dimensional ensembles is additive over the state dimensions
         # and cannot form the cross terms a period estimate needs; the fast layer ("both")
         # or a hidden layer ("mlp") supplies them.
-        n_p = n_features + (n_fast if path_from == "both" else 0)
+        # "state": the window as Nengo's decoders read it (n_state numbers), also hand-set
+        n_p = n_state if path_from == "state" else n_features + (n_fast if path_from == "both" else 0)
         self.read_p = nn.Linear(n_p, n_path) if path_readout == "linear" else             nn.Sequential(nn.Linear(n_p, 256), nn.ReLU(), nn.Linear(256, n_path))
         self.path_from = path_from
         self.n_fast, self.n_features, self.n_horizons, self.n_cells, self.n_short = n_fast, n_features, n_horizons, n_cells, n_short
@@ -57,20 +59,24 @@ class LmuNet(nn.Module):
 
     def init_state(self, batch: int, device):
         z = lambda n: torch.zeros(batch, n, device=device)  # noqa: E731
-        return (z(self.n_fast), z(self.n_fast), z(self.n_fast), z(self.n_features))   # mem, spikes, r_fast, r_lmu
+        return (z(self.n_fast), z(self.n_fast), z(self.n_fast), z(self.n_features), None)   # mem, spikes, r_fast, r_lmu, r_state
 
-    def step(self, x: torch.Tensor, act: torch.Tensor, state):
-        """x: (B, n_in) input cells; act: (B, n_lmu) LMU rates in Hz -> heads (B, H, 2, n_cells),
-        path (B, n_path), state, this step's fast-layer spike fraction (with gradient)."""
-        mem, spk, r_f, r_l = state
+    def step(self, x: torch.Tensor, act: torch.Tensor, state, decoded: torch.Tensor | None = None):
+        """x: (B, n_in) input cells; act: (B, n_lmu) LMU rates in Hz; decoded: (B, n_state) the
+        LMU's decoded window -> heads (B, H, 2, n_cells), path (B, n_path), state, this
+        step's fast-layer spike fraction (with gradient)."""
+        mem, spk, r_f, r_l, r_s = state
         a = (act / LMU_ACT_SCALE) @ self.proj
+        if decoded is not None:
+            r_s = decoded if r_s is None else self.alpha * r_s + (1.0 - self.alpha) * decoded
         spk, mem = self.fast(self.w_in(x) + self.w_ff(spk) + self.w_sf(a), mem)
         r_f = self.alpha * r_f + (1.0 - self.alpha) * spk
         r_l = self.alpha * r_l + (1.0 - self.alpha) * a
         heads = torch.cat([self.read_short(r_f), self.read_long(torch.cat([r_f, r_l], dim=-1))], dim=-1)
         heads = heads.reshape(x.shape[0], self.n_horizons, 2, self.n_cells)
-        path = self.read_p(torch.cat([r_l, r_f], dim=-1) if self.path_from == "both" else r_l)
-        return heads, path, (mem, spk, r_f, r_l), spk.mean()
+        src = {"lmu": r_l, "both": torch.cat([r_l, r_f], dim=-1) if r_f is not None else r_l, "state": r_s}[self.path_from]
+        path = self.read_p(src)
+        return heads, path, (mem, spk, r_f, r_l, r_s), spk.mean()
 
 
 class LmuMemory(SpikingMemory):
@@ -91,14 +97,16 @@ class LmuMemory(SpikingMemory):
         self.net = LmuNet(n_in, n_fast, self.lmu.n, dt_s, self.tau_fast, self.readout_tau_s,
                           len(self.horizons_s), self.n_per_axis, N_PATH,
                           sum(h <= 0.05 for h in self.horizons_s), self.seed,
-                          path_from=path_from, path_readout=path_readout).to(self.device)
+                          path_from=path_from, path_readout=path_readout, n_state=2 * q).to(self.device)
         self.k_feed = max(1, round(self.horizons_s[0] / dt_s))                   # the 25 ms head feeds back
+        self.radii_t = torch.tensor(self.radii, dtype=torch.float32, device=self.device)   # decoded state -> order one
         self.blank_prob = 0.0
         self.reset()
 
     def set_radii_from(self, tracks: list[Track]) -> None:
         """Size the LMU's representation to the corpus and rebuild the population."""
         self.radii = state_radii([tr.gt - 0.5 for tr in tracks], self.q, self.theta_s, self.dt_s)
+        self.radii_t = torch.tensor(self.radii, dtype=torch.float32, device=self.device)
         self.lmu = SpikingLmu(build_population(self.q, self.theta_s, self.n_per_dim, self.radii, self.tau_syn_s,
                                                2, self.lmu_seed), self.dt_s, device=self.device)
 
@@ -163,7 +171,8 @@ class LmuMemory(SpikingMemory):
                 u = torch.nan_to_num(pos - 0.5)
                 act, state["lmu"] = self.lmu.step(u, state["lmu"])
             state["act"] = act
-            heads, path, state["net"], r = self.net.step(x, act, state["net"])
+            decoded = self.lmu.decode(act).reshape(B, -1) / self.radii_t if self.path_from == "state" else None
+            heads, path, state["net"], r = self.net.step(x, act, state["net"], decoded)
             disp = self.out_enc[0].decode(heads[:, 0].detach())                          # 25 ms head, (B, 2)
             state["fed"].append(ref.detach() + disp)
             cells.append(heads); paths.append(path); refs.append(ref); rate = rate + r
@@ -269,7 +278,7 @@ class LmuMemory(SpikingMemory):
 
     @staticmethod
     def _detach(state):
-        state["net"] = tuple(v.detach() for v in state["net"])
+        state["net"] = tuple(None if v is None else v.detach() for v in state["net"])
         state["ref"] = state["ref"].detach()
         state["anchors"] = deque((a.detach() for a in state["anchors"]), maxlen=state["anchors"].maxlen)
         state["fed"] = deque((a.detach() for a in state["fed"]), maxlen=state["fed"].maxlen)
