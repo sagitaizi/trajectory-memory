@@ -19,7 +19,7 @@ freely moving real target, with a break signal.
 |---|---|
 | A — Data | 🟨 Real corpus recorded and split; development set labelled; sim corpus generated. **Open: label the held-out clips.** |
 | B — Frontend + baselines | ✅ |
-| C — Trajectory memory, Stage 1 | 🟨 **In progress.** Design decided (below); building the network, the training script and the first sim numbers. |
+| C — Trajectory memory, Stage 1 | 🟨 **In progress.** Network, training and evaluation built; 13.6 px at 100 ms on sim (Kalman 7.5), at the Kalman bar on the development set. Open: the cycle memory. |
 | D — Deviation detection | ⬜ Scoring exists; thresholds must be chosen on development clips. |
 | E — Raw events, Stage 2 | ⬜ Only if Stage 1 lands. |
 | F — Paper | 🟨 Written as sections unlock; draft due 2026-10-01. |
@@ -81,11 +81,12 @@ freely moving real target, with a break signal.
   7.5 px, 5.6 on exact paths. Break detection on sim: AUC 0.91 / 0.87, latency 0.33 /
   0.15 s. Lock-on pools to "never" on both sets at a 15 px tolerance — the tolerance
   must be set per regime (§IV-D).
-  The pendulum numbers are a *constant* vertical offset of 27–43 px between the event
-  centroid and the marked brush centre (1–3 px sideways) — a labelling convention, and a
-  floor under any pendulum error scored against labels. How to treat it is an open §IV-D
-  choice: subtract the per-clip offset, or score prediction against the frontend's own
-  track and report localisation separately.
+  Hand-labels mark a fixed point of the object that is not the event centroid (pendulum:
+  brush centre, 25–42 px below the centroid; wall target: 12–21 px), a floor under any error
+  scored against them. **Decided (2026-09-17): `--subtract-offset`** removes each clip's
+  median label−centroid vector before scoring and reports it (§IV-D). With it, development
+  pooled at 100 ms: Kalman 14.8, Harmonic 24.0, SNN (`runs/memory/snn.pt`) 18.3; fan 7.0 /
+  6.0 / 11.5; `loop_01` 61.9 / 54.2 / 29.0.
 
 ## C — Trajectory memory, Stage 1 (the goal)
 
@@ -96,19 +97,51 @@ freely moving real target, with a break signal.
 - **Design** (decided 2026-09-16; rationale in `materials/01-literature/multi-timescale-memory.md`):
   - *Input*: place cells per axis — 32 overlapping Gaussian tuning curves along x and 32
     along y (64 inputs); the encoder is a swappable class so a 2-D grid can replace it.
-  - *Core*: two recurrent LIF layers. Fast layer (membrane τ 20–50 ms) takes the input;
-    slow layer (τ ~300–700 ms) takes input only from the fast layer and feeds back to it.
-    Time constants spread within each layer and learnable. Single mixed-τ layer and fixed
-    random weights (reservoir) are the ablations.
-  - *Readout*: linear, from a 50 ms low-pass of the spikes. Horizon heads (x, y) at 25 / 50 /
-    100 / 200 ms from the fast layer; path head from the slow layer — period, phase as
-    (cos, sin), mean + 3 harmonics per axis (17 numbers), exact targets from sim ground truth.
+  - *Core*: two recurrent spiking layers. Fast layer (LIF, membrane τ 10–25 ms; 20–50 was
+    ~1 px worse) takes the input; slow layer takes input only from the fast layer and feeds
+    back to it. The slow layer's neurons are **adaptive LIF (LSNN, Bellec et al. 2018;
+    decided 2026-09-17)**: fast membrane plus a threshold that rises per spike and decays
+    over 0.5–4 s — a seconds-long memory that spikes do not reset. Plain LIF with a
+    300–700 ms leak (`slow_kind="leaky"`) is the ablation: it never held the cycle (path
+    head flat, no gain from reading it) and went silent without a rate regulariser. Time
+    constants spread within each layer and learnable.
+  - *Readout*: linear, from a 15 ms low-pass of the spikes. Horizon heads at 25 / 50 / 100 /
+    200 ms from the fast layer, each as place cells again (32 per axis, position = centre of
+    mass, cross-entropy against the true position's bump); path head from the slow layer —
+    period, phase as (cos, sin), mean + 3 harmonics per axis (17 numbers), exact targets
+    from sim ground truth. A firing-rate regulariser (target 10 %, weight 10) keeps both
+    layers active.
   - *Deviation score*: immediate = smoothed error of the 100 ms head against what arrives;
     structural = error of the position reconstructed from the path head; each scaled by its
     on-pattern level on development clips; the score is the larger of the two.
   - *Training*: surrogate-gradient BPTT in snnTorch, own loop, 5 s chunks with state carried
-    over; loss masked before the first cycle and after a scripted break; 90 sim clips train,
-    10 validate. e-prop (local, plausible) is future work.
+    over; loss masked before the first cycle and after a scripted break; of the 57 usable
+    sim clips 51 train and 6 validate. e-prop (local, plausible) is future work.
+- **Built**: `trajmem/snn.py`, `scripts/train_memory.py` (→ `runs/memory/snn.pt`),
+  `run_experiment.py --memory snn`. Trains on the 57 sim clips whose centroid is within
+  15 px of the truth (the rest are string-locked).
+- **Runs so far** (validation sim clips, px median; persistence = the input repeated):
+
+  | | 25 ms | 50 ms | 100 ms | 200 ms |
+  |---|---|---|---|---|
+  | persistence | 11 | 18 | 29 | 51 |
+  | (x, y) readout, 192 fast, 30 epochs | 30 | 41 | 47 | 64 |
+  | place cells out, 384 fast, rate reg, lr 3e-3, 30 epochs | 21 | 27 | 39 | 59 |
+  | + velocity cells in, displacement cells out (`m1_base`) | 5.8 | 8.7 | 15.6 | 33.8 |
+  | + fast τ 10–25 ms, readout 15 ms, mirror flips | 5.6 | 7.8 | 13.6 | 27.3 |
+  | + string-locked clips with truth standing in, 40 epochs cosine | 5.5 | 7.6 | 11.7 | 21.9 |
+  | + corpus doubled to 200 sim clips (`runs/memory/snn.pt`) | 5.6 | 7.3 | 10.7 | 19.2 |
+  | + 20 ms anchor smoothing, stopped at epoch 34 (`runs/memory/snn_anchor20.pt`) | 5.7 | 7.2 | 10.2 | 17.7 |
+
+  Kalman on the same clips: 7.5 px at 100 ms. Development set at 100 ms, offset-subtracted,
+  pooled: SNN 16.6–17.4, Kalman 14.8, Harmonic 24.0; fan 12–13 (Kalman 7.0); `loop_01`
+  26–28 (Kalman 61.9). The adaptive (LSNN) slow layer made no difference in two runs. The
+  full record of the 2026-09-17 overnight sweep is `docs/snn-experiments-log.md`, the short
+  version `docs/snn-experiments-summary.md`. Decided along the way: horizon heads are place
+  cells over the displacement from the current position; the input carries velocity cells;
+  a firing-rate regulariser keeps both layers active. **Open: the cycle memory — the slow
+  layer and path head contribute little yet; the network extrapolates recent motion rather
+  than knowing the path. Training is data-limited (overfits 51 clips after ~20 epochs).**
 - **Done when:** on real repetitive clips, Stage 1 prediction error beats the classical
   baseline *or* matches it with a stated event-native/latency argument; lock-on within N
   cycles. Bar: Kalman 24.2 px pooled (8.0 on the fan), ~3 px on sim.

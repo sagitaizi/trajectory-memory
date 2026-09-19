@@ -1,7 +1,7 @@
 """The framework-agnostic boundary: Localiser + TrajectoryMemory Protocols.
 
-Ships a provisional NumPy reservoir and a centroid localiser. Framework-specific
-implementations (LMU, snnTorch) are added behind the same Protocols once G-F closes.
+The Stage-1 memory is `snn.SpikingMemory`; the baselines are in `baseline.py`. The
+reservoir and localiser below are placeholders.
 """
 from __future__ import annotations
 

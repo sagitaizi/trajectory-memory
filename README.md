@@ -31,7 +31,9 @@ python scripts/check_localiser.py --set development            # centroid vs han
 python scripts/replay_gt.py corpus/real/fan/fan_brush_slow_02 --model kalman   # watch it live
 python scripts/make_tracks.py                                  # position tracks for pretraining
 python scripts/make_frames.py --downsample 8                   # frame sets for the localiser
-python -m pytest                                               # ~40 s
+python scripts/train_memory.py                                 # pretrain the SNN memory -> runs/memory/snn.pt
+python scripts/run_experiment.py --set development --memory snn --subtract-offset
+python -m pytest                                               # ~2 min
 ```
 
 `corpus/sets.yaml` names the development and held-out real clips. Results land in

@@ -440,3 +440,34 @@ def load_clip(path) -> Clip:
         clip.gt = _ego_gt_for_clip(Path(clip.source), meta["slug"], meta["anchor"],
                                    meta["t0_device_us"])
     return clip
+
+
+# --- position tracks (what the memory core pretrains on) -------------------------
+
+@dataclass
+class Track:
+    """One clip as the memory sees it: the measured position per window, the truth, the
+    break (NaN if none) and the path's period. Positions are normalised."""
+    name: str
+    t: np.ndarray                                        # window centres, s
+    obs: np.ndarray                                      # (N, 2), NaN = unseen
+    gt: np.ndarray                                       # (N, 2)
+    deviation_t: float
+    period_s: float
+
+
+def load_tracks(corpus) -> list[Track]:
+    """Every clip in `<corpus>/tracks.npz` (from scripts/make_tracks.py), with the period
+    from the corpus manifest."""
+    corpus = Path(corpus)
+    periods = {}
+    with open(corpus / "manifest.csv", newline="", encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            periods[row["name"]] = float(row["period_s"])
+    tracks = []
+    with np.load(corpus / "tracks.npz") as z:
+        names = sorted({k.split("/")[0] for k in z.files if "/" in k})
+        for name in names:
+            tracks.append(Track(name=name, t=z[f"{name}/t"], obs=z[f"{name}/obs"], gt=z[f"{name}/gt"],
+                                deviation_t=float(z[f"{name}/deviation_t"]), period_s=periods[name]))
+    return tracks

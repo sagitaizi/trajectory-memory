@@ -17,16 +17,20 @@ trajectory-memory/
     simulate.py
     frontend.py
     model.py
+    snn.py                   Stage-1 memory: place cells -> fast LIF <-> adaptive LIF -> readouts
+    augment.py               track-level augmentation for pretraining (flips, shift, scale, stretch)
+    localise.py              Stage-1 localiser harness: FrameSet, evaluate_localiser, FrameCentroid
     baseline.py
     metrics.py
     experiment.py
   scripts/
     make_sim_dataset.py
     run_experiment.py        CLI: one clip or --set; scorecard table + runs/results/*.csv
-    check_localiser.py       centroid vs hand-labels per clip
+    check_localiser.py       a localiser (classical centroid, or a frame localiser) vs hand-labels
     match_sim_real.py        sim-vs-real statistics on a labelled clip (v2e calibration)
     make_tracks.py           corpus/sim/tracks.npz: measured + true positions per window
     make_frames.py           corpus/sim/frames_<d>x_<w>us/: uint8 count images per window
+    train_memory.py          pretrain snn.SpikingMemory on tracks.npz -> runs/memory/snn.pt
     corpus_summary.py        verify the corpus, print the §IV-A table
     replay_gt.py             player; --model draws a memory's output live
   tests/
@@ -105,9 +109,10 @@ class Model:                                       # Localiser + TrajectoryMemor
     def step(self, obs) -> (prediction, deviation_score): ...
 ```
 
-Ships: `ReservoirMemory` (NumPy echo-state + ridge/RLS readout) and `CentroidLocaliser`
-(wraps `frontend.to_position`). Framework-specific implementations (LMU, snnTorch) are added
-behind the same Protocols once G-F closes.
+The Stage-1 memory behind this Protocol is `snn.SpikingMemory` (design in `PLAN.md` §C):
+`PlaceCells` encoder → `TwoLayerNet` (fast and slow recurrent LIF layers, snnTorch) →
+horizon heads and a path head; `fit` pretrains by BPTT on `data.Track`s, `save`/`load`
+carry the weights, the target standardisation and the deviation scales.
 
 ### `baseline.py` ✅
 `PeriodicKalman` (harmonic state per coordinate, normalised-innovation surprise) and
@@ -148,7 +153,7 @@ position tracks → weights frozen → evaluation runs on real clips only.
 
 | Piece | Candidates | Notes |
 |---|---|---|
-| Memory core | reservoir/LSM (NumPy or Brian2), LMU (Nengo), spiking RNN (snnTorch) | G-F, open. Reservoir is the provisional default. |
+| Memory core | two-timescale recurrent LIF (snnTorch) | G-F: snnTorch. LMU (Nengo) kept as an optional comparison. |
 | Localiser (Stage 1/2) | spiking conv / WTA (snnTorch or SpikingJelly) | Topographic → not NEF. |
 | Simulator | v2e | ESIM fallback if a 3-D scene is ever needed. |
 | Baseline | NumPy / SciPy | No SNN. |
@@ -164,6 +169,6 @@ pytest, hardware-free, deterministic on simulated clips.
 - `simulate.py`: event count scales with blob speed; events fall on the path.
 - `frontend.py`: frame shape and timing; centroid tracks a known sim path.
 - `metrics.py`: known-answer cases for error, lock-on, ROC.
-- `model.py`: `ReservoirMemory` predicts a clean sine within tolerance after training; a
-  scripted deviation raises `deviation_score` above baseline.
+- `snn.py`: place cells, path targets round-trip, a tiny network learns a few ellipses and
+  predicts ahead; a scripted deviation raises `deviation_score`; checkpoints round-trip.
 - `experiment.py`: end-to-end smoke run on 3 tiny sim clips.

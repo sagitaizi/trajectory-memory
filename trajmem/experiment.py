@@ -16,6 +16,7 @@ from .frontend import to_position
 from .metrics import deviation_roc, lock_on_time, prediction_error
 
 SETS_PATH = Path(__file__).resolve().parent.parent / "corpus" / "sets.yaml"
+SNN_CHECKPOINT = Path(__file__).resolve().parent.parent / "runs" / "memory" / "snn.pt"
 
 
 @dataclass
@@ -31,11 +32,19 @@ class Trace:
 
 
 def make_memory(name: str, dt_s: float, **params):
+    """A fresh memory by name. The baselines take their own params (`warmup_s`, ...); the
+    SNN is loaded from `checkpoint` (default runs/memory/snn.pt, from train_memory.py)
+    and ignores the rest."""
     from .baseline import HarmonicFit, PeriodicKalman
 
+    if name == "snn":
+        from .snn import SpikingMemory
+
+        return SpikingMemory.load(params.get("checkpoint") or SNN_CHECKPOINT, params.get("device"), dt_s)
     kinds = {"kalman": PeriodicKalman, "harmonic": HarmonicFit}
     if name not in kinds:
-        raise ValueError(f"unknown memory {name!r}; one of {sorted(kinds)}")
+        raise ValueError(f"unknown memory {name!r}; one of {sorted(kinds) + ['snn']}")
+    params = {k: v for k, v in params.items() if k not in ("checkpoint", "device")}
     return kinds[name](dt_s=dt_s, **params)
 
 
@@ -55,19 +64,39 @@ def evaluate_clip(memory, clip: Clip, window_us: int, horizon_s: float) -> Trace
                  horizon_s=horizon_s, window_us=window_us)
 
 
+def label_offset(trace: Trace, clip: Clip, settle_s: float = 0.0) -> np.ndarray:
+    """Median (label - measured position) over the steady part, normalised units. On hand-
+    labelled clips the marks sit on a fixed point of the object that is not the event
+    centroid (the pendulum's brush centre vs its bright string end); this is that constant."""
+    t_break = min(clip.deviation_times) if clip.deviation_times else np.inf
+    steady = (trace.t >= settle_s) & (trace.t < t_break)
+    gt_now = np.full_like(trace.obs, np.nan)
+    if clip.gt is not None and steady.any():
+        gt_now[steady] = np.atleast_2d(clip.gt(trace.t[steady]))
+    d = gt_now - trace.obs
+    d = d[np.isfinite(d).all(axis=1)]
+    return np.median(d, axis=0) if len(d) else np.zeros(2)
+
+
 def score_trace(trace: Trace, clip: Clip, tol_px: float, settle_s: float = 0.0,
-                threshold: float | None = None) -> dict:
+                threshold: float | None = None, subtract_offset: bool = False) -> dict:
     """Prediction error (px, on steps before any break and after `settle_s`), lock-on
-    time (s, from the clip's start), and the deviation-detection numbers."""
+    time (s, from the clip's start), and the deviation-detection numbers. With
+    `subtract_offset` the clip's constant label-vs-measurement offset is removed from
+    the prediction first (reported as `offset_px`), so the error is about prediction,
+    not about which point of the object the labels mark."""
     scale = np.array(clip.meta["resolution"], dtype=float)
-    err_all = prediction_error(trace.pred * scale, trace.gt_ahead * scale)["errors"]
+    offset = label_offset(trace, clip, settle_s) if subtract_offset else np.zeros(2)
+    pred = trace.pred + offset
+    err_all = prediction_error(pred * scale, trace.gt_ahead * scale)["errors"]
     t_break = min(clip.deviation_times) if clip.deviation_times else np.inf
     steady = (trace.t >= settle_s) & (trace.t + trace.horizon_s < t_break)
-    err = prediction_error(trace.pred[steady] * scale, trace.gt_ahead[steady] * scale)
+    err = prediction_error(pred[steady] * scale, trace.gt_ahead[steady] * scale)
     err.pop("errors")
     before_break = trace.t + trace.horizon_s < t_break
     return {
         "error_px": err,
+        "offset_px": (offset * scale).tolist(),
         "lock_on_s": lock_on_time(err_all[before_break], tol_px, trace.window_us / 1e6),
         "deviation": deviation_roc(trace.score, trace.t, clip.deviation_times, threshold=threshold),
         "n_steps": int(len(trace.t)),
@@ -118,13 +147,13 @@ def open_set(name: str, path=None) -> list[tuple[str, Clip]]:
 
 
 def run_set(make_memory_fn, clips, window_us: int, horizon_s: float, tol_px: float,
-            settle_s: float, threshold: float | None = None):
+            settle_s: float, threshold: float | None = None, subtract_offset: bool = False):
     """Score a fresh memory on every clip; return the per-clip rows and a pooled row
     (medians of the per-clip numbers; detection numbers over the break clips only)."""
     rows = []
     for name, clip in clips:
         trace = evaluate_clip(make_memory_fn(), clip, window_us, horizon_s)
-        rows.append({"name": name, **score_trace(trace, clip, tol_px, settle_s, threshold)})
+        rows.append({"name": name, **score_trace(trace, clip, tol_px, settle_s, threshold, subtract_offset)})
     return rows, pool(rows)
 
 

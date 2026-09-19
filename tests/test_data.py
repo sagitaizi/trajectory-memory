@@ -593,3 +593,19 @@ def test_a_sliced_sim_clip_refuses_to_be_saved_rather_than_lose_its_truth(tmp_pa
                 gt=lambda t: sample(spec, t), meta={"spec": spec, "resolution": (64, 48)})
     with pytest.raises(ValueError, match="slice"):
         save_clip(slice_clip(clip, 0.5, 2.0), tmp_path / "part")
+
+
+def test_load_tracks_pairs_the_track_file_with_the_manifest(tmp_path):
+    from trajmem.data import Track, load_tracks
+
+    t = np.arange(4) * 0.005
+    np.savez(tmp_path / "tracks.npz", window_us=5000, **{
+        "sim_000/t": t, "sim_000/obs": np.zeros((4, 2)), "sim_000/gt": np.ones((4, 2)),
+        "sim_000/deviation_t": np.nan,
+        "sim_001/t": t, "sim_001/obs": np.zeros((4, 2)), "sim_001/gt": np.ones((4, 2)),
+        "sim_001/deviation_t": 0.01})
+    (tmp_path / "manifest.csv").write_text("name,shape,period_s\nsim_000,circle,1.5\nsim_001,figure8,2.0\n")
+    tracks = load_tracks(tmp_path)
+    assert [tr.name for tr in tracks] == ["sim_000", "sim_001"]
+    assert isinstance(tracks[0], Track) and tracks[0].period_s == 1.5
+    assert np.isnan(tracks[0].deviation_t) and tracks[1].deviation_t == 0.01

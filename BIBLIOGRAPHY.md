@@ -101,8 +101,8 @@ between one mixed-τ recurrent layer and a fast→slow layer split for the memor
 ### Bellec, Salaj, Subramoney, Legenstein & Maass, 2018 — "Long short-term memory and learning-to-learn in networks of spiking neurons"
 - *NeurIPS* 31.
 - **Why:** LSNN — an adaptive threshold decaying over seconds gives LIF networks long memory
-  without long membrane constants. Alternative slow variable to a slow layer.
-- **Where:** memory-core alternative, Phase C.
+  without long membrane constants. The slow layer's neuron model (`snn.AdaptiveLeaky`).
+- **Where:** memory core, Phase C (`PLAN.md` §C design; `docs/snn-experiments-log.md` Run 4).
 
 ### Yin, Corradi & Bohté, 2021 — "Accurate and efficient time-domain classification with adaptive spiking recurrent neural networks"
 - *Nature Machine Intelligence* 3:905–913.

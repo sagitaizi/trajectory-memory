@@ -4,6 +4,7 @@
     python scripts/replay_gt.py corpus/real/wall/scan_pan_slow_01 --gt-scale 1.307
     python scripts/replay_gt.py corpus/real/wall/scan_pan_slow_01 --save
     python scripts/replay_gt.py corpus/real/fan/fan_brush_slow_02 --model kalman
+    python scripts/replay_gt.py corpus/sim/sim_072.npz --model snn --checkpoint runs/memory/sweep/m2_flips.pt
 
 Plays accumulated event frames with a crosshair at gt(t), a fading trail of where the
 ground truth has just been, the marked anchor, and a HUD. The point is to catch a
@@ -320,7 +321,8 @@ def main() -> None:
                    help="the one flag that changes the ground truth: divides "
                         "ticks_per_radian by F, widening the predicted sweep F-fold. "
                         "Nothing on disk is written either way")
-    p.add_argument("--model", metavar="NAME", help="draw a memory's live output (kalman, harmonic)")
+    p.add_argument("--model", metavar="NAME", help="draw a memory's live output (kalman, harmonic, snn)")
+    p.add_argument("--checkpoint", metavar="PATH", help="SNN weights (default runs/memory/snn.pt)")
     p.add_argument("--horizon", type=float, default=0.1, help="model prediction horizon (s)")
     p.add_argument("--window-us", type=int, default=5000, help="model input window")
     p.add_argument("--warmup", type=float, default=5.0, help="model period warm-up (s)")
@@ -339,7 +341,8 @@ def main() -> None:
     if args.model:
         from trajmem.experiment import evaluate_clip, make_memory
 
-        memory = make_memory(args.model, dt_s=args.window_us / 1e6, warmup_s=args.warmup)
+        memory = make_memory(args.model, dt_s=args.window_us / 1e6, warmup_s=args.warmup,
+                             checkpoint=args.checkpoint)
         trace = evaluate_clip(memory, clip, args.window_us, args.horizon)
         overlay = ModelOverlay(trace, clip.meta["resolution"], args.model)
         label = f"{label} + {args.model}"

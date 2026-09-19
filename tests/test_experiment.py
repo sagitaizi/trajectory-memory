@@ -63,8 +63,19 @@ def test_score_trace_without_a_break_has_no_detection_numbers_but_a_false_alarm_
 
 def test_make_memory_builds_the_named_baseline():
     assert isinstance(make_memory("harmonic", dt_s=0.005), HarmonicFit)
+    assert isinstance(make_memory("harmonic", dt_s=0.005, checkpoint="x.pt"), HarmonicFit)   # SNN-only param ignored
     with pytest.raises(ValueError):
         make_memory("nonsense", dt_s=0.005)
+
+
+def test_make_memory_loads_the_snn_from_a_checkpoint(tmp_path):
+    from trajmem.snn import SpikingMemory
+
+    SpikingMemory(dt_s=0.005, n_per_axis=4, n_fast=8, n_slow=4).save(tmp_path / "m.pt")
+    m = make_memory("snn", dt_s=0.005, warmup_s=5.0, checkpoint=tmp_path / "m.pt")
+    assert isinstance(m, SpikingMemory) and m.n_fast == 8
+    with pytest.raises(ValueError):
+        make_memory("snn", dt_s=0.001, checkpoint=tmp_path / "m.pt")
 
 
 # --- clip sets and pooled runs ---------------------------------------------------
@@ -133,3 +144,18 @@ def test_load_set_glob_resolves_against_the_repo_and_refuses_an_empty_match(tmp_
     assert [e["name"] for e in load_set("sim", sets)] == ["sim_000"]
     with pytest.raises(ValueError, match="matches no clip"):
         load_set("none", sets)
+
+
+def test_subtracting_the_label_offset_removes_a_constant_labelling_bias():
+    from trajmem.experiment import label_offset
+
+    spec = a_spec()
+    clip = a_clip_of_events(spec)
+    shifted = Clip(events=clip.events, duration_us=clip.duration_us, deviation_times=[],
+                   gt=lambda t: sample(spec, t) + np.array([0.0, 0.05]), meta=clip.meta)   # labels 24 px low
+    trace = evaluate_clip(HarmonicFit(dt_s=0.005, warmup_s=3.0), shifted, window_us=5000, horizon_s=0.1)
+    raw = score_trace(trace, shifted, tol_px=10.0, settle_s=4.0)
+    fixed = score_trace(trace, shifted, tol_px=10.0, settle_s=4.0, subtract_offset=True)
+    assert raw["error_px"]["median"] > 20 and fixed["error_px"]["median"] < 6
+    assert abs(fixed["offset_px"][1] - 24) < 2 and abs(fixed["offset_px"][0]) < 2
+    assert np.allclose(label_offset(trace, shifted, 4.0) * (640, 480), fixed["offset_px"])

@@ -25,3 +25,26 @@ def test_frames_of_gives_downsampled_uint8_counts_with_truth_per_window():
     assert fr["frames"].sum() == len(clip.events)               # no count lost or clipped
     ys, xs = np.nonzero(fr["frames"][0].sum(axis=0))
     assert abs(xs.mean() / 80 - fr["gt"][0, 0]) < 0.03           # counts sit on the truth
+
+
+def test_train_memory_end_to_end_writes_a_loadable_checkpoint(tmp_path):
+    from scripts.train_memory import main, usable
+    from tests.test_snn import a_track
+    from trajmem.snn import SpikingMemory
+
+    tracks = [a_track(name=f"sim_{i:03d}", period_s=1.0 + 0.1 * i, duration_s=2.5) for i in range(3)]
+    arrays = {"window_us": 5000}
+    for tr in tracks:
+        arrays.update({f"{tr.name}/t": tr.t, f"{tr.name}/obs": tr.obs, f"{tr.name}/gt": tr.gt,
+                       f"{tr.name}/deviation_t": tr.deviation_t})
+    np.savez(tmp_path / "tracks.npz", **arrays)
+    (tmp_path / "manifest.csv").write_text("name,period_s\n" + "".join(f"{tr.name},{tr.period_s}\n" for tr in tracks))
+    off = tracks[0]
+    off.obs = off.gt + 0.1                                       # 64 px off: the string, not the target
+    assert len(usable(tracks, 15.0, (640, 480))) == 2
+
+    out = tmp_path / "m.pt"
+    main(["--corpus", str(tmp_path), "--out", str(out), "--epochs", "1", "--chunk-s", "1.0",
+          "--n-per-axis", "4", "--n-fast", "8", "--n-slow", "4", "--val-fraction", "0.34"])
+    m = SpikingMemory.load(out)
+    assert m.n_fast == 8 and out.with_suffix(".csv").exists()
