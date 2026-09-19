@@ -106,3 +106,17 @@ def test_predicts_a_figure8_whose_energy_sits_at_the_second_harmonic(make):
 def test_surprise_smoothing_is_stable_for_windows_longer_than_its_time_constant():
     m = PeriodicKalman(dt_s=0.2, warmup_s=5.0)
     assert m.score_alpha <= 1.0
+
+
+@pytest.mark.parametrize("make", [lambda: PeriodicKalman(dt_s=DT), lambda: HarmonicFit(dt_s=DT)])
+def test_path_points_trace_the_learned_path_once_the_period_is_known(make):
+    t, xy, spec = a_track()
+    model = make()
+    assert model.path_points([0.0]) is None and np.isnan(model.period())   # nothing learned yet
+    run(model, t, xy, 0.1)
+    assert model.period() == pytest.approx(spec.period_s, rel=0.02)
+    cycle = model.path_points(np.arange(64) / 64)
+    assert cycle.shape == (64, 2)
+    truth = sample(spec, np.linspace(0, spec.period_s, 64, endpoint=False))
+    d = np.hypot(*(cycle[:, None] - truth[None]).T)        # every point sits on the true path
+    assert d.min(axis=0).max() < 0.005

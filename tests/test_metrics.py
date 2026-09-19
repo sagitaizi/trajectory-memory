@@ -78,3 +78,32 @@ def test_deviation_roc_default_threshold_sits_above_the_pre_break_scores():
     r = deviation_roc(s, t, [5.0])
     assert r["threshold"] >= np.percentile(s[t < 5.0], 99) - 1e-9
     assert r["latency_s"] < 1.0
+
+
+# --- path shape ------------------------------------------------------------------
+
+def a_cycle(radius, n=64, phase=0.0, centre=(0.0, 0.0)):
+    phi = np.linspace(0, 2 * np.pi, n, endpoint=False) + phase
+    return np.column_stack([centre[0] + radius * np.cos(phi), centre[1] + radius * np.sin(phi)])
+
+
+def test_path_shape_error_is_zero_for_the_same_cycle_at_another_phase():
+    from trajmem.metrics import path_shape_error
+
+    assert path_shape_error(a_cycle(1.0, phase=1.3), a_cycle(1.0)) < 2e-3   # chord error of the sub-point shifts
+
+
+def test_path_shape_error_is_the_mean_point_distance_after_the_best_shift():
+    from trajmem.metrics import path_shape_error
+
+    assert path_shape_error(a_cycle(1.5), a_cycle(1.0)) == pytest.approx(0.5, abs=2e-3)
+    assert path_shape_error(a_cycle(1.0, centre=(0.3, 0.0)), a_cycle(1.0)) == pytest.approx(0.3, abs=0.02)
+    reversed_cycle = a_cycle(1.0)[::-1]                   # same shape, run the other way: not the same path
+    assert path_shape_error(reversed_cycle, a_cycle(1.0)) > 0.5
+
+
+def test_path_shape_error_needs_matching_point_counts():
+    from trajmem.metrics import path_shape_error
+
+    with pytest.raises(ValueError):
+        path_shape_error(a_cycle(1.0, n=32), a_cycle(1.0, n=64))

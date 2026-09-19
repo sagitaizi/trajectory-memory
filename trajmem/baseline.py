@@ -50,6 +50,15 @@ class _Periodic:
             return
         self._step(self.t_now, np.array([x, y], dtype=float))
 
+    def period(self) -> float:
+        return float(self.period_s) if self.period_s else np.nan
+
+    def path_points(self, fractions):
+        coef = self._coef
+        if coef is None:
+            return None
+        return self._design(np.asarray(fractions, dtype=float) * self.period_s) @ coef
+
     def _smooth(self, surprise: float) -> None:
         self.score += self.score_alpha * (surprise - self.score)
 
@@ -99,6 +108,10 @@ class HarmonicFit(_Periodic):
             return self.last_known
         x, y = (self._design(self.t_now + horizon_s) @ self.coef)[0]
         return float(x), float(y)
+
+    @property
+    def _coef(self):
+        return self.coef
 
 
 class PeriodicKalman(_Periodic):
@@ -164,3 +177,7 @@ class PeriodicKalman(_Periodic):
         ahead = self._transition(self.t_now + horizon_s - self.t_state) @ self.state
         x, y = self._h @ ahead
         return float(x), float(y)
+
+    @property
+    def _coef(self):
+        return self.state

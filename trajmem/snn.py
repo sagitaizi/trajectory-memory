@@ -87,8 +87,8 @@ def path_targets(t, gt, period_s: float, until_s: float = np.nan,
     return out
 
 
-def path_position(p, horizon_s: float, n_harmonics: int = N_HARMONICS) -> np.ndarray:
-    """Position `horizon_s` ahead from path parameters (N, N_PATH) -> (N, 2)."""
+def path_position(p, horizon_s, n_harmonics: int = N_HARMONICS) -> np.ndarray:
+    """Position `horizon_s` (scalar or per row) ahead from path parameters (N, N_PATH) -> (N, 2)."""
     p = np.asarray(p, dtype=float)
     phi = np.arctan2(p[:, 2], p[:, 1]) + 2.0 * np.pi * horizon_s / p[:, 0]
     out = np.empty((len(p), 2))
@@ -369,6 +369,17 @@ class SpikingMemory:
             self.err_str += alpha * (e - self.err_str)
         self.ring.append(self.last_heads[self._i100].copy())
         self.seen_any = self.seen_any or bool(seen)
+
+    def period(self) -> float:
+        if self.last_path is None or not (np.isfinite(self.last_path[0]) and self.last_path[0] > 1e-3):
+            return np.nan
+        return float(self.last_path[0])
+
+    def path_points(self, fractions):
+        if not np.isfinite(self.period()):
+            return None
+        ahead = np.asarray(fractions, dtype=float) * self.last_path[0]
+        return path_position(np.repeat(self.last_path[None], len(ahead), axis=0), ahead)
 
     def predict(self, horizon_s: float) -> tuple[float, float]:
         if self.last_heads is None:

@@ -13,10 +13,12 @@ import numpy as np
 
 from .data import Clip
 from .frontend import to_position
-from .metrics import deviation_roc, lock_on_time, prediction_error
+from .metrics import deviation_roc, lock_on_time, path_shape_error, prediction_error
+from .trajectories import _harmonic_fit, search_period
 
 SETS_PATH = Path(__file__).resolve().parent.parent / "corpus" / "sets.yaml"
 SNN_CHECKPOINT = Path(__file__).resolve().parent.parent / "runs" / "memory" / "snn.pt"
+CYCLE_POINTS = 64                  # samples per cycle when comparing a remembered path to the truth
 
 
 @dataclass
@@ -29,6 +31,8 @@ class Trace:
     score: np.ndarray              # (N,) deviation score
     horizon_s: float
     window_us: int
+    period: np.ndarray = None      # (N,) the memory's period, s; NaN = none yet
+    cycles: np.ndarray = None      # (N, CYCLE_POINTS, 2) the memory's path over one true period; NaN = none yet
 
 
 def make_memory(name: str, dt_s: float, **params):
@@ -48,12 +52,40 @@ def make_memory(name: str, dt_s: float, **params):
     return kinds[name](dt_s=dt_s, **params)
 
 
+def clip_period(clip: Clip) -> float:
+    """The path's period: exact from the spec on simulated clips, searched over the truth
+    before any break otherwise."""
+    if "spec" in clip.meta:
+        return float(clip.meta["spec"].period_s)
+    t_break = min(clip.deviation_times) if clip.deviation_times else clip.duration_us / 1e6
+    t = np.arange(0.0, t_break, 0.05)
+    return search_period(t, np.atleast_2d(clip.gt(t)))
+
+
+def reference_cycle(clip: Clip, n: int = CYCLE_POINTS, n_harmonics: int = 3,
+                    period_s: float | None = None) -> np.ndarray:
+    """One cycle of the true path as `n` points, from a harmonic fit of the truth before
+    any break -- the same model the path head and the baselines carry."""
+    period_s = clip_period(clip) if period_s is None else period_s
+    t_break = min(clip.deviation_times) if clip.deviation_times else clip.duration_us / 1e6
+    t = np.arange(0.0, t_break, 0.01)
+    coef, _ = _harmonic_fit(t, np.atleast_2d(clip.gt(t)), period_s, n_harmonics)
+    phase = np.linspace(0.0, 2.0 * np.pi, n, endpoint=False)
+    cols = [np.ones_like(phase)]
+    for k in range(1, n_harmonics + 1):
+        cols += [np.cos(k * phase), np.sin(k * phase)]
+    return np.column_stack(cols) @ coef
+
+
 def evaluate_clip(memory, clip: Clip, window_us: int, horizon_s: float) -> Trace:
     memory.reset()
-    rows = []
+    period_s = clip_period(clip) if clip.gt is not None else np.nan
+    rows, periods, cycles = [], [], []
     for t, x, y in to_position(clip, window_us):
         memory.observe(x, y)
         rows.append((t, x, y, *memory.predict(horizon_s), memory.deviation_score()))
+        periods.append(memory.period())
+        cycles.append(remembered_path(memory, period_s))
     a = np.array(rows, dtype=float)
     ahead = a[:, 0] + horizon_s
     gt = np.full((len(a), 2), np.nan)
@@ -61,7 +93,17 @@ def evaluate_clip(memory, clip: Clip, window_us: int, horizon_s: float) -> Trace
     if clip.gt is not None and inside.any():
         gt[inside] = np.atleast_2d(clip.gt(ahead[inside]))
     return Trace(t=a[:, 0], obs=a[:, 1:3], pred=a[:, 3:5], gt_ahead=gt, score=a[:, 5],
-                 horizon_s=horizon_s, window_us=window_us)
+                 horizon_s=horizon_s, window_us=window_us, period=np.array(periods), cycles=np.array(cycles))
+
+
+def remembered_path(memory, period_s: float, n: int = CYCLE_POINTS) -> np.ndarray:
+    """The memory's path over one *true* period as `n` points, so the shape is scored
+    apart from the period: a memory whose period is 2T covers half its cycle here."""
+    p = memory.period()
+    if not (np.isfinite(p) and np.isfinite(period_s)) or p <= 0:
+        return np.full((n, 2), np.nan)
+    points = memory.path_points(np.arange(n) / n * period_s / p)
+    return np.full((n, 2), np.nan) if points is None else np.asarray(points, dtype=float)
 
 
 def label_offset(trace: Trace, clip: Clip, settle_s: float = 0.0) -> np.ndarray:
@@ -80,8 +122,10 @@ def label_offset(trace: Trace, clip: Clip, settle_s: float = 0.0) -> np.ndarray:
 
 def score_trace(trace: Trace, clip: Clip, tol_px: float, settle_s: float = 0.0,
                 threshold: float | None = None, subtract_offset: bool = False) -> dict:
-    """Prediction error (px, on steps before any break and after `settle_s`), lock-on
-    time (s, from the clip's start), and the deviation-detection numbers. With
+    """Prediction error (px, on steps before any break and after `settle_s`), path-shape
+    error (px, same steps; `last` = median over the final cycle before the break), the
+    memory's period over the true one, lock-on times (s, from the clip's start), and the
+    deviation-detection numbers. With
     `subtract_offset` the clip's constant label-vs-measurement offset is removed from
     the prediction first (reported as `offset_px`), so the error is about prediction,
     not about which point of the object the labels mark."""
@@ -94,10 +138,20 @@ def score_trace(trace: Trace, clip: Clip, tol_px: float, settle_s: float = 0.0,
     err = prediction_error(pred[steady] * scale, trace.gt_ahead[steady] * scale)
     err.pop("errors")
     before_break = trace.t + trace.horizon_s < t_break
+    dt = trace.window_us / 1e6
+    period_s = clip_period(clip)
+    reference = reference_cycle(clip, period_s=period_s) * scale
+    path = np.array([path_shape_error((c + offset) * scale, reference) for c in trace.cycles])
+    on_path = (trace.t < t_break) & (trace.t >= min(t_break, trace.t[-1] + dt) - period_s)
+    ratio = trace.period[steady] / period_s
     return {
         "error_px": err,
+        "path_px": {"median": float(np.nanmedian(path[steady])) if np.isfinite(path[steady]).any() else np.nan,
+                    "last": float(np.nanmedian(path[on_path])) if np.isfinite(path[on_path]).any() else np.nan},
+        "period_ratio": float(np.nanmedian(ratio)) if np.isfinite(ratio).any() else np.nan,
         "offset_px": (offset * scale).tolist(),
-        "lock_on_s": lock_on_time(err_all[before_break], tol_px, trace.window_us / 1e6),
+        "lock_on_s": lock_on_time(err_all[before_break], tol_px, dt),
+        "path_lock_on_s": lock_on_time(path[trace.t < t_break], tol_px, dt),
         "deviation": deviation_roc(trace.score, trace.t, clip.deviation_times, threshold=threshold),
         "n_steps": int(len(trace.t)),
         "unseen_fraction": float(np.isnan(trace.obs[:, 0]).mean()),
@@ -172,8 +226,12 @@ def pool(rows: list[dict]) -> dict:
         "name": "pooled", "n_clips": len(rows),
         "error_px": {"median": med(r["error_px"]["median"] for r in rows),
                      "iqr": med(r["error_px"]["iqr"] for r in rows)},
+        "path_px": {"median": med(r["path_px"]["median"] for r in rows),
+                    "last": med(r["path_px"]["last"] for r in rows)},
+        "period_ratio": med(r["period_ratio"] for r in rows),
         "lock_on_s": med(locks),
         "never_locked": int(sum(np.isinf(x) for x in locks)),
+        "path_lock_on_s": med(r["path_lock_on_s"] for r in rows),
         "deviation": {"auc": med(r["deviation"]["auc"] for r in breaks),
                       "latency_s": med(latencies),
                       "missed": int(sum(np.isinf(x) for x in latencies)),

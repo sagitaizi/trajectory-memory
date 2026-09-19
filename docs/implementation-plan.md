@@ -103,6 +103,8 @@ class TrajectoryMemory(Protocol):
     def observe(self, x, y): ...                   # stream one step
     def predict(self, horizon_s) -> (x, y): ...    # short-horizon future position
     def deviation_score(self) -> float: ...        # 0 = on-pattern, high = break
+    def period(self) -> float: ...                 # remembered period, s; NaN before one exists
+    def path_points(self, fractions): ...          # remembered path at fractions of its cycle, (N, 2)
     def reset(self): ...
 
 class Model:                                       # Localiser + TrajectoryMemory

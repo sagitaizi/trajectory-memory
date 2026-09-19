@@ -229,3 +229,18 @@ def test_place_cells_accept_tensors_on_any_device():
     enc = PlaceCells(n_per_axis=4)
     xy = torch.tensor([[0.5, 0.5]])
     assert torch.allclose(enc.bumps(xy), enc.bumps(xy.numpy()))
+
+
+def test_path_points_come_from_the_path_head():
+    m = tiny_memory()
+    m.reset()
+    assert m.path_points([0.0]) is None and np.isnan(m.period())
+    m.observe(0.5, 0.5)
+    cycle = m.path_points(np.arange(8) / 8)
+    assert cycle is None or cycle.shape == (8, 2)          # None while the period readout is not positive
+    p = path_targets(np.arange(0, 2, DT), a_track().gt[:400], 1.0)[0]
+    m.last_path = p                                       # a known path, as the head would report it
+    assert m.period() == 1.0
+    cycle = m.path_points(np.arange(64) / 64)
+    expected = path_position(np.repeat(p[None], 64, axis=0), np.linspace(0, 1.0, 64, endpoint=False))
+    assert np.allclose(cycle, expected)

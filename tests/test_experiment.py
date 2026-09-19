@@ -126,11 +126,13 @@ def test_pool_keeps_misses_and_counts_them():
 
     def row(name, latency, lock):
         return {"name": name, "error_px": {"median": 1.0, "iqr": 0.1}, "lock_on_s": lock,
+                "path_px": {"median": 2.0, "last": 1.5}, "path_lock_on_s": lock, "period_ratio": 1.0,
                 "deviation": {"auc": 0.9, "latency_s": latency, "fp_per_min": 0.0}, "unseen_fraction": 0.0}
     pooled = pool([row("a", 0.3, 1.0), row("b", np.inf, np.inf), row("c", 0.4, 2.0), row("d", np.inf, 3.0)])
     assert pooled["deviation"]["latency_s"] == np.inf            # half the breaks were missed
     assert pooled["deviation"]["missed"] == 2 and pooled["never_locked"] == 1
-    assert pooled["lock_on_s"] == 2.5                            # median of [1, inf, 2, 3]
+    assert pooled["lock_on_s"] == 2.5 == pooled["path_lock_on_s"]   # median of [1, inf, 2, 3]
+    assert pooled["path_px"] == {"median": 2.0, "last": 1.5}
 
 
 def test_load_set_glob_resolves_against_the_repo_and_refuses_an_empty_match(tmp_path, monkeypatch):
@@ -159,3 +161,64 @@ def test_subtracting_the_label_offset_removes_a_constant_labelling_bias():
     assert raw["error_px"]["median"] > 20 and fixed["error_px"]["median"] < 6
     assert abs(fixed["offset_px"][1] - 24) < 2 and abs(fixed["offset_px"][0]) < 2
     assert np.allclose(label_offset(trace, shifted, 4.0) * (640, 480), fixed["offset_px"])
+
+
+# --- path shape ------------------------------------------------------------------
+
+def test_reference_cycle_uses_the_spec_period_or_searches_for_it():
+    from trajmem.experiment import clip_period, reference_cycle
+
+    clip = a_clip_of_events(a_spec())
+    assert clip_period(clip) == pytest.approx(1.0, abs=0.02)      # searched: the meta has no spec
+    clip.meta["spec"] = a_spec()
+    assert clip_period(clip) == 1.0
+    cycle = reference_cycle(clip, n=64)
+    truth = sample(a_spec(), np.linspace(0, 1.0, 64, endpoint=False))
+    assert cycle.shape == (64, 2) and np.hypot(*(cycle - truth).T).max() < 0.01
+
+
+def test_reference_cycle_fits_the_part_before_the_break():
+    from trajmem.experiment import reference_cycle
+
+    spec = a_spec(deviations=[Deviation(at_t=6.0, kind="shrink", params={"factor": 0.5})])
+    clip = a_clip_of_events(spec)
+    clip.meta["spec"] = spec
+    cycle = reference_cycle(clip, n=64)
+    assert np.hypot(*(cycle - np.array([0.5, 0.5])).T).mean() == pytest.approx(0.2, abs=0.01)
+
+
+def test_evaluate_clip_scores_the_path_shape_per_step_and_score_trace_summarises_it():
+    clip = a_clip_of_events(a_spec())
+    trace = evaluate_clip(HarmonicFit(dt_s=0.005, warmup_s=3.0), clip, window_us=5000, horizon_s=0.1)
+    assert trace.cycles.shape == (1600, 64, 2) and trace.period.shape == (1600,)
+    assert np.isnan(trace.cycles[trace.t < 3.0]).all()            # no path before the warm-up
+    assert np.isfinite(trace.cycles[trace.t > 3.1]).all()
+    r = score_trace(trace, clip, tol_px=10.0, settle_s=4.0)
+    assert r["path_px"]["median"] < 3.0 and r["path_px"]["last"] < 3.0
+    assert r["period_ratio"] == pytest.approx(1.0, abs=0.02)
+    assert 3.0 <= r["path_lock_on_s"] < 4.0
+
+
+def test_remembered_path_covers_one_true_period_whatever_the_memory_thinks_the_period_is():
+    from trajmem.experiment import remembered_path
+
+    class Doubled:                                        # right curve, period taken as 2T
+        def period(self):
+            return 2.0
+
+        def path_points(self, fractions):
+            phi = 4 * np.pi * np.asarray(fractions)
+            return np.column_stack([np.cos(phi), np.sin(phi)])
+
+    path = remembered_path(Doubled(), period_s=1.0, n=64)
+    phi = np.linspace(0, 2 * np.pi, 64, endpoint=False)
+    assert np.allclose(path, np.column_stack([np.cos(phi), np.sin(phi)]), atol=1e-9)
+
+    class Nothing:
+        def period(self):
+            return np.nan
+
+        def path_points(self, fractions):
+            return None
+
+    assert np.isnan(remembered_path(Nothing(), 1.0, n=8)).all()

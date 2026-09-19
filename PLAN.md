@@ -139,9 +139,28 @@ freely moving real target, with a break signal.
   full record of the 2026-09-17 overnight sweep is `docs/snn-experiments-log.md`, the short
   version `docs/snn-experiments-summary.md`. Decided along the way: horizon heads are place
   cells over the displacement from the current position; the input carries velocity cells;
-  a firing-rate regulariser keeps both layers active. **Open: the cycle memory — the slow
-  layer and path head contribute little yet; the network extrapolates recent motion rather
-  than knowing the path. Training is data-limited (overfits 51 clips after ~20 epochs).**
+  a firing-rate regulariser keeps both layers active.
+- **Path-shape metric** (`metrics.path_shape_error`, columns `path_med` / `path_last` /
+  `path_lock` / `period` in `run_experiment.py`; definition in
+  `materials/02-methods/metrics.md`): how far each memory's own picture of one cycle sits
+  from the true cycle, px, with the period reported apart as `P / T`. This is the direct
+  measure of "memory of the path"; the 200 ms horizon is only a proxy for it. Development
+  set, offset-subtracted, path median px / period ratio:
+
+  | | Kalman | Harmonic | SNN (`snn_anchor20.pt`) |
+  |---|---|---|---|
+  | pooled | 14.0 / 1.00 | 10.3 / 1.00 | 64.4 / 1.83 |
+  | `fan_brush_slow_02` | 6.8 / 2.00 | 4.5 / 2.00 | 77.3 / 2.68 |
+  | `small_01` | 12.1 / 1.01 | 10.4 / 1.01 | 55.6 / 1.97 |
+  | `loop_01` | 48.9 / 0.50 | 43.9 / 0.50 | 39.0 / 1.39 |
+
+  On clean sim clips the Kalman's path is 1.5–9 px, the SNN's 30–65 px. **The SNN's path
+  head holds nothing usable: its period readout is ~2× off and its shape is at the scale
+  of the path itself, on sim as on real clips. Its prediction numbers come from short-term
+  extrapolation alone.** The baselines' period search also lands on 2T (fan) or T/2
+  (`loop_01`) from a 5 s warm-up; their shape is right regardless. **Open: the cycle memory
+  — give the slow layer and path head a training signal that demands it, and judge by the
+  path-shape metric.** Training is data-limited (overfits 51 clips after ~20 epochs).
 - **Done when:** on real repetitive clips, Stage 1 prediction error beats the classical
   baseline *or* matches it with a stated event-native/latency argument; lock-on within N
   cycles. Bar: Kalman 24.2 px pooled (8.0 on the fan), ~3 px on sim.

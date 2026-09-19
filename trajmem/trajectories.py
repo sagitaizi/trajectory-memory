@@ -195,7 +195,6 @@ def search_period(t, xy, n_harmonics: int = 3) -> float:
     f_lo = 0.5 / span
     f_hi = 0.5 / np.median(np.diff(np.sort(t))) / n_harmonics
     step = 1.0 / (8.0 * span)
-    tie = 1e-6 * float(np.sum((xy - xy.mean(axis=0)) ** 2))       # "as good as the best"
 
     def resid(f):
         return _harmonic_fit(t, xy, 1.0 / f, n_harmonics)[1]
@@ -205,6 +204,9 @@ def search_period(t, xy, n_harmonics: int = 3) -> float:
     fine = np.linspace(best - step, best + step, 201)
     fine = fine[fine > 0]
     best, best_resid = min(((f, resid(f)) for f in fine), key=lambda fr: fr[1])
+    # "fits as well": within the run-to-run spread two fits of the same noise show. A
+    # wrong divisor misses a whole harmonic, so its residual is far above this.
+    tie = 0.02 * best_resid + 1e-6 * float(np.sum((xy - xy.mean(axis=0)) ** 2))
     for m in (3, 2):                                              # T/3, then T/2
         if m * best < f_hi and resid(m * best) <= best_resid + tie:
             return float(1.0 / (m * best))

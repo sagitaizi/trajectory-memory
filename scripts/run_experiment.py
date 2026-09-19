@@ -10,8 +10,11 @@ With --set every clip of a named set in corpus/sets.yaml is scored and a pooled 
 added; the table is also written to runs/results/<set>_<memory>.csv.
 
 Prediction error is in pixels at the horizon, on the steady part of the clip before
-any break; lock-on is seconds until the error stays under --tol-px; the deviation
-numbers follow trajmem.metrics.deviation_roc. --subtract-offset removes each clip's
+any break; path error is how far the memory's own picture of one cycle sits from the
+true cycle (px, same steps; `last` over the final cycle before any break) and `period`
+the memory's period over the true one; lock-on is
+seconds until the prediction error stays under --tol-px, path lock-on the same for the
+path error; the deviation numbers follow trajmem.metrics.deviation_roc. --subtract-offset removes each clip's
 constant label-vs-centroid offset first (the pendulum labels sit 27-43 px below the
 event centroid) and prints it, so the error is about prediction, not labelling.
 """
@@ -42,25 +45,29 @@ def open_clip(path, window=None):
     return slice_clip(clip, *window) if window else clip
 
 
-HEADER = (f"{'':26} {'err_med':>8} {'err_iqr':>8} {'lock_on_s':>9} {'auc':>7} "
-          f"{'latency_s':>9} {'fp/min':>8} {'unseen':>8} {'offset_px':>14}")
-CSV_FIELDS = ("set", "memory", "clip", "err_median_px", "err_iqr_px", "lock_on_s", "auc",
-              "latency_s", "fp_per_min", "unseen_fraction", "offset_x_px", "offset_y_px")
+HEADER = (f"{'':26} {'err_med':>8} {'err_iqr':>8} {'lock_on_s':>9} {'path_med':>8} {'path_last':>9} "
+          f"{'path_lock':>9} {'period':>7} {'auc':>7} {'latency_s':>9} {'fp/min':>8} {'unseen':>8} {'offset_px':>14}")
+CSV_FIELDS = ("set", "memory", "clip", "err_median_px", "err_iqr_px", "lock_on_s", "path_median_px",
+              "path_last_px", "path_lock_on_s", "period_ratio", "auc", "latency_s", "fp_per_min", "unseen_fraction",
+              "offset_x_px", "offset_y_px")
 
 
 def row(name: str, r: dict) -> str:
-    e, d = r["error_px"], r["deviation"]
+    e, d, p = r["error_px"], r["deviation"], r["path_px"]
     ox, oy = r.get("offset_px", (0.0, 0.0))
     return (f"{name:26} {e['median']:8.1f} {e['iqr']:8.1f} {r['lock_on_s']:9.2f} "
+            f"{p['median']:8.1f} {p['last']:9.1f} {r['path_lock_on_s']:9.2f} {r['period_ratio']:7.2f} "
             f"{d['auc']:7.2f} {d['latency_s']:9.2f} {d['fp_per_min']:8.2f} {r['unseen_fraction']:8.1%} "
             f"{ox:+6.1f} {oy:+6.1f}")
 
 
 def csv_row(set_name: str, memory: str, r: dict) -> dict:
-    e, d = r["error_px"], r["deviation"]
+    e, d, p = r["error_px"], r["deviation"], r["path_px"]
     ox, oy = r.get("offset_px", (0.0, 0.0))
     return {"set": set_name, "memory": memory, "clip": r["name"], "err_median_px": e["median"],
-            "err_iqr_px": e["iqr"], "lock_on_s": r["lock_on_s"], "auc": d["auc"],
+            "err_iqr_px": e["iqr"], "lock_on_s": r["lock_on_s"], "path_median_px": p["median"],
+            "path_last_px": p["last"], "path_lock_on_s": r["path_lock_on_s"],
+            "period_ratio": r["period_ratio"], "auc": d["auc"],
             "latency_s": d["latency_s"], "fp_per_min": d["fp_per_min"],
             "unseen_fraction": r["unseen_fraction"], "offset_x_px": ox, "offset_y_px": oy}
 

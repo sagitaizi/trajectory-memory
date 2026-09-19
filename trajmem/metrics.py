@@ -1,8 +1,10 @@
-"""Prediction error, lock-on time, deviation-detection ROC + latency.
+"""Prediction error, path-shape error, lock-on time, deviation-detection ROC + latency.
 Definitions follow materials/02-methods/metrics.md."""
 from __future__ import annotations
 
 import numpy as np
+
+SUB_SHIFTS = 8                     # phase-alignment resolution of path_shape_error, in fractions of a point
 
 
 def prediction_error(pred, gt) -> dict:
@@ -16,6 +18,25 @@ def prediction_error(pred, gt) -> dict:
     q1, q3 = np.percentile(e, [25, 75])
     return {"errors": errors, "median": float(np.median(e)), "iqr": float(q3 - q1),
             "mean": float(e.mean()), "n": int(len(e))}
+
+
+def path_shape_error(cycle, reference) -> float:
+    """How far a remembered cycle is from the true one: mean point distance over the
+    cycle at the best circular shift, so a phase slip is not counted at every point.
+    Both are (M, 2) sampled uniformly in phase; direction matters (a path run backwards
+    is another path). NaN if the cycle has unknown points."""
+    cycle, reference = np.asarray(cycle, dtype=float), np.asarray(reference, dtype=float)
+    if cycle.shape != reference.shape:
+        raise ValueError(f"cycle {cycle.shape} and reference {reference.shape} must match")
+    if not np.isfinite(cycle).all():
+        return np.nan
+    m = len(cycle)
+    idx = (np.arange(m)[None, :] + np.arange(m)[:, None]) % m                # (shift, point)
+    frac = np.arange(SUB_SHIFTS) / SUB_SHIFTS
+    # shifts finer than one point, by interpolating along the cycle
+    shifted = (1 - frac)[:, None, None, None] * cycle[idx] + frac[:, None, None, None] * cycle[(idx + 1) % m]
+    d = np.hypot(*(shifted - reference[None, None]).transpose(3, 0, 1, 2))   # (frac, shift, point)
+    return float(d.mean(axis=2).min())
 
 
 def lock_on_time(errors, tol: float, dt: float) -> float:

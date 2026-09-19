@@ -12,6 +12,19 @@ e_i = || pred_i(t + h)  −  gt(t + h) ||        # normalised image coords, or p
 Report **median and IQR** (robust to the lock-on transient), and optionally the mean.
 Sweep `h` to show how error grows with horizon.
 
+## Path-shape error
+Whether the memory holds the *path*, not just the next step. Every memory exposes its
+remembered cycle (`period()`, `path_points(fractions)`); the truth is a 3-harmonic fit of
+the ground truth before any break at the clip's period `T` (exact on sim, searched over the
+labels on real clips). Per step:
+```
+shape_i = min over phase shift of  mean_k || path_i(k/M · T)  −  truth(k/M · T + shift) ||   # M = 64 points, px
+```
+The memory's path is sampled over one *true* period, so a memory with the right curve and
+a doubled period scores well on shape; the period is reported separately as `P / T`. Report
+the median over the steady steps, the median over the last cycle before any break, and a
+path lock-on time (as below, on `shape_i`).
+
 ## Lock-on time
 How long until the memory is usable. First time `t*` after which `e(t) < tol` holds for the
 rest of the clip (or for `K` consecutive cycles). Report in **seconds** and in **cycles**

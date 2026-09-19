@@ -20,6 +20,8 @@ class TrajectoryMemory(Protocol):
     def observe(self, x: float, y: float) -> None: ...   # stream one step
     def predict(self, horizon_s: float) -> tuple[float, float]: ...
     def deviation_score(self) -> float: ...              # 0 = on-pattern, high = break
+    def period(self) -> float: ...                       # the remembered period, s; NaN if none yet
+    def path_points(self, fractions): ...                # the remembered path at these fractions of its cycle, (N, 2); None if none yet
     def reset(self) -> None: ...
 
 
@@ -49,6 +51,12 @@ class ReservoirMemory:
         raise NotImplementedError
 
     def deviation_score(self) -> float:
+        raise NotImplementedError
+
+    def period(self) -> float:
+        raise NotImplementedError
+
+    def path_points(self, fractions):
         raise NotImplementedError
 
     def reset(self) -> None:
