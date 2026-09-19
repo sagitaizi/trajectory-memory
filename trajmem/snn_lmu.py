@@ -22,6 +22,7 @@ from .lmu import SpikingLmu, build_population, state_radii
 from .snn import HORIZONS_S, N_PATH, SpikingMemory, _betas, path_targets
 
 LMU_ACT_SCALE = 100.0                        # Hz -> order one, for the readouts and the fast layer
+LMU_FEATURES = 512                           # fixed random projection of the population the readouts see
 
 
 class LmuNet(nn.Module):
@@ -29,29 +30,33 @@ class LmuNet(nn.Module):
     rates come in as `act`). `step` is one network step; the caller carries the state."""
 
     def __init__(self, n_in: int, n_fast: int, n_lmu: int, dt_s: float, tau_fast, readout_tau_s: float,
-                 n_horizons: int, n_cells: int, n_path: int, n_short: int, seed: int = 0):
+                 n_horizons: int, n_cells: int, n_path: int, n_short: int, seed: int = 0,
+                 n_features: int = LMU_FEATURES):
         super().__init__()
         gen = torch.Generator().manual_seed(seed)
         grad = surrogate.fast_sigmoid(slope=25)
         self.fast = snn.Leaky(beta=_betas(n_fast, tau_fast, dt_s, gen), learn_beta=True, spike_grad=grad)
+        # The population is read through a fixed random projection: a random subspace of its
+        # tuning curves keeps the nonlinear-readout capacity at a fraction of the cost.
+        self.register_buffer("proj", torch.randn(n_lmu, n_features, generator=gen) / math.sqrt(n_lmu))
         self.w_in = nn.Linear(n_in, n_fast)
         self.w_ff = nn.Linear(n_fast, n_fast, bias=False)
-        self.w_sf = nn.Linear(n_lmu, n_fast, bias=False)
+        self.w_sf = nn.Linear(n_features, n_fast, bias=False)
         self.read_short = nn.Linear(n_fast, n_short * 2 * n_cells)
-        self.read_long = nn.Linear(n_fast + n_lmu, (n_horizons - n_short) * 2 * n_cells)
-        self.read_p = nn.Linear(n_lmu, n_path)
-        self.n_fast, self.n_lmu, self.n_horizons, self.n_cells, self.n_short = n_fast, n_lmu, n_horizons, n_cells, n_short
+        self.read_long = nn.Linear(n_fast + n_features, (n_horizons - n_short) * 2 * n_cells)
+        self.read_p = nn.Linear(n_features, n_path)
+        self.n_fast, self.n_features, self.n_horizons, self.n_cells, self.n_short = n_fast, n_features, n_horizons, n_cells, n_short
         self.alpha = math.exp(-dt_s / readout_tau_s)
 
     def init_state(self, batch: int, device):
         z = lambda n: torch.zeros(batch, n, device=device)  # noqa: E731
-        return (z(self.n_fast), z(self.n_fast), z(self.n_fast), z(self.n_lmu))     # mem, spikes, r_fast, r_lmu
+        return (z(self.n_fast), z(self.n_fast), z(self.n_fast), z(self.n_features))   # mem, spikes, r_fast, r_lmu
 
     def step(self, x: torch.Tensor, act: torch.Tensor, state):
         """x: (B, n_in) input cells; act: (B, n_lmu) LMU rates in Hz -> heads (B, H, 2, n_cells),
         path (B, n_path), state, this step's fast-layer spike fraction (with gradient)."""
         mem, spk, r_f, r_l = state
-        a = act / LMU_ACT_SCALE
+        a = (act / LMU_ACT_SCALE) @ self.proj
         spk, mem = self.fast(self.w_in(x) + self.w_ff(spk) + self.w_sf(a), mem)
         r_f = self.alpha * r_f + (1.0 - self.alpha) * spk
         r_l = self.alpha * r_l + (1.0 - self.alpha) * a
