@@ -344,3 +344,32 @@ reads the window as Nengo's decoders read it, 48 numbers, scaled by the radii) s
 offline probe: the training blanks (half the chunks carry up to a period of self-fed,
 currently wrong, positions while the path targets stay on). **Run 10 (`lmu_noblank`)**:
 run 9's configuration with `--blank-prob 0`, started 12:10.
+
+**Run 10 (`lmu_noblank`, run 9 without training blanks)**: epochs 1–4 trace runs 7–9
+exactly (path 97 → 58, 100 ms 32 → 28.5). The blanks are not what limits either number.
+
+**Offline readout experiments (2026-09-19 midday) — what the window can give.**
+Records the low-passed decoded window (48 numbers) for every masked step of the 188
+training and 12 validation tracks (336 k / 21 k samples), then fits path heads offline
+with thousands of Adam steps instead of the ~200 BPTT updates a 12-epoch run gives:
+
+| readout of the window | val path px | period error |
+|---|---|---|
+| linear, exact (non-spiking) state | 61 | 0.33 |
+| 2×256 MLP, exact state | 34 | 0.15 |
+| 2×256 MLP, spiking state, 1 000 steps | **46** (then overfits: 51 at 6 000) | 0.19 |
+| classical period search + harmonic fit on the window reconstructed from the exact state | **5.9** (p90 77) | 0.01 |
+| same on the window reconstructed from the spiking state | 74–86 | 0.8–1.6 |
+
+So: (i) a learned static readout of a 4 s window is a poor period estimator even with a
+perfect window (34 px vs the baselines' 10–14); (ii) the classical decoder is excellent on
+a perfect window — the harmonic baseline *is* a designed readout of this memory — but
+collapses on the spiking window, whose state carries a 2–4 %-of-radius systematic error
+per dimension (200 neurons per 1-D ensemble; 800 barely better; the discrete-time NEF
+mapping of Voelker & Eliasmith 2018 changes nothing; a 200–500 ms low-pass makes it
+worse, so it is not fast noise). Reconstructing a 4 s window weights all 24 Legendre
+orders equally, so that error becomes ~90 px at any lag. The fidelity of the spiking
+window, not the readout, is now the binding constraint on the path.
+
+`LmuMemory.fit(path_pretrain_steps=N)` fits the path head offline on the recorded window
+and freezes it (`--path-pretrain-steps`); not yet used in a full run.
