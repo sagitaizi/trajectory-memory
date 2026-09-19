@@ -295,3 +295,39 @@ p90 on the sim paths (q = 16: p90 35 px); 200 LIF neurons per state dimension wi
 sub-steps track the exact LMU to 5 % of the signal (100 neurons, or 2.5 ms sub-steps,
 drift). The population costs ~10 ms per network step whatever its size — kernel launch
 overhead — so training runs at batch 32.
+
+## Run 7 — first LMU memory (2026-09-19, night)
+
+`train_memory.py --arch lmu --include-locked --epochs 12 --batch 32 --schedule cosine
+--anchor-tau-s 0.02` → `runs/memory/lmu_quick.pt` (q 24, θ 4 s, 200 neurons per state
+dimension, readouts through a fixed 512-feature random projection, blanks in half the
+chunks, geometric path loss, path head linear from the LMU features). ~14 min per epoch.
+
+| | val 100 ms | val path px | dev pred | dev path | dev period | fan path | `loop_01` path |
+|---|---|---|---|---|---|---|---|
+| two-layer, geometric loss (run 6) | 23.6 | 71.6 | 28.1 | 65.9 | 1.32 | 49 | 46 |
+| **LMU quick** | 25.9 | **55.7** | 32.0 | **58.3** | 1.30 | **30** | **29** |
+| Kalman | 7.5 | 1.5–9 | 14.7 | 14.0 | 1.00 | 6.8 | 49 |
+
+Validation path 147 → 87 (epoch 1) → 56 (epoch 12), still falling at the end. Prediction
+is worse than the two-layer net's (26 vs 24 on sim, 32 vs 28 on dev). Through a 1 s blank
+(`--blank 8 9`, self-fed loop) the error inside the blank is 52–65 px on sim clips
+(Kalman 13–57).
+
+**Why the path stops near 56 px — measured, not guessed.** A readout fitted offline from
+the *exact* LMU state (48 numbers, a perfect window) to the path targets: linear (ridge)
+61 px shape / period ratio error 0.33; a 2×256 MLP 34 px / 0.15; mean path 111 px. So
+the window holds what is needed and the network's linear head already extracts what a
+linear map can. The limit is structural: every LMU neuron sees one state dimension, so a
+linear readout of the population is additive over dimensions and cannot form the cross
+terms (autocorrelation-like products) that a period estimate needs. Options added:
+`--path-from both` (the path head also reads the fast layer, a nonlinear spiking layer
+that sees the LMU features) and `--path-readout mlp` (hidden layer; the non-spiking upper
+bound). Run 8 (`lmu_mlp`, both options) started 09:55.
+
+**Open after this run.** (1) Prediction got worse with the LMU in the loop: ablate the
+blanks (`--blank-prob 0`), the LMU→fast input, and the `seen` cell; 12 epochs without
+flips is also short of the two-layer's best recipe. (2) Self-feeding drifts through
+blanks: feed the LMU's own delay readout at lag = period ("where it was one cycle ago")
+instead of the 25 ms head — the window already contains it. (3) The spiking version of
+whatever nonlinearity the MLP proves necessary.

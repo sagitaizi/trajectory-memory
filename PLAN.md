@@ -166,8 +166,13 @@ freely moving real target, with a break signal.
   extrapolation alone.** The baselines' period search also lands on 2T (fan) or T/2
   (`loop_01`) from a 5 s warm-up; their shape is right regardless. The geometric path loss
   moved the path to ~72 px and routing the long horizons through the slow layer changed
-  nothing (`docs/snn-experiments-log.md`, run 6) — hence the LMU core above. **Open: the
-  LMU memory's first numbers (in progress).**
+  nothing (`docs/snn-experiments-log.md`, run 6) — hence the LMU core above. First LMU
+  run (12 epochs, `runs/memory/lmu_quick.pt`): path **58 px** on the development set (fan
+  30, `loop_01` 29), prediction 32 px; sim validation path 56 px. A perfect window read
+  linearly gives 61 px, read by a small MLP 34 px — the readout's nonlinearity is the
+  next lever (run 8, `--path-from both --path-readout mlp`, in progress). **Open: path
+  readout nonlinearity; prediction regressed (32 vs 17) — ablate blanks / LMU→fast /
+  `seen`; self-feeding through blanks drifts (52–65 px in a 1 s blank).**
 - **Done when:** on real repetitive clips, Stage 1 prediction error beats the classical
   baseline *or* matches it with a stated event-native/latency argument; lock-on within N
   cycles. Bar: Kalman 24.2 px pooled (8.0 on the fan), ~3 px on sim.

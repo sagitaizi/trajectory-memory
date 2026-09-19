@@ -113,3 +113,43 @@ best run.
   horizons routed through it) is written in the log, awaiting a decision. The corpus was extended to 200 sim clips (119 usable vs 57); runs on it are
   queued. A code review found and fixed three bugs (NaN deviation score after an unseen
   first window, CUDA crash in the encoder, epochs sampling with replacement).
+
+
+## Where it stands (2026-09-19, morning)
+
+**The metric first.** We now score the *path itself*: how far the memory's own picture of
+one cycle sits from the true cycle (px), with the period reported separately. It showed
+that the learned two-layer network never held the path — its cycle was 64 px off on real
+clips (the size of the path), its period twice the truth — and that its decent prediction
+numbers came from short-term extrapolation. A better loss (px of the drawn cycle) and
+routing the long horizons through the slow layer each moved the path to ~72 px and no
+further: the slow layer's only long memory is a spike count, which records where the
+target has been but not in what order.
+
+**The new core.** Decided with Sagi: a hand-set window memory — a spiking Legendre Memory
+Unit, built by Nengo (encoders, decoders, the fixed recurrent wiring) and simulated in
+torch beside the fast layer. It holds the last 4 s of the position by construction
+(verified: it reconstructs the position one period back to 0.5 px median on the exact
+system, and the spiking population tracks that to 5 %). The readouts and the fast layer
+are learned; when the target is unseen the network feeds its own prediction back in.
+
+**First numbers (12 epochs, no augmentation).** Path on real development clips **58 px**
+(two-layer 66, Kalman 14); fan 30 (was 77), hand-moved loop 29 (Kalman 49). Prediction
+at 100 ms **32 px** — worse than the two-layer's 17 and the Kalman's 14.7. Through a 1 s
+blank the network drifts (52–65 px). So: the memory now clearly holds more of the path
+than the learned slow layer ever did, and it is not yet near the baselines on either
+number. The night's goal — beating the baselines across the board — was not reached.
+
+**What limits the path, measured.** A readout fitted offline from a *perfect* window:
+linear 61 px, small MLP 34 px. The network's linear head (61 → 56 px) is already doing
+what a linear map can. The population's neurons each see one dimension of the window, so
+a linear readout cannot form products across dimensions — and estimating a period needs
+them. A run with a nonlinear path head (reads the LMU and the fast layer through a hidden
+layer) is in progress: `runs/memory/train_lmu_mlp.log`, `lmu_mlp.pt` when done.
+
+**Next, in order.** (1) Read the MLP-head result: if the path drops well below 56, the
+spiking form of that nonlinearity (fast layer as the hidden layer, or a small dedicated
+spiking layer) is the design step. (2) Get prediction back: ablate the training blanks,
+the LMU→fast input and the `seen` cell (each is a flag); then the full recipe (flips,
+40 epochs). (3) Through blanks, feed the window's own "one cycle ago" position instead of
+the 25 ms head.
