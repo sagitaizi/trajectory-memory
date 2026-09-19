@@ -72,6 +72,8 @@ def main(argv=None) -> None:
     p.add_argument("--lmu-q", type=int, default=24, help="lmu: Legendre order per axis")
     p.add_argument("--lmu-n", type=int, default=200, help="lmu: neurons per state dimension")
     p.add_argument("--lmu-theta", type=float, default=4.0, help="lmu: window (s)")
+    p.add_argument("--path-from", default="lmu", choices=("lmu", "both"), help="lmu: what the path head reads")
+    p.add_argument("--path-readout", default="linear", choices=("linear", "mlp"), help="lmu: path head form")
     p.add_argument("--schedule", default="none", choices=("none", "cosine"), help="learning-rate schedule")
     p.add_argument("--max-obs-err-px", type=float, default=15.0)
     p.add_argument("--include-locked", action="store_true", help="string-locked clips too, truth standing in")
@@ -99,7 +101,8 @@ def main(argv=None) -> None:
 
         memory = LmuMemory(dt_s=dt_s, device=args.device, n_per_axis=args.n_per_axis, n_fast=args.n_fast,
                            anchor_tau_s=args.anchor_tau_s, q=args.lmu_q, n_per_dim=args.lmu_n,
-                           theta_s=args.lmu_theta, seed=args.seed)
+                           theta_s=args.lmu_theta, path_from=args.path_from, path_readout=args.path_readout,
+                           seed=args.seed)
         memory.set_radii_from(train)
         fit_extra = {"blank_prob": args.blank_prob}
     else:

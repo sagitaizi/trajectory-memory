@@ -31,8 +31,10 @@ class LmuNet(nn.Module):
 
     def __init__(self, n_in: int, n_fast: int, n_lmu: int, dt_s: float, tau_fast, readout_tau_s: float,
                  n_horizons: int, n_cells: int, n_path: int, n_short: int, seed: int = 0,
-                 n_features: int = LMU_FEATURES):
+                 n_features: int = LMU_FEATURES, path_from: str = "lmu", path_readout: str = "linear"):
         super().__init__()
+        if path_from not in ("lmu", "both") or path_readout not in ("linear", "mlp"):
+            raise ValueError(f"path_from {path_from!r} / path_readout {path_readout!r}")
         gen = torch.Generator().manual_seed(seed)
         grad = surrogate.fast_sigmoid(slope=25)
         self.fast = snn.Leaky(beta=_betas(n_fast, tau_fast, dt_s, gen), learn_beta=True, spike_grad=grad)
@@ -44,7 +46,12 @@ class LmuNet(nn.Module):
         self.w_sf = nn.Linear(n_features, n_fast, bias=False)
         self.read_short = nn.Linear(n_fast, n_short * 2 * n_cells)
         self.read_long = nn.Linear(n_fast + n_features, (n_horizons - n_short) * 2 * n_cells)
-        self.read_p = nn.Linear(n_features, n_path)
+        # A linear readout of one-dimensional ensembles is additive over the state dimensions
+        # and cannot form the cross terms a period estimate needs; the fast layer ("both")
+        # or a hidden layer ("mlp") supplies them.
+        n_p = n_features + (n_fast if path_from == "both" else 0)
+        self.read_p = nn.Linear(n_p, n_path) if path_readout == "linear" else             nn.Sequential(nn.Linear(n_p, 256), nn.ReLU(), nn.Linear(256, n_path))
+        self.path_from = path_from
         self.n_fast, self.n_features, self.n_horizons, self.n_cells, self.n_short = n_fast, n_features, n_horizons, n_cells, n_short
         self.alpha = math.exp(-dt_s / readout_tau_s)
 
@@ -62,7 +69,8 @@ class LmuNet(nn.Module):
         r_l = self.alpha * r_l + (1.0 - self.alpha) * a
         heads = torch.cat([self.read_short(r_f), self.read_long(torch.cat([r_f, r_l], dim=-1))], dim=-1)
         heads = heads.reshape(x.shape[0], self.n_horizons, 2, self.n_cells)
-        return heads, self.read_p(r_l), (mem, spk, r_f, r_l), spk.mean()
+        path = self.read_p(torch.cat([r_l, r_f], dim=-1) if self.path_from == "both" else r_l)
+        return heads, path, (mem, spk, r_f, r_l), spk.mean()
 
 
 class LmuMemory(SpikingMemory):
@@ -70,17 +78,20 @@ class LmuMemory(SpikingMemory):
     `_run`, which does the encoding, the anchor, the self-feeding and the LMU stepping."""
 
     def __init__(self, dt_s: float, device=None, q: int = 24, n_per_dim: int = 200, theta_s: float = 4.0,
-                 tau_syn_s: float = 0.02, radii=None, lmu_seed: int = 0, n_fast: int = 384, **kw):
+                 tau_syn_s: float = 0.02, radii=None, lmu_seed: int = 0, n_fast: int = 384,
+                 path_from: str = "lmu", path_readout: str = "linear", **kw):
         kw.setdefault("anchor_tau_s", 0.02)
         super().__init__(dt_s, device=device, n_fast=n_fast, n_slow=4, **kw)
         self.q, self.n_per_dim, self.theta_s, self.tau_syn_s, self.lmu_seed = q, n_per_dim, theta_s, tau_syn_s, lmu_seed
+        self.path_from, self.path_readout = path_from, path_readout
         self.radii = np.full(2 * q, 0.5) if radii is None else np.asarray(radii, dtype=float)
         self.lmu = SpikingLmu(build_population(q, theta_s, n_per_dim, self.radii, tau_syn_s, 2, lmu_seed),
                               dt_s, device=self.device)
         n_in = self.pos_enc.n_out + self.vel_enc.n_out + 1                       # + the `seen` cell
         self.net = LmuNet(n_in, n_fast, self.lmu.n, dt_s, self.tau_fast, self.readout_tau_s,
                           len(self.horizons_s), self.n_per_axis, N_PATH,
-                          sum(h <= 0.05 for h in self.horizons_s), self.seed).to(self.device)
+                          sum(h <= 0.05 for h in self.horizons_s), self.seed,
+                          path_from=path_from, path_readout=path_readout).to(self.device)
         self.k_feed = max(1, round(self.horizons_s[0] / dt_s))                   # the 25 ms head feeds back
         self.blank_prob = 0.0
         self.reset()
@@ -97,7 +108,8 @@ class LmuMemory(SpikingMemory):
         c = super().config()
         c.pop("n_slow"); c.pop("tau_slow"); c.pop("heads_from"); c.pop("slow_kind"); c.pop("tau_adapt"); c.pop("adapt_scale")
         c.update(q=self.q, n_per_dim=self.n_per_dim, theta_s=self.theta_s, tau_syn_s=self.tau_syn_s,
-                 radii=self.radii.tolist(), lmu_seed=self.lmu_seed)
+                 radii=self.radii.tolist(), lmu_seed=self.lmu_seed, path_from=self.path_from,
+                 path_readout=self.path_readout)
         return c
 
     def save(self, path) -> Path:

@@ -81,3 +81,14 @@ def test_checkpoint_round_trip_keeps_the_predictions(tmp_path):
         out.append((mem.predict(0.1), mem.last_path.copy()))
     assert np.allclose(out[0][0], out[1][0]) and np.allclose(out[0][1], out[1][1])
     assert m2.q == 6 and m2.n_per_dim == 30 and m2.theta_s == 1.5
+
+
+@pytest.mark.parametrize("path_from,path_readout", [("both", "linear"), ("lmu", "mlp")])
+def test_path_head_options_run_and_round_trip(tmp_path, path_from, path_readout):
+    m = tiny_memory(path_from=path_from, path_readout=path_readout)
+    m.reset()
+    m.observe(0.5, 0.5)
+    assert m.last_path.shape == (17,)
+    m.save(tmp_path / "m.pt")
+    m2 = LmuMemory.load(tmp_path / "m.pt")
+    assert m2.path_from == path_from and m2.path_readout == path_readout
