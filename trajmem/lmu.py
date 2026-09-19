@@ -5,8 +5,6 @@ dynamics (Voelker & Eliasmith 2018), and `SpikingLmu` runs those neurons in torc
 """
 from __future__ import annotations
 
-from math import comb
-
 import numpy as np
 from scipy.linalg import expm
 
@@ -23,10 +21,13 @@ def legendre_matrices(q: int, theta: float) -> tuple[np.ndarray, np.ndarray]:
 def delay_readout(q: int, theta: float, lag_s) -> np.ndarray:
     """Weights that read u(t - lag) off the state: shifted Legendre polynomials at lag/theta.
     lag_s scalar -> (q,); array (L,) -> (L, q)."""
-    r = np.atleast_1d(np.asarray(lag_s, dtype=float)) / theta
-    out = np.empty((len(r), q))
-    for i in range(q):
-        out[:, i] = (-1) ** i * sum(comb(i, k) * comb(i + k, k) * (-r) ** k for k in range(i + 1))
+    x = 2.0 * np.atleast_1d(np.asarray(lag_s, dtype=float)) / theta - 1.0
+    out = np.empty((len(x), q))
+    out[:, 0] = 1.0
+    if q > 1:
+        out[:, 1] = x
+    for n in range(1, q - 1):                       # Bonnet recurrence: stable at high order
+        out[:, n + 1] = ((2 * n + 1) * x * out[:, n] - n * out[:, n - 1]) / (n + 1)
     return out if np.ndim(lag_s) else out[0]
 
 
