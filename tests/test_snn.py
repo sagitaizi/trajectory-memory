@@ -244,3 +244,30 @@ def test_path_points_come_from_the_path_head():
     cycle = m.path_points(np.arange(64) / 64)
     expected = path_position(np.repeat(p[None], 64, axis=0), np.linspace(0, 1.0, 64, endpoint=False))
     assert np.allclose(cycle, expected)
+
+
+def test_shape_points_draw_the_path_head_at_even_phases():
+    from trajmem.snn import _shape_points
+
+    tr = a_track(shape="figure8")
+    p = path_targets(tr.t, tr.gt, tr.period_s)[:1]                # one row of exact parameters
+    pts = _shape_points(torch.tensor(p), 8).numpy()[0]           # (8, 2)
+    phi0 = np.arctan2(p[0, 2], p[0, 1])
+    theta = np.arange(8) * 2 * np.pi / 8
+    expected = path_position(np.repeat(p, 8, axis=0), (theta - phi0) * tr.period_s / (2 * np.pi))
+    assert pts.shape == (8, 2) and np.allclose(pts, expected, atol=1e-6)
+
+
+def test_geometric_path_loss_is_zero_on_the_targets_and_logs_path_px():
+    torch.manual_seed(0)
+    tracks = [a_track(name=f"c{i}", period_s=1.0 + 0.1 * i) for i in range(3)]
+    m = tiny_memory()
+    log = m.fit(tracks, epochs=1, chunk_s=2.0, batch=3, val_fraction=1 / 3, lr=1e-2, path_loss="geometric")
+    assert np.isfinite(log[-1]["val_path_px"]) and log[-1]["val_path_px"] > 0
+    arrays = m._arrays(tracks)
+    m._standardise(arrays, fit=False)
+    yp, mp = arrays[0]["yp"][None], arrays[0]["mp"][None]
+    cells = torch.zeros(1, 1, len(m.horizons_s), 2, m.n_per_axis)
+    yh, mh = torch.zeros(1, 1, len(m.horizons_s), 2), torch.zeros(1, 1, len(m.horizons_s), dtype=torch.bool)
+    _, _, lp, px = m._loss(cells, yp, yh, mh, yp, mp, path_weight=1.0)
+    assert lp == pytest.approx(0.0, abs=1e-4) and px == pytest.approx(0.0, abs=1e-2)

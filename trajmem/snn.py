@@ -25,6 +25,8 @@ from .trajectories import _harmonic_fit
 N_HARMONICS = 3
 N_PATH = 3 + 2 * (1 + 2 * N_HARMONICS)          # period, cos/sin phase, then per axis: mean + 3 harmonics
 HORIZONS_S = (0.025, 0.05, 0.1, 0.2)
+SHAPE_PHASES = 16                                # where the geometric path loss samples the cycle
+SHAPE_PX_SCALE = 50.0                            # px of shape error that count as one unit of loss
 
 
 # --- input code ------------------------------------------------------------------
@@ -99,6 +101,20 @@ def path_position(p, horizon_s, n_harmonics: int = N_HARMONICS) -> np.ndarray:
             acc += p[:, base + 2 * k - 1] * np.cos(k * phi) + p[:, base + 2 * k] * np.sin(k * phi)
         out[:, axis] = acc
     return out
+
+
+def _shape_points(p: torch.Tensor, n_phases: int) -> torch.Tensor:
+    """The cycle the path parameters describe, at `n_phases` even phases: (..., n_phases, 2).
+    Torch twin of `path_position` over a whole cycle, for the training loss."""
+    theta = torch.arange(n_phases, dtype=p.dtype, device=p.device) * (2.0 * math.pi / n_phases)
+    out = []
+    for axis in range(2):
+        base = 3 + axis * (1 + 2 * N_HARMONICS)
+        acc = p[..., base, None].expand(*p.shape[:-1], n_phases)
+        for k in range(1, N_HARMONICS + 1):
+            acc = acc + p[..., base + 2 * k - 1, None] * torch.cos(k * theta) + p[..., base + 2 * k, None] * torch.sin(k * theta)
+        out.append(acc)
+    return torch.stack(out, dim=-1)
 
 
 # --- the network -------------------------------------------------------------------
@@ -293,6 +309,7 @@ class SpikingMemory:
                                len(self.horizons_s), n_per_axis, N_PATH, heads_from, slow_kind, tau_adapt,
                                adapt_scale, seed).to(self.device)
         self.path_mean, self.path_std = np.zeros(N_PATH), np.ones(N_PATH)
+        self.path_loss = "geometric"
         self.scales = (1.0, 1.0)                     # on-pattern level of (immediate, structural), px
         self.reset()
 
@@ -433,16 +450,34 @@ class SpikingMemory:
 
     def _loss(self, cells, path, yh, mh, yp, mp, path_weight: float):
         """Cross-entropy of each head's cell activity against the true position's bump,
-        squared error on the standardised path numbers, and the firing-rate regulariser
-        that keeps both layers near `rate_target` (a silent layer cannot learn)."""
+        the path-head loss, and the firing-rate regulariser that keeps both layers near
+        `rate_target` (a silent layer cannot learn). Returns (loss, heads, path, path px).
+
+        Path loss "geometric": the cycle the head describes against the true cycle, as
+        px distance at SHAPE_PHASES phases (scaled by SHAPE_PX_SCALE), plus the phase
+        pair's squared error and the period's relative squared error -- so each of the
+        17 numbers costs what it does to the drawn path. "mse": squared error on the
+        standardised numbers (the ablation)."""
         target = torch.stack([enc.bumps(yh[..., j, :]) for j, enc in enumerate(self.out_enc)], dim=-3)
         target = target / target.sum(-1, keepdim=True).clamp_min(1e-6)
         ce = -(target * torch.log_softmax(cells, dim=-1)).sum(-1).mean(-1)[mh]      # mean over x, y
-        ep = ((path - yp) ** 2).mean(-1)[mp]
+        if self.path_loss == "geometric":
+            std = torch.as_tensor(self.path_std, dtype=path.dtype, device=path.device)
+            mean = torch.as_tensor(self.path_mean, dtype=path.dtype, device=path.device)
+            p, q = path * std + mean, yp * std + mean
+            res = torch.as_tensor(self.resolution, dtype=path.dtype, device=path.device)
+            diff = (_shape_points(p, SHAPE_PHASES) - _shape_points(q, SHAPE_PHASES)) * res
+            px = torch.sqrt((diff ** 2).sum(-1) + 1e-6).mean(-1)      # smooth at zero, unlike hypot
+            phase = ((p[..., 1:3] - q[..., 1:3]) ** 2).sum(-1)
+            period = ((p[..., 0] - q[..., 0]) / q[..., 0]) ** 2
+            ep, px = (px / SHAPE_PX_SCALE + phase + period)[mp], px[mp]
+        else:
+            ep, px = ((path - yp) ** 2).mean(-1)[mp], None
         lh = ce.mean() if ce.numel() else cells.sum() * 0
         lp = ep.mean() if ep.numel() else path.sum() * 0
         reg = sum((r - self.rate_target) ** 2 for r in self.net.rates)
-        return lh + path_weight * lp + self.rate_weight * reg, lh.item(), lp.item()
+        path_px = px.mean().item() if px is not None and px.numel() else np.nan
+        return lh + path_weight * lp + self.rate_weight * reg, lh.item(), lp.item(), path_px
 
     def _run_chunks(self, arrays, idx, chunk: int, path_weight: float, optimiser=None):
         """Forward (and update, if an optimiser is given) over one batch of tracks, chunk by
@@ -455,7 +490,7 @@ class SpikingMemory:
             sl = slice(s, s + chunk)
             with torch.set_grad_enabled(optimiser is not None):
                 cells, path, state = self.net(x[sl], state)
-                loss, lh, lp = self._loss(cells, path, yh[sl], mh[sl], yp[sl], mp[sl], path_weight)
+                loss, lh, lp, path_px = self._loss(cells, path, yh[sl], mh[sl], yp[sl], mp[sl], path_weight)
                 heads = self._decode(cells)
             if optimiser is not None:
                 optimiser.zero_grad()
@@ -463,20 +498,23 @@ class SpikingMemory:
                 nn.utils.clip_grad_norm_(self.net.parameters(), 1.0)
                 optimiser.step()
             state = tuple(v.detach() for v in state)
-            losses.append((loss.item(), lh, lp))
+            losses.append((loss.item(), lh, lp, path_px))
             h100, m100 = heads[:, :, self._i100].detach(), mh[sl][:, :, self._i100]
             px = torch.hypot(*(((h100 - yh[sl][:, :, self._i100]) * torch.tensor(self.resolution, device=h100.device))).unbind(-1))
             errs.append(px[m100].cpu().numpy())
-        return np.mean(losses, axis=0), np.concatenate(errs)
+        return np.nanmean(losses, axis=0), np.concatenate(errs)
 
     def fit(self, tracks: list[Track], epochs: int = 30, chunk_s: float = 5.0, batch: int = 16,
-            val_fraction: float = 0.1, lr: float = 1e-3, path_weight: float = 0.1, seed: int = 0,
+            val_fraction: float = 0.1, lr: float = 1e-3, path_weight: float = 1.0, seed: int = 0,
             schedule: str = "none", weight_decay: float = 0.0, val_tracks: list[Track] | None = None,
-            log_fn=None) -> list[dict]:
+            path_loss: str = "geometric", log_fn=None) -> list[dict]:
         """Train on `tracks` (a held-back fraction validates and picks the best epoch, or
         `val_tracks` if given), then set the deviation scales on the validation tracks.
-        `schedule` "cosine" decays the learning rate to zero over the epochs. Returns the
-        per-epoch log."""
+        `schedule` "cosine" decays the learning rate to zero over the epochs; `path_loss`
+        as in `_loss`. Returns the per-epoch log."""
+        if path_loss not in ("geometric", "mse"):
+            raise ValueError(f"path_loss {path_loss!r}: geometric or mse")
+        self.path_loss = path_loss
         rng = np.random.default_rng(seed)
         torch.manual_seed(seed)
         if val_tracks is not None:
@@ -501,10 +539,10 @@ class SpikingMemory:
                 loss, errs = self._run_chunks(arrays, val_idx, chunk, path_weight)
                 val_px = float(np.median(errs)) if errs.size else np.nan
             else:
-                loss, val_px = (np.nan,) * 3, np.nan
+                loss, val_px = (np.nan,) * 4, np.nan
             entry = {"epoch": epoch, "train_loss": train_loss, "val_loss": loss[0], "val_heads": loss[1],
-                     "val_path": loss[2], "val_px": val_px, "rate_fast": self.net.last_rates[0],
-                     "rate_slow": self.net.last_rates[1]}
+                     "val_path": loss[2], "val_path_px": loss[3], "val_px": val_px,
+                     "rate_fast": self.net.last_rates[0], "rate_slow": self.net.last_rates[1]}
             log.append(entry)
             if log_fn:
                 log_fn(entry)
