@@ -19,7 +19,7 @@ from torch import nn
 
 from .data import Track
 from .lmu import SpikingLmu, build_population, state_radii
-from .snn import HORIZONS_S, N_PATH, SpikingMemory, _betas, path_targets
+from .snn import HORIZONS_S, N_PATH, SHAPE_PHASES, SHAPE_PX_SCALE, SpikingMemory, _betas, _shape_points, path_targets
 
 LMU_ACT_SCALE = 100.0                        # Hz -> order one, for the readouts and the fast layer
 LMU_FEATURES = 512                           # fixed random projection of the population the readouts see
@@ -140,7 +140,7 @@ class LmuMemory(SpikingMemory):
 
     # -- the one loop --
 
-    def _run(self, obs: torch.Tensor, state):
+    def _run(self, obs: torch.Tensor, state, record: list | None = None):
         """obs: (T, B, 2) positions, NaN = unseen. Returns head cells (T, B, H, 2, n_cells),
         path (T, B, n_path), the anchor per step (T, B, 2), the state, and the mean fast
         rate over the steps (with gradient). Unseen steps are fed the network's own
@@ -173,6 +173,8 @@ class LmuMemory(SpikingMemory):
             state["act"] = act
             decoded = self.lmu.decode(act).reshape(B, -1) / self.radii_t if self.path_from == "state" else None
             heads, path, state["net"], r = self.net.step(x, act, state["net"], decoded)
+            if record is not None:
+                record.append(state["net"][4].detach())
             disp = self.out_enc[0].decode(heads[:, 0].detach())                          # 25 ms head, (B, 2)
             state["fed"].append(ref.detach() + disp)
             cells.append(heads); paths.append(path); refs.append(ref); rate = rate + r
@@ -284,7 +286,77 @@ class LmuMemory(SpikingMemory):
         state["fed"] = deque((a.detach() for a in state["fed"]), maxlen=state["fed"].maxlen)
         return state
 
-    def fit(self, tracks: list[Track], blank_prob: float = 0.5, **kw) -> list[dict]:
+    def fit(self, tracks: list[Track], blank_prob: float = 0.5, path_pretrain_steps: int = 0,
+            val_tracks: list[Track] | None = None, **kw) -> list[dict]:
+        """As SpikingMemory.fit. With `path_pretrain_steps` the path head is first fitted
+        offline on the recorded window (needs `path_from="state"`: the window does not
+        depend on the learned parts) and then frozen -- a readout of a fixed memory is a
+        decoder, solved as such, not a few hundred BPTT updates."""
         self.blank_prob = blank_prob
         self._rng = np.random.default_rng(kw.get("seed", 0))
-        return super().fit(tracks, **kw)
+        if path_pretrain_steps > 0:
+            if self.path_from != "state":
+                raise ValueError("path_pretrain_steps needs path_from='state'")
+            self._pretrain_path_head(tracks, val_tracks, path_pretrain_steps, kw.get("path_loss", "geometric"),
+                                     kw.get("seed", 0))
+            for prm in self.net.read_p.parameters():
+                prm.requires_grad_(False)
+            kw["path_weight"] = 0.0
+        return super().fit(tracks, val_tracks=val_tracks, **kw)
+
+    def _recorded_windows(self, tracks: list[Track]):
+        """The path head's input (the low-passed decoded window) and its targets over the
+        masked steps of `tracks`, streamed without blanks or gradient."""
+        arrays = self._arrays(tracks)
+        self._standardise(arrays, fit=False)
+        xs, ys = [], []
+        blank, self.blank_prob = self.blank_prob, 0.0
+        with torch.no_grad():
+            for b in range(0, len(tracks), 32):
+                idx = list(range(b, min(b + 32, len(tracks))))
+                obs, yp, mp = self._stack(arrays, idx, "obs"), self._stack(arrays, idx, "yp"), self._stack(arrays, idx, "mp")
+                state, feats = None, []
+                for s in range(0, obs.shape[0], 1000):
+                    _, _, _, state, _ = self._run(obs[s:s + 1000], state, record=feats)
+                x = torch.stack(feats)                                             # (T, B, n_state)
+                xs.append(x[mp]); ys.append(yp[mp])
+        self.blank_prob = blank
+        return torch.cat(xs), torch.cat(ys)
+
+    def _pretrain_path_head(self, tracks, val_tracks, steps: int, path_loss: str, seed: int) -> None:
+        arrays = self._arrays(tracks)
+        self._standardise(arrays, fit=True)
+        x, y = self._recorded_windows(tracks)
+        xv, yv = self._recorded_windows(val_tracks) if val_tracks else (None, None)
+        gen = torch.Generator(device="cpu").manual_seed(seed)
+        opt = torch.optim.Adam(self.net.read_p.parameters(), lr=1e-3)
+        mask = torch.ones(1, 512, dtype=torch.bool, device=self.device)
+        for step in range(steps):
+            i = torch.randint(0, len(x), (512,), generator=gen).to(self.device)
+            loss = self._path_loss_only(self.net.read_p(x[i])[None], y[i][None], mask, path_loss)
+            opt.zero_grad(); loss.backward(); opt.step()
+        if xv is not None:
+            with torch.no_grad():
+                self.path_pretrain_val_px = float(self._path_px(self.net.read_p(xv)[None], yv[None]))
+
+    def _path_loss_only(self, path, yp, mp, path_loss: str):
+        if path_loss == "mse":
+            return ((path - yp) ** 2).mean(-1)[mp].mean()
+        p, q = self._destandardise(path), self._destandardise(yp)
+        px = self._shape_px(p, q)
+        phase = ((p[..., 1:3] - q[..., 1:3]) ** 2).sum(-1)
+        period = ((p[..., 0] - q[..., 0]) / q[..., 0]) ** 2
+        return (px / SHAPE_PX_SCALE + phase + period)[mp].mean()
+
+    def _path_px(self, path, yp):
+        return self._shape_px(self._destandardise(path), self._destandardise(yp)).median()
+
+    def _destandardise(self, path):
+        std = torch.as_tensor(self.path_std, dtype=path.dtype, device=path.device)
+        mean = torch.as_tensor(self.path_mean, dtype=path.dtype, device=path.device)
+        return path * std + mean
+
+    def _shape_px(self, p, q):
+        res = torch.as_tensor(self.resolution, dtype=p.dtype, device=p.device)
+        diff = (_shape_points(p, SHAPE_PHASES) - _shape_points(q, SHAPE_PHASES)) * res
+        return torch.sqrt((diff ** 2).sum(-1) + 1e-6).mean(-1)

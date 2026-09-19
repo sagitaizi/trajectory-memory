@@ -92,3 +92,15 @@ def test_path_head_options_run_and_round_trip(tmp_path, path_from, path_readout)
     m.save(tmp_path / "m.pt")
     m2 = LmuMemory.load(tmp_path / "m.pt")
     assert m2.path_from == path_from and m2.path_readout == path_readout
+
+
+def test_path_head_can_be_fitted_offline_on_the_recorded_window():
+    torch.manual_seed(0)
+    tracks = [a_track(name=f"c{i}", period_s=1.0 + 0.1 * i, center=(0.4 + 0.05 * i, 0.5)) for i in range(6)]
+    m = tiny_memory(path_from="state", path_readout="mlp")
+    m.set_radii_from(tracks)
+    log = m.fit(tracks[:5], val_tracks=tracks[5:], epochs=1, chunk_s=2.0, batch=5, lr=1e-2, seed=0,
+                blank_prob=0.0, path_pretrain_steps=300)
+    assert np.isfinite(m.path_pretrain_val_px) and m.path_pretrain_val_px < 120
+    assert not any(p.requires_grad for p in m.net.read_p.parameters())
+    assert np.isfinite(log[-1]["val_px"])

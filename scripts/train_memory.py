@@ -74,6 +74,8 @@ def main(argv=None) -> None:
     p.add_argument("--lmu-theta", type=float, default=4.0, help="lmu: window (s)")
     p.add_argument("--path-from", default="lmu", choices=("lmu", "both", "state"), help="lmu: what the path head reads")
     p.add_argument("--path-readout", default="linear", choices=("linear", "mlp"), help="lmu: path head form")
+    p.add_argument("--path-pretrain-steps", type=int, default=0,
+                   help="lmu: fit the path head offline on the recorded window for this many steps, then freeze it")
     p.add_argument("--schedule", default="none", choices=("none", "cosine"), help="learning-rate schedule")
     p.add_argument("--max-obs-err-px", type=float, default=15.0)
     p.add_argument("--include-locked", action="store_true", help="string-locked clips too, truth standing in")
@@ -104,7 +106,7 @@ def main(argv=None) -> None:
                            theta_s=args.lmu_theta, path_from=args.path_from, path_readout=args.path_readout,
                            seed=args.seed)
         memory.set_radii_from(train)
-        fit_extra = {"blank_prob": args.blank_prob}
+        fit_extra = {"blank_prob": args.blank_prob, "path_pretrain_steps": args.path_pretrain_steps}
     else:
         memory = SpikingMemory(dt_s=dt_s, device=args.device, n_per_axis=args.n_per_axis,
                                n_fast=args.n_fast, n_slow=args.n_slow, anchor_tau_s=args.anchor_tau_s,
@@ -125,6 +127,8 @@ def main(argv=None) -> None:
     log = memory.fit(train, val_tracks=val, epochs=args.epochs, chunk_s=args.chunk_s, batch=args.batch,
                      lr=args.lr, path_weight=args.path_weight, seed=args.seed, schedule=args.schedule,
                      path_loss=args.path_loss, log_fn=show, **fit_extra)
+    if getattr(memory, "path_pretrain_val_px", None) is not None:
+        print(f"path head pretrained offline: validation path {memory.path_pretrain_val_px:.1f} px")
     out = memory.save(out)
     out.with_suffix(".partial.pt").unlink(missing_ok=True)
     best = min((e for e in log if np.isfinite(e["val_loss"])), key=lambda e: e["val_loss"])
