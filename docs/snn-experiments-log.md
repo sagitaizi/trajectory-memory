@@ -338,3 +338,9 @@ features of the spike rates (plus the fast layer) does not find what the offline
 found on the exact state (34 px). Run 9 (`lmu_state`, `--path-from state`: the path head
 reads the window as Nengo's decoders read it, 48 numbers, scaled by the radii) started
 11:45 to separate the substrate from the head.
+
+**Run 9 (`lmu_state`)** stopped at epoch 4: path 57 px, the same plateau as runs 7 and
+8 — reading the clean decoded window changes nothing. Remaining difference from the
+offline probe: the training blanks (half the chunks carry up to a period of self-fed,
+currently wrong, positions while the path targets stay on). **Run 10 (`lmu_noblank`)**:
+run 9's configuration with `--blank-prob 0`, started 12:10.
