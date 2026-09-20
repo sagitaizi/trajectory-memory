@@ -389,3 +389,42 @@ representation (e.g. lower q with a shorter θ, or a 2-D ensemble per Legendre o
 or reading period from a *bank of shorter windows*); (2) the prediction side needs the
 two-layer recipe (flips, 40 epochs) before it can be compared; (3) through blanks, feed
 the window's own one-period-back position.
+
+## Run 11 — the clock-and-map architecture, non-spiking prototype (2026-09-20, night)
+
+Decided with Sagi (2026-09-19 evening) after the LMU: the memory is a **phase advancing
+at a rate** (a clock) plus a **map from phase to position** learned online in the clip —
+the Kalman's structure, buildable in neurons — instead of a recording of the past.
+`trajmem/phasemap.py` (`PhaseMap`, registered as `--memory phasemap`):
+
+- five clocks start at periods 0.8–4 s; each is an adaptive-frequency oscillator
+  (Righetti, Buchli & Ijspeert 2006) pulled by the motion's main-axis signal (found online
+  from a running covariance), phase and rate nudged by F·sin φ, in the clock's own units;
+- each clock owns a 64-bin map, updated by a delta rule (running mean at first, then a
+  steady step) and a global scale that follows the radial mismatch (the pendulum's decay);
+- the clock is elected by the drive's zero-crossing period when that is steady, else by
+  the smallest mismatch; prediction = map at φ + ωh plus the smoothed current residual,
+  decaying over 2 s; `period`, `path_points` straight from the clock and map;
+- deviation = mismatch against a **snapshot** of the map taken two laps after election
+  (the remembered path; the working map keeps adapting for prediction).
+
+Locking rule as first written (phase error from the map's own tangent) could not lock —
+the map cannot referee the clock that draws it. Righetti's input-driven rule locks within
+a few cycles on clean paths (100 ms error 3–8 px). Two bugs fixed on the way: additive
+pulls slammed slow clocks to the rate floor; the early drive is unnormalised (clipped).
+
+Development set, offset-subtracted, prototype vs Kalman:
+
+| | pred 100 ms | path px | period | AUC | latency s | fp/min |
+|---|---|---|---|---|---|---|
+| Kalman | 14.7 | 14.0 | 1.00 | 0.80 | 0.95 | 13.2 |
+| **PhaseMap** | **13.9** | **13.5** | 1.00 | **0.99** | **0.10** | **9.8** |
+
+Per clip: fan 5.0 / 4.8 (Kalman 7.0 / 6.8), `small_01` 11.0 / 11.6 (12.1 / 12.1),
+`loop_01` 29 / 26 (62 / 49), `wide_break` AUC 1.00 (0.85), `loop_break_01` AUC 0.98
+(0.75). Loses: `loop_break_01` prediction 13.2 vs 12.2; `wide_02` 18.5 vs 18.2; the
+diagonal sweep locks at half the period. Sim: `sim_000` 10.1 vs 9.1, through a 1 s blank
+`sim_007` 10.5 vs 59.7; the 3:2 Lissajous (`sim_003`) is the known weak case — neither
+coordinate carries the fundamental, so nothing at the true period drives the clock.
+Snapshot for deviation: without it the memory re-learns the new path after a break within
+~3 laps and the AUC on `loop_break_01` is 0.58.

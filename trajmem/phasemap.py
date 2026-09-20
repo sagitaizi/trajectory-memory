@@ -13,12 +13,18 @@ TWO_PI = 2.0 * np.pi
 
 class _Clock:
     def __init__(self, omega: float, n_bins: int, width: float, dt_s: float, eta: float, k_phase: float,
-                 k_rate: float, score_tau_s: float):
+                 k_rate: float, score_tau_s: float, resid_tau_s: float, k_scale: float):
         self.phi, self.omega, self.n, self.width, self.dt = 0.0, omega, n_bins, width, dt_s
+        self.k_scale = k_scale
+        self.alpha_r = min(1.0, dt_s / resid_tau_s)
         self.eta, self.k_phase, self.k_rate = eta, k_phase, k_rate
         self.map = np.zeros((n_bins, 2))
         self.conf = np.zeros(n_bins)                   # how much each bin has learned
         self.err = np.nan                              # smoothed mismatch, normalised units
+        self.resid = np.zeros(2)                       # smoothed (obs - map), carried into predictions
+        self.pull = 0.0                                # smoothed signed pull on the clock: sustained = off-pattern
+        self.snapshot = None                           # (map, conf) once locked: the remembered path, for deviation
+        self.err_snap = np.nan
         self.alpha = min(1.0, dt_s / score_tau_s)
         self.centres = np.arange(n_bins) * TWO_PI / n_bins
 
@@ -26,13 +32,14 @@ class _Clock:
         d = np.angle(np.exp(1j * (self.centres - phi)))          # signed distance on the ring
         return np.exp(-0.5 * (d / self.width) ** 2)
 
-    def read(self, phi) -> np.ndarray:
+    def read(self, phi, snapshot: bool = False) -> np.ndarray:
         """Position at phase(s) `phi`: confidence-weighted average of the nearby bins;
-        NaN where the map is still empty there."""
+        NaN where the map is still empty there. `snapshot`: the remembered path instead."""
+        table, conf = self.snapshot if snapshot and self.snapshot is not None else (self.map, self.conf)
         phi = np.atleast_1d(np.asarray(phi, dtype=float))
-        w = np.exp(-0.5 * (np.angle(np.exp(1j * (self.centres[None] - phi[:, None]))) / self.width) ** 2) * self.conf
+        w = np.exp(-0.5 * (np.angle(np.exp(1j * (self.centres[None] - phi[:, None]))) / self.width) ** 2) * conf
         s = w.sum(1)
-        out = (w @ self.map) / np.maximum(s, 1e-9)[:, None]
+        out = (w @ table) / np.maximum(s, 1e-9)[:, None]
         out[s < 0.05] = np.nan
         return out
 
@@ -41,9 +48,10 @@ class _Clock:
         the adaptive-frequency-oscillator rule (Righetti, Buchli & Ijspeert 2006): the input
         pulls the phase and the rate through F sin(phi), independent of the map."""
         if np.isfinite(drive):
-            pull = drive * np.sin(self.phi)
+            pull = float(np.clip(drive, -1.5, 1.5)) * np.sin(self.phi) * self.omega   # in the clock's own units
+            self.pull += self.alpha * (pull / self.omega - self.pull)
             self.phi = (self.phi + (self.omega - self.k_phase * pull) * self.dt) % TWO_PI
-            self.omega = float(np.clip(self.omega - self.k_rate * pull * self.dt, 0.3, 20.0))
+            self.omega = float(np.clip(self.omega - self.k_rate * pull * self.dt, TWO_PI / 6.0, TWO_PI / 0.5))
         else:
             self.phi = (self.phi + self.omega * self.dt) % TWO_PI
         if not np.isfinite(obs).all():
@@ -52,6 +60,15 @@ class _Clock:
         if np.isfinite(p).all():
             e = float(np.hypot(*(obs - p)))
             self.err = e if np.isnan(self.err) else self.err + self.alpha * (e - self.err)
+            if self.snapshot is not None:
+                es = float(np.hypot(*(obs - self.read(self.phi, snapshot=True)[0])))
+                self.err_snap = es if np.isnan(self.err_snap) else self.err_snap + self.alpha * (es - self.err_snap)
+            self.resid += self.alpha_r * (obs - p - self.resid)
+            if self.k_scale > 0 and self.conf.sum() > 2 * self.n:
+                centre = (self.map * self.conf[:, None]).sum(0) / self.conf.sum()
+                radial = p - centre
+                s = float((obs - p) @ radial) / (float(radial @ radial) + 1e-6)
+                self.map = centre + (1.0 + self.k_scale * s * self.dt) * (self.map - centre)
         g = self._weights(self.phi)
         rate = np.maximum(self.eta, g / (self.conf + 1.0))       # running mean at first, then a steady step
         self.map += (rate * g)[:, None] * (obs - self.map)
@@ -64,7 +81,16 @@ class _Axis:
 
     def __init__(self, dt_s: float, tau_s: float = 3.0):
         self.a = min(1.0, dt_s / tau_s)
+        self.dt = dt_s
         self.mean, self.cov, self.n = np.zeros(2), np.zeros((2, 2)), 0
+        self.sign, self.crossings, self.t = 0, [], 0.0
+
+    def period_zc(self) -> float:
+        """Period from the drive's upward zero crossings (with hysteresis), NaN before two."""
+        if len(self.crossings) < 3:
+            return np.nan
+        gaps = np.diff(self.crossings[-6:])
+        return float(np.median(gaps)) if gaps.std() < 0.15 * gaps.mean() else np.nan     # only when steady
 
     def drive(self, obs: np.ndarray) -> float:
         if not np.isfinite(obs).all():
@@ -78,19 +104,34 @@ class _Axis:
             return np.nan
         vals, vecs = np.linalg.eigh(self.cov)
         u, var = vecs[:, -1], max(vals[-1], 1e-8)
-        return float(d @ u) / np.sqrt(2.0 * var)              # unit amplitude for a sinusoid
+        if not hasattr(self, "u") or float(u @ self.u) < 0:  # keep the axis's sign stable
+            u = -u if hasattr(self, "u") else u
+        self.u = u
+        f = float(d @ u) / np.sqrt(2.0 * var)              # unit amplitude for a sinusoid
+        self.t += self.dt
+        if f > 0.3 and self.sign <= 0:
+            if self.sign < 0:
+                self.crossings.append(self.t)
+            self.sign = 1
+        elif f < -0.3 and self.sign >= 0:
+            self.sign = -1
+        return f
 
 
 class PhaseMap:
     """TrajectoryMemory: clocks race, the best is read (`period`, `path_points`, `predict`)."""
 
     def __init__(self, dt_s: float, periods_s=(0.8, 1.3, 2.0, 3.0, 4.0), n_bins: int = 64, width_bins: float = 1.5,
-                 eta: float = 0.05, k_phase: float = 2.0, k_rate: float = 4.0, score_tau_s: float = 0.2,
-                 settle_s: float = 3.0, resolution=(640, 480)):
+                 eta: float = 0.05, k_phase: float = 0.3, k_rate: float = 0.6, score_tau_s: float = 0.2,
+                 settle_s: float = 3.0, resid_tau_s: float = 0.02, resid_decay_s: float = 2.0,
+                 prefer_slow: float = 0.0, k_scale: float = 1.0, elect: str = "zero_crossings", pull_weight: float = 0.0,
+                 snapshot_laps: float = 2.0, resolution=(640, 480)):
         self.dt_s, self.periods_s, self.n_bins = dt_s, tuple(periods_s), n_bins
         self.width = width_bins * TWO_PI / n_bins
         self.eta, self.k_phase, self.k_rate, self.score_tau_s = eta, k_phase, k_rate, score_tau_s
         self.settle_s, self.resolution = settle_s, np.asarray(resolution, dtype=float)
+        self.resid_tau_s, self.resid_decay_s, self.prefer_slow = resid_tau_s, resid_decay_s, prefer_slow
+        self.k_scale, self.elect, self.pull_weight, self.snapshot_laps = k_scale, elect, pull_weight, snapshot_laps
         self.reset()
 
     def fit(self, tracks) -> None:
@@ -98,9 +139,10 @@ class PhaseMap:
 
     def reset(self) -> None:
         self.clocks = [_Clock(TWO_PI / T, self.n_bins, self.width, self.dt_s, self.eta, self.k_phase, self.k_rate,
-                              self.score_tau_s) for T in self.periods_s]
+                              self.score_tau_s, self.resid_tau_s, self.k_scale) for T in self.periods_s]
         self.t = 0.0
         self.best = None
+        self.t_elected = None
         self.last = np.array([np.nan, np.nan])
         self.axis = _Axis(self.dt_s)
 
@@ -114,7 +156,18 @@ class PhaseMap:
             self.last = obs
         errs = np.array([c.err for c in self.clocks])
         if self.t >= self.settle_s and np.isfinite(errs).any():
-            self.best = int(np.nanargmin(errs))
+            good = np.flatnonzero(errs <= np.nanmin(errs) * (1.0 + self.prefer_slow))
+            t_zc = self.axis.period_zc()
+            if self.elect == "zero_crossings" and np.isfinite(t_zc):
+                good = np.flatnonzero(errs <= np.nanmin(errs) * 1.5)
+                self.best = int(min(good, key=lambda i: abs(np.log(TWO_PI / self.clocks[i].omega / t_zc))))
+            else:
+                self.best = int(min(good, key=lambda i: self.clocks[i].omega))
+            if self.t_elected is None:
+                self.t_elected = self.t
+            c = self.clocks[self.best]
+            if c.snapshot is None and self.snapshot_laps > 0 and self.t - self.t_elected >= self.snapshot_laps * TWO_PI / c.omega:
+                c.snapshot = (c.map.copy(), c.conf.copy())          # the remembered path
 
     @property
     def _clock(self):
@@ -124,12 +177,15 @@ class PhaseMap:
         c = self._clock
         if c is None:
             return tuple(self.last)
-        p = c.read(c.phi + c.omega * horizon_s)[0]
+        p = c.read(c.phi + c.omega * horizon_s)[0] + c.resid * np.exp(-horizon_s / self.resid_decay_s)
         return tuple(p) if np.isfinite(p).all() else tuple(self.last)
 
     def deviation_score(self) -> float:
         c = self._clock
-        return 0.0 if c is None or np.isnan(c.err) else float(c.err * self.resolution[0])
+        if c is None or np.isnan(c.err):
+            return 0.0
+        err = c.err_snap if np.isfinite(c.err_snap) else c.err
+        return float(err * self.resolution[0] + self.pull_weight * abs(c.pull))
 
     def period(self) -> float:
         c = self._clock
