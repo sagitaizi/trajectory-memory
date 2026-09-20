@@ -19,7 +19,9 @@ trajectory-memory/
     model.py
     snn.py                   learned two-timescale memory: place cells -> fast LIF <-> adaptive LIF -> readouts (ablation)
     lmu.py                   Legendre Memory Unit: exact reference; Nengo-built spiking population run in torch
-    snn_lmu.py               Stage-1 memory: fast LIF layer + LMU window memory -> readouts; self-feeds through blanks
+    snn_lmu.py               LMU window memory + fast LIF layer -> readouts (ablation: window recording)
+    phasemap.py              clock-and-map memory, non-spiking reference: adaptive-frequency clocks + online map
+    snn_phasemap.py          Stage-1 memory: the same in spiking neurons (Nengo-built clock populations, ring, PES map)
     augment.py               track-level augmentation for pretraining (flips, shift, scale, stretch)
     localise.py              Stage-1 localiser harness: FrameSet, evaluate_localiser, FrameCentroid
     baseline.py
@@ -113,16 +115,18 @@ class Model:                                       # Localiser + TrajectoryMemor
     def step(self, obs) -> (prediction, deviation_score): ...
 ```
 
-The Stage-1 memory behind this Protocol is `snn_lmu.LmuMemory` (design in `PLAN.md` §C and
-`docs/superpowers/specs/2026-09-19-lmu-memory-design.md`): `PlaceCells` encoder → fast
-recurrent LIF layer (snnTorch) ⊕ a spiking Legendre Memory Unit holding the last 4 s of the
-position (`lmu.py`: Nengo builds the population, torch runs it; nothing in it is learned) →
-horizon heads (25/50 ms from the fast layer, 100/200 ms from both) and a path head (from the
-LMU). When the target is unseen the network feeds its own 25 ms prediction back in. `fit`
-pretrains by BPTT on `data.Track`s with deliberate blanks; `save`/`load` carry the weights,
-the target standardisation and the deviation scales; the checkpoint's `arch` key picks the
-class in `experiment.make_memory`. `snn.SpikingMemory` (two learned recurrent layers) is
-the ablation.
+The Stage-1 memory behind this Protocol is `snn_phasemap.SpikingPhaseMap` (design decided
+2026-09-19/20; `phasemap.PhaseMap` is its non-spiking reference): five **clocks** — 4-D
+LIF populations built by Nengo with the adaptive-frequency-oscillator dynamics as their
+recurrent wiring, run in torch as one batch — lock their phase to the motion's main-axis
+signal; each drives a **ring** of phase cells (a 2-D LIF population) whose connections to a
+position readout are the **map**, learned in the clip by the PES rule. The rate is a slow
+modulatory scalar (a neural integrator would drift). Prediction reads the map at the rotated
+phase plus the smoothed current residual; the clock is elected by the drive's zero-crossing
+period; deviation is the mismatch against a snapshot of the map taken once the mismatch has
+settled (the remembered path), after which the election is committed. Nothing is pretrained:
+the path is learned online. `snn.SpikingMemory` (learned two-timescale) and `snn_lmu.LmuMemory`
+(window recording) are the ablations, kept with their checkpoints.
 
 ### `baseline.py` ✅
 `PeriodicKalman` (harmonic state per coordinate, normalised-innovation surprise) and

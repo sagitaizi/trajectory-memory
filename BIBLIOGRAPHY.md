@@ -52,6 +52,22 @@ manuscript.
 - **Where:** `lmu.py` (`build_population`: NEF principle 3 with a lowpass synapse); the
   plausibility argument in `docs/superpowers/specs/2026-09-19-lmu-memory-design.md`.
 
+### Righetti, Buchli & Ijspeert, 2006 — "Dynamic Hebbian learning in adaptive frequency oscillators"
+- *Physica D* 216(2):269–281.
+- **Why:** an oscillator whose frequency adapts to its input by a local rule (the input pulls
+  the phase and the rate through F·sin φ) locks onto the rhythm of an arbitrary periodic
+  signal without any search. The clock of the clock-and-map memory; its input coupling is
+  computed by the clock population's neurons.
+- **Where:** `phasemap.py` (`_Clock.step`), `snn_phasemap.py` (`clock_dynamics`); `PLAN.md` §C.
+
+### Bekolay et al., 2014 — "Nengo: a Python tool for building large-scale functional brain models"
+- *Frontiers in Neuroinformatics* 7:48.
+- **Why:** the Neural Engineering Framework tooling that solves encoders, decoders and the
+  recurrent weights for a population that computes a given dynamics; used at construction
+  time for the LMU population and the clock populations, which torch then simulates. Also the
+  home of the PES rule (error-driven decoder learning) the map uses.
+- **Where:** `lmu.py` (`build_population`, `build_dynamics`), `snn_phasemap.py`.
+
 ### MacDonald, Lepage, Eden & Eichenbaum, 2011 — "Hippocampal 'time cells' bridge the gap in memory for discontiguous events"
 - *Neuron* 71(4):737–749.
 - **Why:** neurons firing in sequence at successive lags after an event — the brain's version
