@@ -15,7 +15,8 @@ With --model a memory (a baseline now, the SNN later) runs over the clip first a
 its output is drawn live: the measured position (cyan), the prediction for t+horizon
 (magenta, joined to it), and the error and surprise score in a second HUD line.
 
-Needs a clip that has ground truth -- a marked anchor (Setup 4a) or hand-labels.
+Needs a clip that has ground truth -- a marked anchor (Setup 4a) or hand-labels -- unless
+--model is given, in which case an unlabelled clip plays with the model's output alone.
 """
 from __future__ import annotations
 
@@ -212,8 +213,11 @@ def render(clip, t: float, view_window_s: float, view_brightness: int, trail_s: 
     res = clip.meta["resolution"]
     mid = t + view_window_s / 2
     img = accumulate(clip.events, t, view_window_s, res, gain=view_brightness)
-    gt_px = to_pixels(clip.gt(mid), res)[0]
-    trail_px = to_pixels(trail_points(clip.gt, mid, trail_s), res)
+    if clip.gt is None:                                   # unlabelled: the model alone is drawn
+        gt_px, trail_px = np.array([np.nan, np.nan]), np.empty((0, 2))
+    else:
+        gt_px = to_pixels(clip.gt(mid), res)[0]
+        trail_px = to_pixels(trail_points(clip.gt, mid, trail_s), res)
     anchor = clip.meta.get("anchor")
     return _draw(img, gt_px, trail_px, anchor[:2] if anchor else None, view_zoom,
                  label, t, view_window_s, view_brightness,
@@ -321,7 +325,8 @@ def main() -> None:
                    help="the one flag that changes the ground truth: divides "
                         "ticks_per_radian by F, widening the predicted sweep F-fold. "
                         "Nothing on disk is written either way")
-    p.add_argument("--model", metavar="NAME", help="draw a memory's live output (kalman, harmonic, snn)")
+    p.add_argument("--model", metavar="NAME",
+                   help="draw a memory's live output (kalman, harmonic, phasemap, snn_phasemap, snn)")
     p.add_argument("--checkpoint", metavar="PATH", help="SNN weights (default runs/memory/snn.pt)")
     p.add_argument("--horizon", type=float, default=0.1, help="model prediction horizon (s)")
     p.add_argument("--window-us", type=int, default=5000, help="model input window")
@@ -332,8 +337,8 @@ def main() -> None:
     args = p.parse_args()
 
     clip, label = open_clip(args.clip)
-    if clip.gt is None:
-        raise SystemExit(f"{label}: no ground truth (mark an anchor or add hand-labels first)")
+    if clip.gt is None and not args.model:
+        raise SystemExit(f"{label}: no ground truth (mark an anchor or add hand-labels first, or give --model)")
     if args.gt_scale != 1.0:
         clip = rescale_gt(clip, args.gt_scale)
 
