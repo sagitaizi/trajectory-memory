@@ -97,35 +97,41 @@ freely moving real target, with a break signal.
 - **Design** (decided 2026-09-16; rationale in `materials/01-literature/multi-timescale-memory.md`):
   - *Input*: place cells per axis — 32 overlapping Gaussian tuning curves along x and 32
     along y (64 inputs); the encoder is a swappable class so a 2-D grid can replace it.
-  - *Core* (**decided 2026-09-19**, spec `docs/superpowers/specs/2026-09-19-lmu-memory-design.md`):
-    a fast recurrent LIF layer (membrane τ 10–25 ms) takes the input cells plus a `seen`
-    cell, and a **hand-set window memory** sits beside it — a spiking Legendre Memory Unit
-    (`lmu.py`): 48 one-dimensional LIF ensembles (q = 24 per axis, 200 neurons each) whose
-    fixed recurrent wiring, built by Nengo and simulated in torch, holds the last θ = 4 s
-    of the position; nothing in it is learned. Its filtered spikes feed the fast layer
-    (learned) and the readouts. When the target is unseen the network feeds its own 25 ms
-    prediction back in, so the window keeps rolling. The learned two-timescale network
-    (`snn.py`: fast layer ⇄ adaptive-LIF slow layer) is the ablation: under three training
-    signals its path readout stalled at ~72 px on sim (mean-path 120, Kalman 1.5–9) — an
-    adaptive threshold records occupancy, not a sequence.
-  - *Readout*: linear, from a 15 ms low-pass of the spikes. Horizon heads at 25 / 50 ms from
-    the fast layer and 100 / 200 ms from fast ⊕ LMU, each as place cells over the
-    displacement from the anchor (32 per axis, centre of mass, cross-entropy against the true
-    bump); path head from the LMU — period, phase as (cos, sin), mean + 3 harmonics per axis
-    (17 numbers), trained by the **geometric path loss** (px of the drawn cycle + phase +
-    period). A firing-rate regulariser (target 10 %, weight 10) keeps the fast layer active.
-  - *Deviation score*: immediate = smoothed error of the 100 ms head against what arrives;
-    structural = error of the position reconstructed from the path head; each scaled by its
-    on-pattern level on development clips; the score is the larger of the two.
-  - *Training*: surrogate-gradient BPTT in snnTorch, own loop, 5 s chunks with state carried
-    over; loss masked before the first cycle and after a scripted break; deliberate blanks
-    (half the chunks hide 0.25–1 period of observations) so the heads learn to run through
-    the self-fed loop; checkpoint by total validation loss. 200-clip corpus: 119 usable
-    clips, the 81 string-locked ones with the truth standing in; 12 validate. e-prop (local,
-    plausible) is future work.
-- **Built**: `trajmem/snn.py` (ablation), `trajmem/lmu.py` + `trajmem/snn_lmu.py` (the
-  memory), `scripts/train_memory.py --arch lmu` (→ `runs/memory/*.pt`; the checkpoint's
-  `arch` key picks the class), `run_experiment.py --memory snn [--blank T0 T1]`.
+  - *Core* (**decided 2026-09-20**, after the LMU; spec of the LMU attempt in
+    `docs/superpowers/specs/2026-09-19-lmu-memory-design.md`): a **clock and a map**. Five
+    clocks — one batched 4-D LIF population built by Nengo and run in torch, whose recurrent
+    wiring is the adaptive-frequency-oscillator dynamics (Righetti et al. 2006) — lock their
+    phase to the motion's main-axis signal; the rate is a slow modulatory scalar. Each clock
+    drives a ring of 400 phase cells whose connections to a position readout are the map,
+    learned in the clip by the PES rule. Prediction = the map at the rotated phase plus the
+    smoothed current residual; period = the rate; shape = the map; the clock is elected by
+    the drive's zero-crossing period and committed at the snapshot. Nothing is pretrained:
+    the path is learned online within a few laps. `phasemap.py` is the arithmetic reference.
+    Ablations kept with their checkpoints: the learned two-timescale network (`snn.py`) and
+    the LMU window recording (`snn_lmu.py`) — neither could hold the cycle (path 55–72 px).
+  - *Readout*: as above; horizon heads from a learned fast layer are an open addition for
+    the 25–50 ms detail (the two-layer network's fast layer reached 5.6 px at 25 ms).
+  - *Deviation score*: the mismatch between the observed position and the **snapshot** of
+    the map taken once the mismatch has settled after lock-on (the remembered path); the
+    working map keeps adapting for prediction. Without the snapshot the memory re-learns a
+    new path within ~3 laps and the break vanishes from the score.
+  - *Training*: none for the memory. Pretraining on simulation applies to any gradient-trained
+    stage added on top (a fast layer), with the same corpus, blanks and checkpoint rules.
+- **Built**: `trajmem/phasemap.py` (reference), `trajmem/snn_phasemap.py` (the memory),
+  `run_experiment.py --memory snn_phasemap`; the LMU and two-layer memories and their
+  checkpoints stay as ablations (`--memory snn --checkpoint …`).
+- **Numbers** (development set, 100 ms, offset-subtracted; `docs/snn-experiments-log.md` run 12):
+
+  | | pred px | path px | period | AUC | latency s | fp/min |
+  |---|---|---|---|---|---|---|
+  | Kalman | 14.7 | 14.0 | 1.00 | 0.80 | 0.95 | 13.2 |
+  | **SpikingPhaseMap** | **14.3** | **12.4** | 1.00 | **0.99** | **0.11** | **8.1** |
+
+  Prediction is a tie per clip (within 0.3–2 px behind on six, far ahead on two); path
+  better on five of eight; deviation clearly better. Known weak cases: the diagonal sweep
+  locks at half the period; a 3:2 Lissajous has nothing at the fundamental to lock to.
+  **Open: the half-period lock; a fast layer for the short horizons; the held-out set
+  (scored once, at the end).**
 - **Runs so far** (validation sim clips, px median; persistence = the input repeated):
 
   | | 25 ms | 50 ms | 100 ms | 200 ms |

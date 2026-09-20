@@ -57,7 +57,7 @@ def lif_rates(j: torch.Tensor) -> torch.Tensor:
 class SpikingPhaseMap:
     """TrajectoryMemory. Parameters mirror `PhaseMap` where the mechanism is the same."""
 
-    def __init__(self, dt_s: float, periods_s=(0.8, 1.3, 2.0, 3.0, 4.0), n_clock: int = 6000, n_ring: int = 200,
+    def __init__(self, dt_s: float, periods_s=(0.8, 1.3, 2.0, 3.0, 4.0), n_clock: int = 6000, n_ring: int = 400,
                  gamma: float = 2.0, k_phase: float = 0.3, k_rate: float = 0.6, eta: float = 0.02,
                  eta_start: float = 0.3, eta_tau_s: float = 2.0, score_tau_s: float = 0.2, settle_s: float = 3.0,
                  resid_tau_s: float = 0.02, resid_decay_s: float = 2.0, k_scale: float = 1.0,

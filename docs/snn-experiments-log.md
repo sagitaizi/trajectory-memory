@@ -428,3 +428,37 @@ diagonal sweep locks at half the period. Sim: `sim_000` 10.1 vs 9.1, through a 1
 coordinate carries the fundamental, so nothing at the true period drives the clock.
 Snapshot for deviation: without it the memory re-learns the new path after a break within
 ~3 laps and the AUC on `loop_break_01` is 0.58.
+
+## Run 12 — the clock-and-map memory in spiking neurons (2026-09-20)
+
+`trajmem/snn_phasemap.py` (`--memory snn_phasemap`). Built with Nengo, run in torch, as
+the LMU was: the five clocks are one batched 4-D LIF population (6 000 neurons) whose
+recurrent wiring computes the adaptive-frequency-oscillator dynamics — the pull F·sin φ
+and the amplitude term are products the neurons compute — with the phase as (x, y), the
+rate and the drive as inputs; the rate is a slow modulatory scalar updated from the decoded
+F·y, because as an integrator dimension inside the population it drifted the slow clocks
+to the clamp within seconds (a known NEF limitation). Each clock drives a ring of 400
+phase cells (2-D LIF population, unit-circle encoders, 10 ms synapse); the map is the
+ring → position weights learned by the PES rule (normalised LMS: the unnormalised step was
+~0.6 per observation and diverged). Prediction ahead evaluates the ring's rate curves at
+the rotated phase. The output scale adapts about a running centre of the map's own output
+(scaling the weights themselves about the image centre collapsed the map on the fan clip).
+Election, residual carry and the snapshot are the prototype's; election commits at the
+snapshot, and the snapshot waits until the mismatch has stopped falling (≥ 3 laps, ≤ 6
+laps or 12 s). Nothing is pretrained. Cost ~3 ms per step for all five clocks.
+
+Development set, offset-subtracted:
+
+| | pred 100 ms | path px | period | AUC | latency s | fp/min |
+|---|---|---|---|---|---|---|
+| Kalman | 14.7 | 14.0 | 1.00 | 0.80 | 0.95 | 13.2 |
+| PhaseMap (arithmetic) | 14.0 | 14.0 | 1.00 | 1.00 | 0.10 | — |
+| **SpikingPhaseMap** | **14.3** | **12.4** | 1.00 | **0.99** | **0.11** | **8.1** |
+
+Per clip vs the Kalman: prediction within 0.3–2 px behind on six clips, far ahead on two
+(`loop_01` 36 vs 62, horizontal sweep 13.7 vs 17.3) — a tie in substance; path better on
+five of eight; AUC 1.00 / 0.99 vs 0.85 / 0.75 and latency 0.14 / 0.08 s vs 1.49 / 0.40 on
+the two break clips. Known weak cases: the diagonal sweep locks at half the period (both
+versions; the zero-crossing estimate gives T/2 there); a 3:2 Lissajous has no energy at the
+fundamental to lock to. Sweep: ring synapse 10 ms (20 → prediction 18.9; 5 → 16.1); ring
+400 cells over 200: path 13.2 → 12.4.

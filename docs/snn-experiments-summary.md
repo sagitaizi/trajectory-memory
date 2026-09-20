@@ -158,3 +158,38 @@ for period, or 2-D ensembles per pair of orders — a design question for Sagi. 
 prediction back with the two-layer recipe (flips, 40 epochs): every LMU run so far is 12
 epochs without augmentation, so 32 px vs 17 is not yet a like-for-like comparison. (3)
 Through blanks, feed the window's own "one cycle ago" position instead of the 25 ms head.
+
+
+## Where it stands (2026-09-20, afternoon) — the architecture changed
+
+**Why.** Every memory so far tried to store a *recording* of the last few seconds and read
+"period, shape, phase" off it. The Kalman never does that: it keeps a clock hand and a
+drawing, and corrects both a little every step. We built that in neurons.
+
+**The clock-and-map memory.** Five clocks (spiking populations whose wiring makes them
+oscillate and lets the input pull their phase and rate — Righetti's adaptive-frequency
+oscillator) race from different starting rates; the one whose rate matches the motion's
+rhythm is elected. Each clock drives a ring of phase cells; the connections from the ring
+to a position readout are the map — the memory of the path — learned during the clip by a
+local rule. Prediction reads the map a little ahead on the ring; the period is the clock's
+rate; the shape is the map; a deviation is a mismatch against a snapshot of the map taken
+once the memory has locked. Nothing is pretrained. First checked in plain arithmetic
+(`phasemap.py`), then built in spiking neurons (`snn_phasemap.py`): Nengo solves the
+wiring, torch runs it, as with the LMU.
+
+**Numbers** (development set, offset-subtracted, against the Kalman): prediction 14.3 vs
+14.7 px (a tie per clip: slightly behind on six clips, far ahead on two), **path 12.4 vs
+14.0** (better on five of eight), **break AUC 0.99 vs 0.80** with latency 0.11 s vs 0.95
+and fewer false alarms. The prototype in arithmetic is about the same. This is the first
+memory of the project that holds the cycle; the previous best spiking path was 55 px.
+
+**Known weak cases.** The diagonal sweep locks at half the period (both versions); a 3:2
+Lissajous has no energy at the fundamental, so nothing drives the clock at the true period.
+The rate lives outside the population as a slow scalar because a neural integrator drifted.
+
+**Next.** (1) The half-period lock: a second, slower pull toward map consistency once a map
+exists, or a harmonic check in the election. (2) A gradient-trained fast layer for the
+25–50 ms detail on top of the map (snnTorch; the two-layer network's fast layer reached
+5.6 px at 25 ms). (3) The held-out set, scored once. (4) The framework statement for the
+paper: NEF-built populations (Nengo at construction) simulated in torch, a local PES rule
+for the memory, snnTorch for any gradient-trained stage.
