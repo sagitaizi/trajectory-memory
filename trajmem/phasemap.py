@@ -155,6 +155,8 @@ class PhaseMap:
         if np.isfinite(obs).all():
             self.last = obs
         errs = np.array([c.err for c in self.clocks])
+        if self.best is not None and self.clocks[self.best].snapshot is not None:
+            return                                                   # committed: the memory is this clock
         if self.t >= self.settle_s and np.isfinite(errs).any():
             good = np.flatnonzero(errs <= np.nanmin(errs) * (1.0 + self.prefer_slow))
             t_zc = self.axis.period_zc()
@@ -166,8 +168,22 @@ class PhaseMap:
             if self.t_elected is None:
                 self.t_elected = self.t
             c = self.clocks[self.best]
-            if c.snapshot is None and self.snapshot_laps > 0 and self.t - self.t_elected >= self.snapshot_laps * TWO_PI / c.omega:
+            if c.snapshot is None and self.snapshot_laps > 0 and self._settled(c):
                 c.snapshot = (c.map.copy(), c.conf.copy())          # the remembered path
+
+    def _settled(self, c) -> bool:
+        """Snapshot time: at least `snapshot_laps` since election and the mismatch no longer
+        falling by more than 10 % per lap (or six laps, whichever first)."""
+        lap = TWO_PI / c.omega
+        since = self.t - self.t_elected
+        if since < max(3.0, self.snapshot_laps) * lap:
+            return False
+        if since >= min(6 * lap, 12.0):
+            return True
+        hist = getattr(self, "_err_hist", [])
+        hist.append((self.t, c.err))
+        self._err_hist = [(t, e) for t, e in hist if t >= self.t - lap]
+        return len(self._err_hist) > 1 and self._err_hist[-1][1] > 0.9 * self._err_hist[0][1]
 
     @property
     def _clock(self):

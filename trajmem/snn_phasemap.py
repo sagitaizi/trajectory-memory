@@ -62,19 +62,19 @@ class SpikingPhaseMap:
                  eta_start: float = 0.3, eta_tau_s: float = 2.0, score_tau_s: float = 0.2, settle_s: float = 3.0,
                  resid_tau_s: float = 0.02, resid_decay_s: float = 2.0, k_scale: float = 1.0,
                  elect: str = "zero_crossings", snapshot_laps: float = 2.0, kick_s: float = 0.1,
-                 tau_syn_s: float = 0.02, resolution=(640, 480), seed: int = 1, device=None):
+                 tau_syn_s: float = 0.02, tau_ring_s: float = 0.01, resolution=(640, 480), seed: int = 1, device=None):
         self.dt_s, self.periods_s, self.n_clock, self.n_ring = dt_s, tuple(periods_s), n_clock, n_ring
         self.gamma, self.k_phase, self.k_rate = gamma, k_phase, k_rate
         self.eta, self.eta_start, self.eta_tau_s, self.score_tau_s, self.settle_s = eta, eta_start, eta_tau_s, score_tau_s, settle_s
         self.resid_tau_s, self.resid_decay_s, self.k_scale = resid_tau_s, resid_decay_s, k_scale
-        self.elect, self.snapshot_laps, self.kick_s, self.tau_syn_s = elect, snapshot_laps, kick_s, tau_syn_s
+        self.elect, self.snapshot_laps, self.kick_s, self.tau_syn_s, self.tau_ring_s = elect, snapshot_laps, kick_s, tau_syn_s, tau_ring_s
         self.resolution, self.seed = np.asarray(resolution, dtype=float), seed
         self.device = torch.device(device or "cpu")
         torch.set_num_threads(min(4, torch.get_num_threads()))
         wc = build_dynamics(n_clock, 4, 1.7, clock_dynamics(tau_syn_s, gamma, k_phase), in_dims=4,
                             tau_syn=tau_syn_s, seed=seed)      # inputs: kick x, kick y, rate w, drive F
         self.clock = SpikingLmu(wc, dt_s, device=self.device)
-        wr = build_dynamics(n_ring, 2, 1.2, lambda s: [0.0, 0.0], in_dims=2, tau_syn=tau_syn_s, seed=seed + 1)
+        wr = build_dynamics(n_ring, 2, 1.2, lambda s: [0.0, 0.0], in_dims=2, tau_syn=tau_ring_s, seed=seed + 1)
         self.ring = SpikingLmu(wr, dt_s, device=self.device)
         self.B = len(self.periods_s)
         self.alpha = min(1.0, dt_s / score_tau_s)
@@ -99,7 +99,7 @@ class SpikingPhaseMap:
         self.err = np.full(B, np.nan)
         self.err_snap = np.full(B, np.nan)
         self.resid = np.zeros((B, 2))
-        self.best, self.t_elected = None, None
+        self.best, self.t_elected, self._err_hist = None, None, []
         self.last = np.array([np.nan, np.nan])
         self.n_learned = 0
 
@@ -151,7 +151,7 @@ class SpikingPhaseMap:
         self._elect()
 
     def _elect(self) -> None:
-        if self.t < self.settle_s or not np.isfinite(self.err).any():
+        if self.t < self.settle_s or not np.isfinite(self.err).any() or self.snapshot is not None:
             return
         t_zc = self.axis.period_zc()
         if self.elect == "zero_crossings" and np.isfinite(t_zc):
@@ -160,9 +160,20 @@ class SpikingPhaseMap:
             self.best = int(np.nanargmin(self.err))
         if self.t_elected is None:
             self.t_elected = self.t
-        if self.snapshot is None and self.snapshot_laps > 0 and \
-                self.t - self.t_elected >= self.snapshot_laps * TWO_PI / self._omega(self.best):
+        if self.snapshot is None and self.snapshot_laps > 0 and self._settled():
             self.snapshot = self.w_map.clone()
+
+    def _settled(self) -> bool:
+        lap = TWO_PI / self._omega(self.best)
+        since = self.t - self.t_elected
+        if since < max(3.0, self.snapshot_laps) * lap:
+            return False
+        if since >= min(6 * lap, 12.0):
+            return True
+        hist = getattr(self, "_err_hist", [])
+        hist.append((self.t, self.err[self.best]))
+        self._err_hist = [(t, e) for t, e in hist if t >= self.t - lap]
+        return len(self._err_hist) > 1 and self._err_hist[-1][1] > 0.9 * self._err_hist[0][1]
 
     def _omega(self, i: int) -> float:
         return float(self.omega[i])
