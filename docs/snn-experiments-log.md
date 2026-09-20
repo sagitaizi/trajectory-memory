@@ -478,3 +478,11 @@ all samples, otherwise rejection feeds on itself) — helps: prototype pred 14.0
 path 14.0 → 12.7; fast fan mismatch 14.7 → 15.6 (no smoothing; rejects 8 %, the flip
 rate). Spiking with the gate and the wider range: pred 14.5, path 13.4, AUC 1.00.
 The proper answer to the string remains the Stage 1 learned localiser.
+Follow-ups the tests forced: missing and rejected samples must reach the memory as
+*unseen* (holding the last position made it learn a frozen point through blanks); the
+deviation score is computed from the raw observation before the gate (a break is exactly
+what the gate refuses to believe — with the gate in front the score froze); and the
+snapshot is now a **slow map** that consolidates toward the working map, quickly while
+young (rate 1/age) and with a 30 s constant once old — a frozen snapshot taken during a
+re-locking transient stayed 25–35 px off on a clean path. Development set after all of
+this: prototype pred 13.5 / path 13.5 / AUC 1.00; spiking 14.5 / 13.4 / 0.98.

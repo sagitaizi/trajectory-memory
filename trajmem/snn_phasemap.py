@@ -63,7 +63,7 @@ class SpikingPhaseMap:
                  resid_tau_s: float = 0.02, resid_decay_s: float = 2.0, k_scale: float = 1.0,
                  elect: str = "zero_crossings", snapshot_laps: float = 2.0, kick_s: float = 0.1,
                  tau_syn_s: float = 0.02, tau_ring_s: float = 0.01, gate_k: float = 2.0, gate_floor_px: float = 10.0,
-                 resolution=(640, 480), seed: int = 1, device=None):
+                 slow_tau_s: float = 30.0, resolution=(640, 480), seed: int = 1, device=None):
         self.dt_s, self.periods_s, self.n_clock, self.n_ring = dt_s, tuple(periods_s), n_clock, n_ring
         self.gamma, self.k_phase, self.k_rate = gamma, k_phase, k_rate
         self.eta, self.eta_start, self.eta_tau_s, self.score_tau_s, self.settle_s = eta, eta_start, eta_tau_s, score_tau_s, settle_s
@@ -71,6 +71,7 @@ class SpikingPhaseMap:
         self.elect, self.snapshot_laps, self.kick_s, self.tau_syn_s, self.tau_ring_s = elect, snapshot_laps, kick_s, tau_syn_s, tau_ring_s
         self.resolution, self.seed = np.asarray(resolution, dtype=float), seed
         self.gate_k, self.gate_floor_px = gate_k, gate_floor_px
+        self.slow_tau_s = slow_tau_s
         self.alpha_gap = min(1.0, dt_s / 1.0)
         self.device = torch.device(device or "cpu")
         torch.set_num_threads(min(4, torch.get_num_threads()))
@@ -103,7 +104,7 @@ class SpikingPhaseMap:
         self.err_snap = np.full(B, np.nan)
         self.resid = np.zeros((B, 2))
         self.best, self.t_elected, self._err_hist = None, None, []
-        self.gap, self.rejected = np.nan, 0
+        self.gap, self.rejected, self.snap_age = np.nan, 0, 0.0
         self.last = np.array([np.nan, np.nan])
         self.n_learned = 0
 
@@ -126,7 +127,8 @@ class SpikingPhaseMap:
         return obs
 
     def observe(self, x: float, y: float) -> None:
-        obs = self._gate(np.array([x, y], dtype=float))
+        raw_obs = np.array([float(x), float(y)], dtype=float)
+        obs = self._gate(raw_obs)
         self.t += self.dt_s
         drive = self.axis.drive(obs)
         kick = self.t < self.kick_s
@@ -155,6 +157,9 @@ class SpikingPhaseMap:
                 a = self.ring_act / 100.0
                 power = (a * a).sum(1, keepdim=True) + 1e-3                                # normalised LMS
                 self.w_map += eta * ((target[None] - raw) / power)[:, :, None] * a[:, None, :]
+                if self.snapshot is not None:                     # slow map: consolidates quickly while young
+                    self.snap_age += self.dt_s
+                    self.snapshot += (self.dt_s / min(self.slow_tau_s, max(1.0, self.snap_age))) * (self.w_map - self.snapshot)
                 self.n_learned += 1
                 e = err.norm(dim=1).cpu().numpy()
                 self.err = np.where(np.isnan(self.err), e, self.err + self.alpha * (e - self.err))
@@ -163,11 +168,12 @@ class SpikingPhaseMap:
                     radial = pred - self.centre
                     sc = ((err * radial).sum(1) / ((radial * radial).sum(1) + 1e-6)).cpu().numpy()
                     self.gain = np.clip(self.gain * (1.0 + self.k_scale * sc * self.dt_s), 0.5, 1.5)
-                if self.snapshot is not None:
-                    ps = torch.einsum("bcn,bn->bc", self.snapshot, self.ring_act / 100.0)
-                    es = (target[None] - ps).norm(dim=1).cpu().numpy()
-                    self.err_snap = np.where(np.isnan(self.err_snap), es, self.err_snap + self.alpha * (es - self.err_snap))
                 self.last = obs
+            if self.snapshot is not None and np.isfinite(raw_obs).all():                   # scored before the gate
+                ps = torch.einsum("bcn,bn->bc", self.snapshot, self.ring_act / 100.0)
+                r = torch.tensor(raw_obs, dtype=torch.float32, device=self.device)
+                es = (r[None, :] - ps).norm(dim=-1).cpu().numpy()
+                self.err_snap = np.where(np.isnan(self.err_snap), es, self.err_snap + self.alpha * (es - self.err_snap))
         self._elect()
 
     def _elect(self) -> None:

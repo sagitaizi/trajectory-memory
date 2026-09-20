@@ -13,8 +13,9 @@ TWO_PI = 2.0 * np.pi
 
 class _Clock:
     def __init__(self, omega: float, n_bins: int, width: float, dt_s: float, eta: float, k_phase: float,
-                 k_rate: float, score_tau_s: float, resid_tau_s: float, k_scale: float):
+                 k_rate: float, score_tau_s: float, resid_tau_s: float, k_scale: float, slow_tau_s: float):
         self.phi, self.omega, self.n, self.width, self.dt = 0.0, omega, n_bins, width, dt_s
+        self.slow_tau_s, self.snap_age = slow_tau_s, 0.0
         self.k_scale = k_scale
         self.alpha_r = min(1.0, dt_s / resid_tau_s)
         self.eta, self.k_phase, self.k_rate = eta, k_phase, k_rate
@@ -43,6 +44,14 @@ class _Clock:
         out[s < 0.05] = np.nan
         return out
 
+    def score(self, obs: np.ndarray) -> None:
+        """Mismatch against the remembered path, from the raw observation (before the gate:
+        a break is exactly what the gate would refuse to believe)."""
+        if self.snapshot is None or not np.isfinite(obs).all():
+            return
+        es = float(np.hypot(*(obs - self.read(self.phi, snapshot=True)[0])))
+        self.err_snap = es if np.isnan(self.err_snap) else self.err_snap + self.alpha * (es - self.err_snap)
+
     def step(self, obs: np.ndarray, drive: float) -> None:
         """`drive`: the motion's main-axis signal, zero-mean, unit-ish amplitude. Locking is
         the adaptive-frequency-oscillator rule (Righetti, Buchli & Ijspeert 2006): the input
@@ -60,9 +69,6 @@ class _Clock:
         if np.isfinite(p).all():
             e = float(np.hypot(*(obs - p)))
             self.err = e if np.isnan(self.err) else self.err + self.alpha * (e - self.err)
-            if self.snapshot is not None:
-                es = float(np.hypot(*(obs - self.read(self.phi, snapshot=True)[0])))
-                self.err_snap = es if np.isnan(self.err_snap) else self.err_snap + self.alpha * (es - self.err_snap)
             self.resid += self.alpha_r * (obs - p - self.resid)
             if self.k_scale > 0 and self.conf.sum() > 2 * self.n:
                 centre = (self.map * self.conf[:, None]).sum(0) / self.conf.sum()
@@ -73,6 +79,12 @@ class _Clock:
         rate = np.maximum(self.eta, g / (self.conf + 1.0))       # running mean at first, then a steady step
         self.map += (rate * g)[:, None] * (obs - self.map)
         self.conf += g
+        if self.snapshot is not None:                            # the slow map consolidates toward the working one,
+            self.snap_age += self.dt                             # quickly while young, slowly once old
+            a = self.dt / min(self.slow_tau_s, max(1.0, self.snap_age))
+            table, conf = self.snapshot
+            table += a * (self.map - table)
+            conf += a * (self.conf - conf)
 
 
 class _Axis:
@@ -126,7 +138,7 @@ class PhaseMap:
                  settle_s: float = 3.0, resid_tau_s: float = 0.02, resid_decay_s: float = 2.0,
                  prefer_slow: float = 0.0, k_scale: float = 1.0, elect: str = "zero_crossings", pull_weight: float = 0.0,
                  snapshot_laps: float = 2.0, smooth_frac: float = 0.0, smooth_min_s: float = 0.01,
-                 gate_k: float = 2.0, gate_floor_px: float = 10.0, resolution=(640, 480)):
+                 gate_k: float = 2.0, gate_floor_px: float = 10.0, slow_tau_s: float = 30.0, resolution=(640, 480)):
         self.dt_s, self.periods_s, self.n_bins = dt_s, tuple(periods_s), n_bins
         self.width = width_bins * TWO_PI / n_bins
         self.eta, self.k_phase, self.k_rate, self.score_tau_s = eta, k_phase, k_rate, score_tau_s
@@ -135,6 +147,7 @@ class PhaseMap:
         self.k_scale, self.elect, self.pull_weight, self.snapshot_laps = k_scale, elect, pull_weight, snapshot_laps
         self.smooth_frac, self.smooth_min_s, self.gate_k, self.gate_floor_px = smooth_frac, smooth_min_s, gate_k, gate_floor_px
         self.alpha_gap = min(1.0, dt_s / 1.0)             # the gap's level over the last second
+        self.slow_tau_s = slow_tau_s
         self.reset()
 
     def fit(self, tracks) -> None:
@@ -142,7 +155,7 @@ class PhaseMap:
 
     def reset(self) -> None:
         self.clocks = [_Clock(TWO_PI / T, self.n_bins, self.width, self.dt_s, self.eta, self.k_phase, self.k_rate,
-                              self.score_tau_s, self.resid_tau_s, self.k_scale) for T in self.periods_s]
+                              self.score_tau_s, self.resid_tau_s, self.k_scale, self.slow_tau_s) for T in self.periods_s]
         self.t = 0.0
         self.best = None
         self.t_elected = None
@@ -180,6 +193,8 @@ class PhaseMap:
         drive = self.axis.drive(obs)
         for c in self.clocks:
             c.step(obs, drive)
+        if self._clock is not None:
+            self._clock.score(raw)
         if np.isfinite(obs).all():
             self.last = obs
         errs = np.array([c.err for c in self.clocks])
