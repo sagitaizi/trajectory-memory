@@ -11,9 +11,11 @@ ground truth has just been, the marked anchor, and a HUD. The point is to catch 
 ground truth whose *shape* is right but whose scale or sign is not: a marker that
 drifts off the target over a sweep is a calibration error, not a labelling one.
 
-With --model a memory (a baseline now, the SNN later) runs over the clip first and
-its output is drawn live: the measured position (cyan), the prediction for t+horizon
-(magenta, joined to it), and the error and surprise score in a second HUD line.
+With --model a memory runs over the clip first and its output is drawn on playback: the
+measured position (cyan), the prediction for t+horizon (magenta, joined to it), and the
+error and surprise score in a second HUD line. --live steps the memory as the frames
+play instead (the clock-and-map memories keep up with real time; playback pauses while
+a slower model catches up).
 
 Needs a clip that has ground truth -- a marked anchor (Setup 4a) or hand-labels -- unless
 --model is given, in which case an unlabelled clip plays with the model's output alone.
@@ -123,6 +125,40 @@ class ModelOverlay:
         return {"obs_px": self.trace.obs[i] * self.scale, "pred_px": pred,
                 "score": float(self.trace.score[i]), "err_px": float(err),
                 "horizon_s": self.trace.horizon_s}
+
+
+class LiveOverlay:
+    """The memory stepped as the frames come: `at(t)` feeds it every window up to `t`
+    and reports its latest output. Causal, so the picture is what the memory knew then."""
+
+    def __init__(self, memory, clip, window_us: int, horizon_s: float, name: str):
+        from trajmem.frontend import to_position
+
+        self.memory, self.clip, self.name, self.horizon_s = memory, clip, name, horizon_s
+        self.scale = np.array(clip.meta["resolution"], dtype=float)
+        self.windows = to_position(clip, window_us)
+        self.pending = None
+        self.step = {"obs_px": np.array([np.nan, np.nan]), "pred_px": np.array([np.nan, np.nan]),
+                     "score": 0.0, "err_px": np.nan, "horizon_s": horizon_s}
+        memory.reset()
+
+    def at(self, t: float) -> dict:
+        while True:
+            if self.pending is None:
+                self.pending = next(self.windows, None)
+                if self.pending is None:
+                    return self.step
+            tw, x, y = self.pending
+            if tw > t:
+                return self.step
+            self.pending = None
+            self.memory.observe(x, y)
+            pred = np.array(self.memory.predict(self.horizon_s), dtype=float) * self.scale
+            err = np.nan
+            if self.clip.gt is not None and tw + self.horizon_s <= self.clip.duration_us / 1e6:
+                err = float(np.hypot(*(pred - np.asarray(self.clip.gt(tw + self.horizon_s), dtype=float) * self.scale)))
+            self.step = {"obs_px": np.array([x, y]) * self.scale, "pred_px": pred,
+                         "score": float(self.memory.deviation_score()), "err_px": err, "horizon_s": self.horizon_s}
 
 
 def _draw_model(view, step: dict, name: str, z: float) -> None:
@@ -329,6 +365,8 @@ def main() -> None:
                    help="draw a memory's live output (kalman, harmonic, phasemap, snn_phasemap, snn)")
     p.add_argument("--checkpoint", metavar="PATH", help="SNN weights (default runs/memory/snn.pt)")
     p.add_argument("--horizon", type=float, default=0.1, help="model prediction horizon (s)")
+    p.add_argument("--live", action="store_true",
+                   help="step the model as the frames play instead of running it over the clip first")
     p.add_argument("--window-us", type=int, default=5000, help="model input window")
     p.add_argument("--warmup", type=float, default=5.0, help="model period warm-up (s)")
     p.add_argument("--save", nargs="?", const="", metavar="PATH",
@@ -348,8 +386,11 @@ def main() -> None:
 
         memory = make_memory(args.model, dt_s=args.window_us / 1e6, warmup_s=args.warmup,
                              checkpoint=args.checkpoint)
-        trace = evaluate_clip(memory, clip, args.window_us, args.horizon)
-        overlay = ModelOverlay(trace, clip.meta["resolution"], args.model)
+        if args.live:
+            overlay = LiveOverlay(memory, clip, args.window_us, args.horizon, args.model)
+        else:
+            trace = evaluate_clip(memory, clip, args.window_us, args.horizon)
+            overlay = ModelOverlay(trace, clip.meta["resolution"], args.model)
         label = f"{label} + {args.model}"
 
     if args.save is None:
