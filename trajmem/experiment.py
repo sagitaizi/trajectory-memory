@@ -52,12 +52,13 @@ def make_memory(name: str, dt_s: float, **params):
         arch = torch.load(Path(path), map_location="cpu", weights_only=False).get("arch", "two_layer")
         return {"two_layer": SpikingMemory, "lmu": LmuMemory}[arch].load(path, params.get("device"), dt_s)
     from .phasemap import PhaseMap
+    from .snn_phasemap import SpikingPhaseMap
 
-    kinds = {"kalman": PeriodicKalman, "harmonic": HarmonicFit, "phasemap": PhaseMap}
+    kinds = {"kalman": PeriodicKalman, "harmonic": HarmonicFit, "phasemap": PhaseMap, "snn_phasemap": SpikingPhaseMap}
     if name not in kinds:
         raise ValueError(f"unknown memory {name!r}; one of {sorted(kinds) + ['snn']}")
     params = {k: v for k, v in params.items() if k not in ("checkpoint", "device")}
-    if name == "phasemap":
+    if name in ("phasemap", "snn_phasemap"):
         params.pop("warmup_s", None)
     return kinds[name](dt_s=dt_s, **params)
 

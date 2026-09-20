@@ -174,3 +174,27 @@ def state_radii(positions, q: int, theta: float, dt: float, margin: float = 1.25
             if i % 10 == 0:
                 peaks.append(np.abs(st[0]).reshape(-1))
     return np.maximum(np.percentile(np.array(peaks), 99, axis=0) * margin, 0.05)
+
+
+def build_dynamics(n: int, dims: int, radius: float, fn, in_dims: int, tau_syn: float = 0.02,
+                   seed: int = 0, intercepts=None) -> LmuWeights:
+    """One `dims`-D LIF ensemble whose recurrent connection computes `fn(state)` (already in
+    NEF form: tau * f(s) + s for the dynamic dimensions), with `in_dims` inputs entering the
+    last `in_dims` dimensions directly. Same tensors as `build_population`, so `SpikingLmu`
+    runs it; `decoders` read the identity."""
+    import nengo
+
+    with nengo.Network(seed=seed) as net:
+        ens = nengo.Ensemble(n, dims, radius=radius, neuron_type=nengo.LIF(), seed=seed,
+                             **({} if intercepts is None else {"intercepts": intercepts}))
+        out = nengo.Node(size_in=dims)
+        c_id = nengo.Connection(ens, out, synapse=None)
+        c_fn = nengo.Connection(ens, out, function=fn, synapse=None)
+    with nengo.Simulator(net, progress_bar=False) as sim:
+        enc, bias = sim.data[ens].scaled_encoders, sim.data[ens].bias
+        dec, w_rec = sim.data[c_id].weights, sim.data[c_fn].weights
+    w_in = np.zeros((dims, in_dims))
+    w_in[dims - in_dims:, :] = np.eye(in_dims)
+    t = lambda x: torch.tensor(np.asarray(x), dtype=torch.float32)  # noqa: E731
+    return LmuWeights(scaled_encoders=t(enc), bias=t(bias), decoders=t(dec), w_rec=t(w_rec), w_in=t(w_in),
+                      q=dims, theta=0.0, tau_syn=tau_syn, n_channels=1)

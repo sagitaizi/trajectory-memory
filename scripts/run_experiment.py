@@ -34,7 +34,7 @@ from trajmem.data import load_clip, load_recording, slice_clip  # noqa: E402
 from trajmem.experiment import (evaluate_clip, make_memory, open_set,  # noqa: E402
                                 run_set, score_trace)
 
-MEMORIES = ("kalman", "harmonic", "phasemap", "snn")
+MEMORIES = ("kalman", "harmonic", "phasemap", "snn_phasemap", "snn")
 BASELINES = MEMORIES[:2]                          # "all" = the baselines; the SNN needs a checkpoint
 
 
