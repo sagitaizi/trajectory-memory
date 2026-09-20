@@ -462,3 +462,19 @@ the two break clips. Known weak cases: the diagonal sweep locks at half the peri
 versions; the zero-crossing estimate gives T/2 there); a 3:2 Lissajous has no energy at the
 fundamental to lock to. Sweep: ring synapse 10 ms (20 → prediction 18.9; 5 → 16.1); ring
 400 cells over 200: path 13.2 → 12.4.
+
+**Run 13 — the input stage (2026-09-21).** Sagi's live look at the unlabelled fast fan
+(`fan_brush_fast_02`): the centroid flips between brush and string (>40 px jumps on 8.8 %
+of steps, vs 1.9 % on the slow fan) and the path looked wrong. Two causes. (1) The clip's
+period is 0.71 s and the clocks' range stopped at 0.7 s — pinned, no lock; range now
+0.4–6 s (prototype) / 0.4–4.5 s (spiking). (2) The flips. Tried: a period-scaled input
+low-pass (tau = 5 % of the period, lag compensated in the map read) — on the labelled
+development set it *costs* (pred 14.0 → 16.9, path 14.0 → 17.4): a low-pass over 5 % of the
+period cuts the swing's amplitude ~5 % at the turnarounds; off by default (option kept).
+An extra 0.5 s starting clock also cost (elected wrongly on some clips); dropped. **A map
+gate** — once a clock is elected, an observation farther from the map's expectation than
+2 × the smoothed all-sample gap + 10 px is not believed (the tolerance is measured over
+all samples, otherwise rejection feeds on itself) — helps: prototype pred 14.0 → 13.9,
+path 14.0 → 12.7; fast fan mismatch 14.7 → 15.6 (no smoothing; rejects 8 %, the flip
+rate). Spiking with the gate and the wider range: pred 14.5, path 13.4, AUC 1.00.
+The proper answer to the string remains the Stage 1 learned localiser.

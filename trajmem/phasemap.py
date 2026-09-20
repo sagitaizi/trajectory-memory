@@ -51,7 +51,7 @@ class _Clock:
             pull = float(np.clip(drive, -1.5, 1.5)) * np.sin(self.phi) * self.omega   # in the clock's own units
             self.pull += self.alpha * (pull / self.omega - self.pull)
             self.phi = (self.phi + (self.omega - self.k_phase * pull) * self.dt) % TWO_PI
-            self.omega = float(np.clip(self.omega - self.k_rate * pull * self.dt, TWO_PI / 6.0, TWO_PI / 0.5))
+            self.omega = float(np.clip(self.omega - self.k_rate * pull * self.dt, TWO_PI / 6.0, TWO_PI / 0.4))
         else:
             self.phi = (self.phi + self.omega * self.dt) % TWO_PI
         if not np.isfinite(obs).all():
@@ -125,13 +125,16 @@ class PhaseMap:
                  eta: float = 0.05, k_phase: float = 0.3, k_rate: float = 0.6, score_tau_s: float = 0.2,
                  settle_s: float = 3.0, resid_tau_s: float = 0.02, resid_decay_s: float = 2.0,
                  prefer_slow: float = 0.0, k_scale: float = 1.0, elect: str = "zero_crossings", pull_weight: float = 0.0,
-                 snapshot_laps: float = 2.0, resolution=(640, 480)):
+                 snapshot_laps: float = 2.0, smooth_frac: float = 0.0, smooth_min_s: float = 0.01,
+                 gate_k: float = 2.0, gate_floor_px: float = 10.0, resolution=(640, 480)):
         self.dt_s, self.periods_s, self.n_bins = dt_s, tuple(periods_s), n_bins
         self.width = width_bins * TWO_PI / n_bins
         self.eta, self.k_phase, self.k_rate, self.score_tau_s = eta, k_phase, k_rate, score_tau_s
         self.settle_s, self.resolution = settle_s, np.asarray(resolution, dtype=float)
         self.resid_tau_s, self.resid_decay_s, self.prefer_slow = resid_tau_s, resid_decay_s, prefer_slow
         self.k_scale, self.elect, self.pull_weight, self.snapshot_laps = k_scale, elect, pull_weight, snapshot_laps
+        self.smooth_frac, self.smooth_min_s, self.gate_k, self.gate_floor_px = smooth_frac, smooth_min_s, gate_k, gate_floor_px
+        self.alpha_gap = min(1.0, dt_s / 1.0)             # the gap's level over the last second
         self.reset()
 
     def fit(self, tracks) -> None:
@@ -145,10 +148,34 @@ class PhaseMap:
         self.t_elected = None
         self.last = np.array([np.nan, np.nan])
         self.axis = _Axis(self.dt_s)
+        self.filtered = np.array([np.nan, np.nan])       # the input stage: gated, period-scaled smoothing
+        self.rejected = 0
+        self.gap = np.nan                                 # smoothed observation-vs-map gap over all samples
+
+    def _input_stage(self, obs: np.ndarray) -> np.ndarray:
+        """Smooth the observation over a fixed fraction of the locked period, and once
+        locked discount an observation the map does not expect (a centroid flip to the
+        string): the memory's expectation gates its input."""
+        if not np.isfinite(obs).all():
+            return self.filtered
+        c = self._clock
+        tau = self.smooth_min_s if c is None else max(self.smooth_min_s, self.smooth_frac * TWO_PI / c.omega)
+        if c is not None:
+            expected = c.read(c.phi + c.omega * tau)[0]          # the map is learned from the lagged input
+            if np.isfinite(expected).all():
+                gap = float(np.hypot(*(obs - expected)))
+                self.gap = gap if np.isnan(self.gap) else self.gap + self.alpha_gap * (gap - self.gap)
+                if gap > self.gate_k * self.gap + self.gate_floor_px / self.resolution[0]:
+                    self.rejected += 1
+                    return self.filtered
+        a = min(1.0, self.dt_s / tau)
+        self.filtered = obs if not np.isfinite(self.filtered).all() else self.filtered + a * (obs - self.filtered)
+        return self.filtered
 
     def observe(self, x: float, y: float) -> None:
-        obs = np.array([x, y], dtype=float)
+        raw = np.array([x, y], dtype=float)
         self.t += self.dt_s
+        obs = self._input_stage(raw)
         drive = self.axis.drive(obs)
         for c in self.clocks:
             c.step(obs, drive)
@@ -193,7 +220,8 @@ class PhaseMap:
         c = self._clock
         if c is None:
             return tuple(self.last)
-        p = c.read(c.phi + c.omega * horizon_s)[0] + c.resid * np.exp(-horizon_s / self.resid_decay_s)
+        lag = max(self.smooth_min_s, self.smooth_frac * TWO_PI / c.omega)
+        p = c.read(c.phi + c.omega * (horizon_s + lag))[0] + c.resid * np.exp(-horizon_s / self.resid_decay_s)
         return tuple(p) if np.isfinite(p).all() else tuple(self.last)
 
     def deviation_score(self) -> float:

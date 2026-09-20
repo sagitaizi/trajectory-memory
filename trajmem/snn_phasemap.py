@@ -19,7 +19,7 @@ from .lmu import SpikingLmu, build_dynamics
 from .phasemap import TWO_PI, _Axis
 
 # the rate lives in the population as w in [-1, 1] over periods 4.5-0.7 s; the drive is halved
-OMEGA_LO, OMEGA_HI = TWO_PI / 4.5, TWO_PI / 0.7
+OMEGA_LO, OMEGA_HI = TWO_PI / 4.5, TWO_PI / 0.4
 OMEGA_MID, OMEGA_SPAN = (OMEGA_LO + OMEGA_HI) / 2, (OMEGA_HI - OMEGA_LO) / 2
 F_SCALE = 0.5
 
@@ -62,13 +62,16 @@ class SpikingPhaseMap:
                  eta_start: float = 0.3, eta_tau_s: float = 2.0, score_tau_s: float = 0.2, settle_s: float = 3.0,
                  resid_tau_s: float = 0.02, resid_decay_s: float = 2.0, k_scale: float = 1.0,
                  elect: str = "zero_crossings", snapshot_laps: float = 2.0, kick_s: float = 0.1,
-                 tau_syn_s: float = 0.02, tau_ring_s: float = 0.01, resolution=(640, 480), seed: int = 1, device=None):
+                 tau_syn_s: float = 0.02, tau_ring_s: float = 0.01, gate_k: float = 2.0, gate_floor_px: float = 10.0,
+                 resolution=(640, 480), seed: int = 1, device=None):
         self.dt_s, self.periods_s, self.n_clock, self.n_ring = dt_s, tuple(periods_s), n_clock, n_ring
         self.gamma, self.k_phase, self.k_rate = gamma, k_phase, k_rate
         self.eta, self.eta_start, self.eta_tau_s, self.score_tau_s, self.settle_s = eta, eta_start, eta_tau_s, score_tau_s, settle_s
         self.resid_tau_s, self.resid_decay_s, self.k_scale = resid_tau_s, resid_decay_s, k_scale
         self.elect, self.snapshot_laps, self.kick_s, self.tau_syn_s, self.tau_ring_s = elect, snapshot_laps, kick_s, tau_syn_s, tau_ring_s
         self.resolution, self.seed = np.asarray(resolution, dtype=float), seed
+        self.gate_k, self.gate_floor_px = gate_k, gate_floor_px
+        self.alpha_gap = min(1.0, dt_s / 1.0)
         self.device = torch.device(device or "cpu")
         torch.set_num_threads(min(4, torch.get_num_threads()))
         wc = build_dynamics(n_clock, 4, 1.7, clock_dynamics(tau_syn_s, gamma, k_phase), in_dims=4,
@@ -100,13 +103,30 @@ class SpikingPhaseMap:
         self.err_snap = np.full(B, np.nan)
         self.resid = np.zeros((B, 2))
         self.best, self.t_elected, self._err_hist = None, None, []
+        self.gap, self.rejected = np.nan, 0
         self.last = np.array([np.nan, np.nan])
         self.n_learned = 0
 
     # -- one step --
 
+    def _gate(self, obs: np.ndarray) -> np.ndarray:
+        """Once a clock is elected, an observation far from where its map expects the target
+        (a centroid flip to the string) is not believed: the memory's expectation gates
+        its input. The tolerance follows the gap over all samples, so it cannot collapse."""
+        if self.best is None or not np.isfinite(obs).all():
+            return obs
+        expected = self._read(self.best, 0.0)
+        if not np.isfinite(expected).all():
+            return obs
+        gap = float(np.hypot(*(obs - expected)))
+        self.gap = gap if np.isnan(self.gap) else self.gap + self.alpha_gap * (gap - self.gap)
+        if gap > self.gate_k * self.gap + self.gate_floor_px / self.resolution[0]:
+            self.rejected += 1
+            return np.array([np.nan, np.nan])
+        return obs
+
     def observe(self, x: float, y: float) -> None:
-        obs = np.array([x, y], dtype=float)
+        obs = self._gate(np.array([x, y], dtype=float))
         self.t += self.dt_s
         drive = self.axis.drive(obs)
         kick = self.t < self.kick_s
