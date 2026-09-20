@@ -156,8 +156,9 @@ class PhaseMap:
         """Smooth the observation over a fixed fraction of the locked period, and once
         locked discount an observation the map does not expect (a centroid flip to the
         string): the memory's expectation gates its input."""
+        unseen = np.array([np.nan, np.nan])
         if not np.isfinite(obs).all():
-            return self.filtered
+            return unseen
         c = self._clock
         tau = self.smooth_min_s if c is None else max(self.smooth_min_s, self.smooth_frac * TWO_PI / c.omega)
         if c is not None:
@@ -167,7 +168,7 @@ class PhaseMap:
                 self.gap = gap if np.isnan(self.gap) else self.gap + self.alpha_gap * (gap - self.gap)
                 if gap > self.gate_k * self.gap + self.gate_floor_px / self.resolution[0]:
                     self.rejected += 1
-                    return self.filtered
+                    return unseen
         a = min(1.0, self.dt_s / tau)
         self.filtered = obs if not np.isfinite(self.filtered).all() else self.filtered + a * (obs - self.filtered)
         return self.filtered
