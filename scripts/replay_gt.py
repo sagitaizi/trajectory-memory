@@ -202,12 +202,12 @@ def _draw_model(view, step: dict, name: str, z: float) -> None:
     cv2.putText(view, hud, (8, view.shape[0] - 32), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                 (255, 0, 255), 1, cv2.LINE_AA)
     bar = int(min(step["score"], 10.0) / 10.0 * 120)
-    cv2.rectangle(view, (view.shape[1] - 130, view.shape[0] - 40),
-                  (view.shape[1] - 130 + bar, view.shape[0] - 28), (255, 0, 255), -1)
+    cv2.rectangle(view, (view.shape[1] - 130, view.shape[0] - 56),
+                  (view.shape[1] - 130 + bar, view.shape[0] - 46), (255, 0, 255), -1)
 
 
 def _draw(img, gt_px, trail_px, anchor, view_zoom, label, t, view_window_s,
-          view_brightness, ticks, gt_scale=1.0, model=None):
+          view_brightness, ticks, gt_scale=1.0, model=None, footer=_HELP):
     import cv2
 
     z = view_zoom
@@ -244,8 +244,9 @@ def _draw(img, gt_px, trail_px, anchor, view_zoom, label, t, view_window_s,
         hud += f"   gt x{gt_scale:g}"
     cv2.putText(view, hud, (8, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                 (0, 220, 255), 1, cv2.LINE_AA)
-    cv2.putText(view, _HELP, (8, view.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX,
-                0.42, (190, 190, 190), 1, cv2.LINE_AA)
+    if footer:
+        cv2.putText(view, footer, (8, view.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.42, (190, 190, 190), 1, cv2.LINE_AA)
     if model is not None:
         _draw_model(view, model["step"], model["name"], z)
     return view

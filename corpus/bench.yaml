@@ -1,0 +1,23 @@
+# The visual test bench (scripts/bench.py): the clips it renders or plays, each with a
+# pool label shown in the header. Held-out clips stay out; they are scored once, blind.
+# Whether a simulated clip was trained on is worked out per localiser checkpoint.
+clips:
+  # simulated, blob target
+  - {clip: corpus/sim/sim_010.npz, pool: sim blob}
+  - {clip: corpus/sim/sim_006.npz, pool: sim blob}
+  # simulated, sheet target (the wall-target setup)
+  - {clip: corpus/sim/sim_220.npz, pool: sim sheet}
+  - {clip: corpus/sim/sim_237.npz, pool: sim sheet}
+  # real, labelled (development set)
+  - {clip: corpus/real/pendulum/small_01, pool: real labelled}
+  - {clip: corpus/real/pendulum/wide_02, pool: real labelled}
+  - {clip: corpus/real/pendulum/wide_break, pool: real labelled}
+  - {clip: corpus/real/fan/fan_brush_slow_02, pool: real labelled}
+  - {clip: corpus/real/wall_target/loop_01, pool: real labelled}
+  - {clip: corpus/real/wall_target/loop_break_01, pool: real labelled}
+  # real, unlabelled
+  - {clip: corpus/real/fan/fan_brush_fast_02, pool: real unlabelled}
+  - {clip: corpus/real/fan/break/fan_brush_break_02, pool: real unlabelled}
+  - {clip: corpus/real/pendulum/updown_02, pool: real unlabelled}
+  - {clip: corpus/real/wall/scan_pan_fast_break_01, pool: real unlabelled}
+  - {clip: corpus/real/wall/scan_tilt_slow_01, pool: real unlabelled}

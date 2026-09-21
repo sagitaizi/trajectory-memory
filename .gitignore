@@ -25,3 +25,4 @@ runs/
 # Fetched paper PDFs (offline reading; large, not ours to redistribute)
 materials/pdfs/
 !corpus/sets.yaml
+!corpus/bench.yaml
