@@ -193,3 +193,37 @@ exists, or a harmonic check in the election. (2) A gradient-trained fast layer f
 5.6 px at 25 ms). (3) The held-out set, scored once. (4) The framework statement for the
 paper: NEF-built populations (Nengo at construction) simulated in torch, a local PES rule
 for the memory, snnTorch for any gradient-trained stage.
+
+
+## Where it stands (2026-09-22, morning) — the localiser
+
+**What it is.** The other half of Stage 1: a spiking network that looks at each 5 ms event
+frame and says where the target is — or that it isn't there — replacing the classical
+"densest cells" centroid that flipped to the brush's string and to noise clusters. A small
+spiking convolutional net (snnTorch), running continuously over the frames so a few frames
+add up; trained on the simulated clips only, with the real cameras' quirks imitated (stuck
+pixels, a noise floor) and stretches where the target is removed so it learns to say "not
+seen". Nothing real was trained on.
+
+**What it took.** Sparse frames leave a default-initialised spiking net silent, and a silent
+spiking net cannot learn; the fix was to calibrate each layer's gain on a sample of frames
+before training, regularise only the dense layer's rate, and backprop over short chunks
+(0.25 s). A wider net at a lower learning rate then learned steadily: **6.7 px** on
+simulated validation, against ~11 for the classical centroid.
+
+**On the real clips** (against the labels, constant offset removed): on the **fan** — the
+setup the simulator was matched to — it does the job it was built for: the string flips
+are gone (1.5 % → 0), the worst errors shrink (p90 15 → 13 px), the median is a little
+worse (5.2 → 7.9). Feeding it to the memory on the fan gives prediction 6.6 px and path
+4.7 px, versus 7.3 / 6.6 from the centroid and 7.0 / 6.8 for the Kalman — the first place
+the all-spiking pipeline beats the classical one on both numbers. On the **pendulum** it
+removes the jumps but marks a different point of the brush, less precisely (median 23 vs
+8–22). On the **wall target** it fails: that target is a small rectangle on a large
+hand-held sheet whose outline also makes events — nothing like the simulator's blobs — and
+the network mostly says "not there".
+
+**What that means.** The localiser works where the simulator resembles reality and not
+where it doesn't; the gap is simulator content, not the network. Next: a "sheet" target
+family in the simulator (a rectangle outline with a small rectangle inside) and a retrain;
+until then the classical centroid stays the memory's default input, with the spiking
+localiser as the fan's better alternative.

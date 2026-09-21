@@ -505,3 +505,45 @@ prototype not: the gate. Its map read is noisier than the prototype's table, so 
 tolerance rejected legitimate samples and starved the clock's drive. Development set,
 spiking: gate 2.0 → 16.6 / 14.1 / 0.96; off → 13.8 / 13.0 / 0.95; **3.0 → 13.5 / 12.9 /
 0.98** (default now). Prototype 14.5 / 13.1 / 1.00. Kalman 14.7 / 14.0 / 0.80.
+
+## Run 15 — the spiking localiser (2026-09-21, night)
+
+`trajmem/snn_localise.py` (`--localiser snn`, spec
+`docs/superpowers/specs/2026-09-21-spiking-localiser-design.md`): conv 5×5/2 LIF → conv
+5×5/2 LIF → dense LIF → 32 + 32 place cells and a "present" unit, read from a 15 ms
+low-pass; runs continuously over the 5 ms count frames (2 × 60 × 80, hot-pixel filtered),
+one step per frame. Trained on the 200 simulated clips only (180 / 20), augmented per
+clip with 50–400 stuck pixels at 50–1500 events/s, a Poisson noise floor up to 0.5 per
+cell, mirror flips, and up to three blank stretches with the target's events removed
+(`present` False — without these the network never learns to say "not seen").
+
+What it took to train at all: the frames are sparse (0.003 counts per cell on average),
+so the default initialisation leaves the deeper layers silent and the surrogate gradient
+has nothing to work with — `calibrate` scales each layer's weights so its currents reach
+threshold on a sample of frames; the rate regulariser applies to the dense layer only
+(sparse conv activity is what a localiser should have); and BPTT over 0.25 s chunks, not
+2 s (the leak spans a few frames; long chunks dilute the gradient: 114 → 18 px on the
+toy set). The first full run (8/16 channels, 128 hidden, lr 1e-2) stalled at 15–19 px
+on sim validation with a flat training loss from epoch 1; the wide run (16/32, 256,
+lr 3e-3) reached 10.2 px after one epoch and **6.7 px** at epoch 19 (the classical
+centroid: ~11 px on sim against the exact truth). ~9 min per epoch.
+
+Development clips, centroid vs localiser, px against the labels with the constant offset
+removed (median / p90 / share of >40 px jumps):
+
+| clip | centroid | spiking localiser | unseen |
+|---|---|---|---|
+| `small_01` | 7.6 / 15.1 / 1.5 % | 23.1 / 35.9 / 0 | 0 |
+| `wide_02/steady` | 11.9 / 25.8 / 0.9 % | 24.9 / 48.3 / 0 | 0.6 % |
+| `wide_break` | 21.9 / 65.0 / 2.5 % | 25.5 / 48.6 / 0.8 % | 8.5 % |
+| `fan_brush_slow_02` | 5.2 / 15.3 / 1.5 % | 7.9 / 12.7 / 0 | 5.8 % |
+| `loop_01` | 16.2 / 52.2 / 5.7 % | 45.0 / 77.7 / 0.6 % | 2.7 % |
+| `loop_break_01` | 14.0 / 26.4 / 1.1 % | 46.7 / 108 / 0.4 % | 77 % |
+
+It transfers to the fan — the setup the simulator was matched to: the string flips are
+gone and the tail is tighter, the median a little worse. On the pendulum it removes the
+jumps but marks a different point of the brush less precisely. On the wall target it
+fails: the target is a small rectangle printed on a large hand-held sheet whose outline
+also makes events, nothing like the simulator's filled blobs, and the network mostly
+calls it absent. A simulator-content gap, not a network one: a "sheet" target family in
+the simulator is the fix.

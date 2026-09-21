@@ -182,6 +182,16 @@ freely moving real target, with a break signal.
   error (shorter θ / fewer orders, a bank of short windows, 2-D ensembles); prediction
   needs the two-layer recipe (flips, 40 epochs) before a fair comparison; self-feeding
   through blanks drifts (52–65 px in a 1 s blank).**
+- **Localiser (Stage 1's other half)**: `trajmem/snn_localise.py` — a spiking conv net over
+  the 5 ms count frames (place cells + a "present" unit), trained on the simulated clips
+  only with stuck pixels, noise, flips and blank stretches added; `--localiser snn` in
+  `run_experiment.py`, `replay_gt.py`, `check_localiser.py`; spec in
+  `docs/superpowers/specs/2026-09-21-spiking-localiser-design.md`. 6.7 px on simulated
+  validation (centroid ~11). On real clips it transfers to the fan (string flips gone, tail
+  tighter, median 7.9 vs 5.2), partly to the pendulum (no jumps, median worse), and not to
+  the wall target (a rectangle on a moving sheet: nothing like it in the simulator; called
+  absent most of the time). **Open: a "sheet" target family in the simulator, then retrain;
+  the pendulum's reference point.** The classical centroid stays the default input.
 - **Done when:** on real repetitive clips, Stage 1 prediction error beats the classical
   baseline *or* matches it with a stated event-native/latency argument; lock-on within N
   cycles. Bar: Kalman 24.2 px pooled (8.0 on the fan), ~3 px on sim.
