@@ -25,7 +25,7 @@ INPUT_SCALE = 1.0                       # counts per cell -> input current
 
 def augment_frames(frames: np.ndarray, gt: np.ndarray, present: np.ndarray, rng: np.random.Generator,
                    stuck=(50, 400), rate=(50.0, 1500.0), background=(0.0, 0.5), flips: bool = True,
-                   blanks=(0, 3), blank_s=(0.1, 0.6), blank_radius: int = 6, brightness=(0.25, 2.0),
+                   blanks=(0, 3), blank_s=(0.1, 0.6), blank_radius: int = 6, brightness=(0.08, 2.0),
                    dt_s: float = 0.005):
     """What the real cameras add that the simulator does not: a set of stuck pixels firing
     at random high rates for the whole clip, a uniform noise floor, the two mirror flips
