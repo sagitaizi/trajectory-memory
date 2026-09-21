@@ -23,7 +23,8 @@ trajectory-memory/
     phasemap.py              clock-and-map memory, non-spiking reference: adaptive-frequency clocks + online map
     snn_phasemap.py          Stage-1 memory: the same in spiking neurons (Nengo-built clock populations, ring, PES map)
     augment.py               track-level augmentation for pretraining (flips, shift, scale, stretch)
-    localise.py              Stage-1 localiser harness: FrameSet, evaluate_localiser, FrameCentroid
+    localise.py              Stage-1 localiser harness: FrameSet (+ present label), evaluate_localiser, FrameCentroid
+    snn_localise.py          Stage-1 spiking localiser: conv LIF net over count frames -> place cells + present; trained on sim
     baseline.py
     metrics.py
     experiment.py
