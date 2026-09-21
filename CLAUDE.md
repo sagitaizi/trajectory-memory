@@ -63,7 +63,7 @@ Package `trajmem/`. One file, one job.
 | `baseline.py` | Non-SNN comparators (`PeriodicKalman`, `HarmonicFit`). Same interface as `model.py`. |
 | `metrics.py` | Prediction error, lock-on time, deviation AUC / latency / false alarms. |
 | `experiment.py` | `evaluate_clip` (the one loop every method goes through), `score_trace`, clip sets, `run_set`, `make_memory`. |
-| `scripts/` | `make_sim_dataset`, `match_sim_real`, `run_experiment`, `check_localiser`, `replay_gt`, `make_tracks`, `make_frames`, `corpus_summary`, the `mark_*` labelling tools. `README.md` lists the commands. |
+| `scripts/` | `make_sim_dataset`, `match_sim_real`, `run_experiment`, `check_localiser`, `replay_gt`, `bench`, `make_tracks`, `make_frames`, `corpus_summary`, the `mark_*` labelling tools. `README.md` lists the commands. |
 
 ## Key conventions
 

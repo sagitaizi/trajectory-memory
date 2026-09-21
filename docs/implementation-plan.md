@@ -38,6 +38,7 @@ trajectory-memory/
     train_memory.py          pretrain snn.SpikingMemory on tracks.npz -> runs/memory/snn.pt
     corpus_summary.py        verify the corpus, print the §IV-A table
     replay_gt.py             player; --model draws a memory's output live
+    bench.py                 visual test bench: corpus/bench.yaml clips through three pipelines side by side, rendered per iteration (runs/bench/<tag>/) or --live
   tests/
   corpus/                # recorded .aedat4 + generated sim clips + GT (gitignored)
   docs/
