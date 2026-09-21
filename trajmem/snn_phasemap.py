@@ -20,8 +20,8 @@ import torch
 from .lmu import SpikingLmu, build_dynamics
 from .phasemap import TWO_PI, _Axis
 
-# the rate lives in the population as w in [-1, 1] over periods 4.5-0.7 s; the drive is halved
-OMEGA_LO, OMEGA_HI = TWO_PI / 4.5, TWO_PI / 0.4
+# the rate lives in the population as w in [-1, 1] over periods 12-0.4 s; the drive is halved
+OMEGA_LO, OMEGA_HI = TWO_PI / 12.0, TWO_PI / 0.4
 OMEGA_MID, OMEGA_SPAN = (OMEGA_LO + OMEGA_HI) / 2, (OMEGA_HI - OMEGA_LO) / 2
 F_SCALE = 0.5
 
@@ -59,13 +59,13 @@ def lif_rates(j: torch.Tensor) -> torch.Tensor:
 class SpikingPhaseMap:
     """TrajectoryMemory. Parameters mirror `PhaseMap` where the mechanism is the same."""
 
-    def __init__(self, dt_s: float, periods_s=(0.8, 1.3, 2.0, 3.0, 4.0), n_clock: int = 6000, n_ring: int = 400,
+    def __init__(self, dt_s: float, periods_s=(0.8, 1.3, 2.0, 3.0, 4.5, 7.0), n_clock: int = 6000, n_ring: int = 400,
                  gamma: float = 2.0, k_phase: float = 0.3, k_rate: float = 0.6, eta: float = 0.02,
                  eta_start: float = 0.3, eta_tau_s: float = 2.0, score_tau_s: float = 0.2, settle_s: float = 3.0,
                  resid_tau_s: float = 0.02, resid_decay_s: float = 2.0, k_scale: float = 1.0,
                  elect: str = "zero_crossings", snapshot_laps: float = 2.0, kick_s: float = 0.1,
                  tau_syn_s: float = 0.02, tau_ring_s: float = 0.01, gate_k: float = 2.0, gate_floor_px: float = 10.0,
-                 slow_tau_s: float = 30.0, resolution=(640, 480), seed: int = 1, device=None):
+                 slow_tau_s: float = 30.0, commit_cap_s: float = 20.0, resolution=(640, 480), seed: int = 1, device=None):
         self.dt_s, self.periods_s, self.n_clock, self.n_ring = dt_s, tuple(periods_s), n_clock, n_ring
         self.gamma, self.k_phase, self.k_rate = gamma, k_phase, k_rate
         self.eta, self.eta_start, self.eta_tau_s, self.score_tau_s, self.settle_s = eta, eta_start, eta_tau_s, score_tau_s, settle_s
@@ -73,7 +73,7 @@ class SpikingPhaseMap:
         self.elect, self.snapshot_laps, self.kick_s, self.tau_syn_s, self.tau_ring_s = elect, snapshot_laps, kick_s, tau_syn_s, tau_ring_s
         self.resolution, self.seed = np.asarray(resolution, dtype=float), seed
         self.gate_k, self.gate_floor_px = gate_k, gate_floor_px
-        self.slow_tau_s = slow_tau_s
+        self.slow_tau_s, self.commit_cap_s = slow_tau_s, commit_cap_s
         self.device = torch.device(device or "cpu")
         torch.set_num_threads(min(4, torch.get_num_threads()))
         wc = build_dynamics(n_clock, 4, 1.7, clock_dynamics(tau_syn_s, gamma, k_phase), in_dims=4,
@@ -196,6 +196,10 @@ class SpikingPhaseMap:
         lap = TWO_PI / self._omega(self.best)
         since = self.t - self.t_elected
         if since < max(3.0, self.snapshot_laps) * lap:
+            return False
+        t_zc = self.axis.period_zc()
+        agreed = np.isfinite(t_zc) and abs(np.log(TWO_PI / self._omega(self.best) / t_zc)) < 0.3
+        if not agreed and self.t < self.commit_cap_s:              # no commitment while the rhythm is unconfirmed
             return False
         if since >= min(6 * lap, 12.0):
             return True

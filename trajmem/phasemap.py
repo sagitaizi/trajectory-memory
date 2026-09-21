@@ -62,7 +62,7 @@ class _Clock:
             pull = float(np.clip(drive, -1.5, 1.5)) * np.sin(self.phi) * self.omega   # in the clock's own units
             self.pull += self.alpha * (pull / self.omega - self.pull)
             self.phi = (self.phi + (self.omega - self.k_phase * pull) * self.dt) % TWO_PI
-            self.omega = float(np.clip(self.omega - self.k_rate * pull * self.dt, TWO_PI / 6.0, TWO_PI / 0.4))
+            self.omega = float(np.clip(self.omega - self.k_rate * pull * self.dt, TWO_PI / 12.0, TWO_PI / 0.4))
         else:
             self.phi = (self.phi + self.omega * self.dt) % TWO_PI
         if not np.isfinite(obs).all():
@@ -135,12 +135,13 @@ class _Axis:
 class PhaseMap:
     """TrajectoryMemory: clocks race, the best is read (`period`, `path_points`, `predict`)."""
 
-    def __init__(self, dt_s: float, periods_s=(0.8, 1.3, 2.0, 3.0, 4.0), n_bins: int = 64, width_bins: float = 1.5,
+    def __init__(self, dt_s: float, periods_s=(0.8, 1.3, 2.0, 3.0, 4.5, 7.0), n_bins: int = 64, width_bins: float = 1.5,
                  eta: float = 0.05, k_phase: float = 0.3, k_rate: float = 0.6, score_tau_s: float = 0.2,
                  settle_s: float = 3.0, resid_tau_s: float = 0.02, resid_decay_s: float = 2.0,
                  prefer_slow: float = 0.0, k_scale: float = 1.0, elect: str = "zero_crossings", pull_weight: float = 0.0,
                  snapshot_laps: float = 2.0, smooth_frac: float = 0.0, smooth_min_s: float = 0.01,
-                 gate_k: float = 2.0, gate_floor_px: float = 10.0, slow_tau_s: float = 30.0, resolution=(640, 480)):
+                 gate_k: float = 2.0, gate_floor_px: float = 10.0, slow_tau_s: float = 30.0, commit_cap_s: float = 20.0,
+                 resolution=(640, 480)):
         self.dt_s, self.periods_s, self.n_bins = dt_s, tuple(periods_s), n_bins
         self.width = width_bins * TWO_PI / n_bins
         self.eta, self.k_phase, self.k_rate, self.score_tau_s = eta, k_phase, k_rate, score_tau_s
@@ -148,7 +149,7 @@ class PhaseMap:
         self.resid_tau_s, self.resid_decay_s, self.prefer_slow = resid_tau_s, resid_decay_s, prefer_slow
         self.k_scale, self.elect, self.pull_weight, self.snapshot_laps = k_scale, elect, pull_weight, snapshot_laps
         self.smooth_frac, self.smooth_min_s, self.gate_k, self.gate_floor_px = smooth_frac, smooth_min_s, gate_k, gate_floor_px
-        self.slow_tau_s = slow_tau_s
+        self.slow_tau_s, self.commit_cap_s = slow_tau_s, commit_cap_s
         self.reset()
 
     def fit(self, tracks) -> None:
@@ -225,6 +226,10 @@ class PhaseMap:
         lap = TWO_PI / c.omega
         since = self.t - self.t_elected
         if since < max(3.0, self.snapshot_laps) * lap:
+            return False
+        t_zc = self.axis.period_zc()
+        agreed = np.isfinite(t_zc) and abs(np.log(TWO_PI / c.omega / t_zc)) < 0.3
+        if not agreed and self.t < self.commit_cap_s:              # no commitment while the rhythm is unconfirmed
             return False
         if since >= min(6 * lap, 12.0):
             return True

@@ -2,11 +2,30 @@
 (baseline / fallback). Time surfaces reuse the main repo's pipeline.time_surface."""
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 import numpy as np
 
 from .data import Clip
+
+
+HOT_PIXEL_RATE = 100.0            # events/s over the clip; a target passing a pixel leaves a few per lap
+
+
+def without_hot_pixels(clip: Clip, max_rate: float = HOT_PIXEL_RATE) -> Clip:
+    """The clip minus the events of pixels that fire faster than `max_rate` over its whole
+    length -- stuck pixels, which on the noisier recordings carry a fifth to a third of all
+    events and form dense clusters a centroid mistakes for the target."""
+    if max_rate <= 0 or len(clip.events) == 0:
+        return clip
+    w, h = clip.meta["resolution"]
+    idx = clip.events["y"].astype(np.int64) * w + clip.events["x"].astype(np.int64)
+    rate = np.bincount(idx, minlength=w * h) / max(clip.duration_us / 1e6, 1e-6)
+    hot = rate > max_rate
+    if not hot.any():
+        return clip
+    return replace(clip, events=clip.events[~hot[idx]], meta={**clip.meta, "hot_pixels": int(hot.sum())})
 
 
 def windows(clip: Clip, window_us: int):
@@ -53,7 +72,7 @@ def _count_frame(ev, w: int, h: int, downsample: int) -> np.ndarray:
 
 
 def to_position(clip: Clip, window_us: int, min_events: int = 5, cell_px: int = 16,
-                frac: float = 0.3):
+                frac: float = 0.3, hot_pixel_rate: float = HOT_PIXEL_RATE):
     """(t_s, x, y) per window, normalised to the sensor; NaN where there is too little.
 
     The target is where events are *dense*, not the mean of all of them: noise is
@@ -64,6 +83,7 @@ def to_position(clip: Clip, window_us: int, min_events: int = 5, cell_px: int = 
     """
     w, h = clip.meta["resolution"]
     nx, ny = -(-w // cell_px), -(-h // cell_px)
+    clip = without_hot_pixels(clip, hot_pixel_rate)
     for t0, ev in windows(clip, window_us):
         t_s = (t0 + window_us / 2) / 1e6
         if len(ev) < min_events:
