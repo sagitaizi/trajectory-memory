@@ -3,6 +3,7 @@
     python scripts/check_localiser.py --set development
     python scripts/check_localiser.py corpus/real/fan/fan_brush_slow_02 --window-us 10000
     python scripts/check_localiser.py --set development --localiser frame_centroid --downsample 8
+    python scripts/check_localiser.py --set development --localiser snn      # runs/localiser/snn.pt
 
 Per clip: median and 90th-percentile distance to the labels in px, and the median
 *signed* offset, which tells a labelling-convention gap (a constant offset) from
@@ -22,11 +23,9 @@ import _thesis_path  # noqa: F401,E402  (adds the thesis repo to sys.path)
 import numpy as np  # noqa: E402
 
 from scripts.run_experiment import open_clip  # noqa: E402
-from trajmem.experiment import open_set  # noqa: E402
+from trajmem.experiment import make_localiser, open_set  # noqa: E402
 from trajmem.frontend import to_position  # noqa: E402
-from trajmem.localise import FrameCentroid, evaluate_localiser, frame_set, score_track  # noqa: E402
-
-LOCALISERS = {"frame_centroid": FrameCentroid}
+from trajmem.localise import evaluate_localiser, frame_set, score_track  # noqa: E402
 
 
 def localiser_error(clip, window_us: int) -> dict:
@@ -52,7 +51,9 @@ def main(argv=None) -> None:
     p.add_argument("clip", nargs="?")
     p.add_argument("--set", metavar="NAME")
     p.add_argument("--window-us", type=int, default=5000)
-    p.add_argument("--localiser", default="centroid", help=f"centroid (classical) or one of {sorted(LOCALISERS)}")
+    p.add_argument("--localiser", default="centroid", choices=("centroid", "frame_centroid", "snn"),
+                   help="the classical centroid, or a frame localiser")
+    p.add_argument("--localiser-checkpoint", help="spiking localiser weights (default runs/localiser/snn.pt)")
     p.add_argument("--downsample", type=int, default=8, help="frame block size for frame localisers")
     args = p.parse_args(argv)
 
@@ -63,7 +64,8 @@ def main(argv=None) -> None:
         if args.localiser == "centroid":
             r = localiser_error(clip, args.window_us)
         else:
-            r = frame_localiser_error(clip, args.window_us, args.downsample, LOCALISERS[args.localiser]())
+            r = frame_localiser_error(clip, args.window_us, args.downsample,
+                                      make_localiser(args.localiser, args.localiser_checkpoint))
         print(f"{name:26} {r['median']:7.1f} {r['p90']:7.1f} {r['dx']:+7.1f} {r['dy']:+7.1f} {r['unseen']:7.1%}")
 
 

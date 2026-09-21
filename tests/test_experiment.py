@@ -241,3 +241,18 @@ def test_evaluate_clip_can_hide_a_window_and_score_the_error_inside_it():
     assert 0 < r["blank_px"] < 10.0                                 # HarmonicFit extrapolates through it
     assert np.isnan(score_trace(evaluate_clip(HarmonicFit(dt_s=0.005, warmup_s=3.0), clip, 5000, 0.1),
                                 clip, 10.0, 4.0)["blank_px"])
+
+
+def test_evaluate_clip_with_a_frame_localiser_matches_the_centroid_path():
+    from trajmem.experiment import make_localiser
+    from trajmem.localise import FrameCentroid
+
+    clip = a_clip_of_events(a_spec())
+    ref = evaluate_clip(HarmonicFit(dt_s=0.005, warmup_s=3.0), clip, window_us=5000, horizon_s=0.1)
+    via = evaluate_clip(HarmonicFit(dt_s=0.005, warmup_s=3.0), clip, window_us=5000, horizon_s=0.1,
+                        localiser=FrameCentroid())
+    assert np.allclose(via.t, ref.t)
+    assert np.nanmedian(np.hypot(*(via.obs - ref.obs).T)) * 640 < 2.0        # same positions to a px or two
+    assert make_localiser("centroid") is None and isinstance(make_localiser("frame_centroid"), FrameCentroid)
+    with pytest.raises(ValueError):
+        make_localiser("sideways")

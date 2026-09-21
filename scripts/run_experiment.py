@@ -31,8 +31,8 @@ import _thesis_path  # noqa: F401,E402  (adds the thesis repo to sys.path)
 import numpy as np  # noqa: E402
 
 from trajmem.data import load_clip, load_recording, slice_clip  # noqa: E402
-from trajmem.experiment import (evaluate_clip, make_memory, open_set,  # noqa: E402
-                                run_set, score_trace)
+from trajmem.experiment import (evaluate_clip, make_localiser, make_memory,  # noqa: E402
+                                open_set, run_set, score_trace)
 
 MEMORIES = ("kalman", "harmonic", "phasemap", "snn_phasemap", "snn")
 BASELINES = MEMORIES[:2]                          # "all" = the baselines; the SNN needs a checkpoint
@@ -77,20 +77,21 @@ def run_on_set(set_name: str, names, args) -> None:
     import csv
 
     clips = open_set(set_name)
+    localiser = make_localiser(args.localiser, args.localiser_checkpoint)
     print(f"set {set_name}: {len(clips)} clips with ground truth  window {args.window_us} us  "
-          f"horizon {args.horizon} s  warm-up {args.warmup} s")
+          f"horizon {args.horizon} s  warm-up {args.warmup} s  localiser {args.localiser}")
     out_dir = pathlib.Path("runs/results")
     out_dir.mkdir(parents=True, exist_ok=True)
     for name in names:
         rows, pooled = run_set(lambda: make_memory(name, dt_s=args.window_us / 1e6, warmup_s=args.warmup,
                                                    checkpoint=args.checkpoint),
                                clips, args.window_us, args.horizon, args.tol_px, args.settle,
-                               subtract_offset=args.subtract_offset)
+                               subtract_offset=args.subtract_offset, localiser=localiser)
         print(f"\n[{name}]\n{HEADER}")
         for r in rows:
             print(row(r["name"], r))
         print(row("pooled (medians)", pooled))
-        path = out_dir / f"{set_name}_{name}.csv"
+        path = out_dir / f"{set_name}_{name}{'' if args.localiser == 'centroid' else '_' + args.localiser}.csv"
         with open(path, "w", newline="", encoding="utf-8") as fh:
             w = csv.DictWriter(fh, fieldnames=CSV_FIELDS)
             w.writeheader()
@@ -104,6 +105,9 @@ def main(argv=None) -> None:
     p.add_argument("--set", metavar="NAME", help="score every clip of a set in corpus/sets.yaml")
     p.add_argument("--memory", default="all", help=f"one of {MEMORIES}, or all (= the baselines)")
     p.add_argument("--checkpoint", help="SNN weights (default runs/memory/snn.pt)")
+    p.add_argument("--localiser", default="centroid", choices=("centroid", "frame_centroid", "snn"),
+                   help="where positions come from: the classical centroid or a frame localiser")
+    p.add_argument("--localiser-checkpoint", help="spiking localiser weights (default runs/localiser/snn.pt)")
     p.add_argument("--window-us", type=int, default=5000)
     p.add_argument("--horizon", type=float, default=0.1, help="prediction horizon (s)")
     p.add_argument("--tol-px", type=float, default=15.0, help="lock-on tolerance")
@@ -128,7 +132,8 @@ def main(argv=None) -> None:
     print(HEADER)
     for name in names:
         memory = make_memory(name, dt_s=args.window_us / 1e6, warmup_s=args.warmup, checkpoint=args.checkpoint)
-        trace = evaluate_clip(memory, clip, args.window_us, args.horizon, blank=args.blank)
+        trace = evaluate_clip(memory, clip, args.window_us, args.horizon, blank=args.blank,
+                              localiser=make_localiser(args.localiser, args.localiser_checkpoint))
         print(row(name, score_trace(trace, clip, args.tol_px, args.settle, subtract_offset=args.subtract_offset)))
 
 

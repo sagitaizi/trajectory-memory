@@ -132,12 +132,12 @@ class LiveOverlay:
     """The memory stepped as the frames come: `at(t)` feeds it every window up to `t`
     and reports its latest output. Causal, so the picture is what the memory knew then."""
 
-    def __init__(self, memory, clip, window_us: int, horizon_s: float, name: str):
-        from trajmem.frontend import to_position
+    def __init__(self, memory, clip, window_us: int, horizon_s: float, name: str, localiser=None):
+        from trajmem.experiment import positions
 
         self.memory, self.clip, self.name, self.horizon_s = memory, clip, name, horizon_s
         self.scale = np.array(clip.meta["resolution"], dtype=float)
-        self.windows = to_position(clip, window_us)
+        self.windows = positions(clip, window_us, localiser)
         self.pending = None
         self.step = {"obs_px": np.array([np.nan, np.nan]), "pred_px": np.array([np.nan, np.nan]),
                      "score": 0.0, "err_px": np.nan, "horizon_s": horizon_s}
@@ -406,6 +406,9 @@ def main() -> None:
     p.add_argument("--model", metavar="NAME",
                    help="draw a memory's live output (kalman, harmonic, phasemap, snn_phasemap, snn)")
     p.add_argument("--checkpoint", metavar="PATH", help="SNN weights (default runs/memory/snn.pt)")
+    p.add_argument("--localiser", default="centroid", choices=("centroid", "frame_centroid", "snn"),
+                   help="where the model's positions come from")
+    p.add_argument("--localiser-checkpoint", metavar="PATH", help="spiking localiser weights")
     p.add_argument("--horizon", type=float, default=0.1, help="model prediction horizon (s)")
     p.add_argument("--precompute", action="store_true",
                    help="run the model over the whole clip first instead of stepping it as the frames play")
@@ -428,12 +431,15 @@ def main() -> None:
 
         memory = make_memory(args.model, dt_s=args.window_us / 1e6, warmup_s=args.warmup,
                              checkpoint=args.checkpoint)
+        from trajmem.experiment import make_localiser
+
+        localiser = make_localiser(args.localiser, args.localiser_checkpoint)
         if args.precompute:
-            trace = evaluate_clip(memory, clip, args.window_us, args.horizon)
+            trace = evaluate_clip(memory, clip, args.window_us, args.horizon, localiser=localiser)
             overlay = ModelOverlay(trace, clip.meta["resolution"], args.model)
         else:
-            overlay = LiveOverlay(memory, clip, args.window_us, args.horizon, args.model)
-        label = f"{label} + {args.model}"
+            overlay = LiveOverlay(memory, clip, args.window_us, args.horizon, args.model, localiser)
+        label = f"{label} + {args.model}" + ("" if args.localiser == "centroid" else f" ({args.localiser})")
 
     if args.save is None:
         play(clip, args.fps, args.view_window, args.view_brightness, args.trail,

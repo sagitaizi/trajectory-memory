@@ -18,6 +18,8 @@ from .trajectories import _harmonic_fit, search_period
 
 SETS_PATH = Path(__file__).resolve().parent.parent / "corpus" / "sets.yaml"
 SNN_CHECKPOINT = Path(__file__).resolve().parent.parent / "runs" / "memory" / "snn.pt"
+LOCALISER_CHECKPOINT = Path(__file__).resolve().parent.parent / "runs" / "localiser" / "snn.pt"
+FRAME_DOWNSAMPLE = 8
 CYCLE_POINTS = 64                  # samples per cycle when comparing a remembered path to the truth
 
 
@@ -92,13 +94,44 @@ def reference_cycle(clip: Clip, n: int = CYCLE_POINTS, n_harmonics: int = 3,
     return np.column_stack(cols) @ coef
 
 
-def evaluate_clip(memory, clip: Clip, window_us: int, horizon_s: float, blank=None) -> Trace:
+def make_localiser(name: str, checkpoint=None):
+    """None for the classical centroid (`frontend.to_position`), or a frame localiser:
+    `frame_centroid` (the reference) or `snn` (loaded from `checkpoint`)."""
+    if name in (None, "centroid"):
+        return None
+    if name == "frame_centroid":
+        from .localise import FrameCentroid
+
+        return FrameCentroid()
+    if name == "snn":
+        from .snn_localise import SpikingLocaliser
+
+        return SpikingLocaliser.load(checkpoint or LOCALISER_CHECKPOINT)
+    raise ValueError(f"unknown localiser {name!r}; centroid, frame_centroid or snn")
+
+
+def positions(clip: Clip, window_us: int, localiser=None):
+    """(t, x, y) per window: the classical centroid, or a frame localiser run over the
+    count frames (NaN where it saw nothing)."""
+    if localiser is None:
+        yield from to_position(clip, window_us)
+        return
+    from .frontend import to_frames
+
+    localiser.reset()
+    for t0, frame in to_frames(clip, window_us, kind="count", downsample=FRAME_DOWNSAMPLE):
+        x, y = localiser.locate(frame)
+        yield (t0 + window_us / 2) / 1e6, float(x), float(y)
+
+
+def evaluate_clip(memory, clip: Clip, window_us: int, horizon_s: float, blank=None, localiser=None) -> Trace:
     """Stream the clip through the memory. With `blank` = (t0, t1) the observations in
-    that window are hidden (NaN), the test of a memory that runs on its own."""
+    that window are hidden (NaN), the test of a memory that runs on its own. With a
+    `localiser` the positions come from it instead of the classical centroid."""
     memory.reset()
     period_s = clip_period(clip) if clip.gt is not None else np.nan
     rows, periods, cycles = [], [], []
-    for t, x, y in to_position(clip, window_us):
+    for t, x, y in positions(clip, window_us, localiser):
         if blank is not None and blank[0] <= t < blank[1]:
             x = y = np.nan
         memory.observe(x, y)
@@ -231,12 +264,12 @@ def open_set(name: str, path=None) -> list[tuple[str, Clip]]:
 
 
 def run_set(make_memory_fn, clips, window_us: int, horizon_s: float, tol_px: float,
-            settle_s: float, threshold: float | None = None, subtract_offset: bool = False):
+            settle_s: float, threshold: float | None = None, subtract_offset: bool = False, localiser=None):
     """Score a fresh memory on every clip; return the per-clip rows and a pooled row
     (medians of the per-clip numbers; detection numbers over the break clips only)."""
     rows = []
     for name, clip in clips:
-        trace = evaluate_clip(make_memory_fn(), clip, window_us, horizon_s)
+        trace = evaluate_clip(make_memory_fn(), clip, window_us, horizon_s, localiser=localiser)
         rows.append({"name": name, **score_trace(trace, clip, tol_px, settle_s, threshold, subtract_offset)})
     return rows, pool(rows)
 
