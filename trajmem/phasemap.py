@@ -6,6 +6,8 @@ read. The spiking version is built against this.
 """
 from __future__ import annotations
 
+from collections import deque
+
 import numpy as np
 
 TWO_PI = 2.0 * np.pi
@@ -146,7 +148,6 @@ class PhaseMap:
         self.resid_tau_s, self.resid_decay_s, self.prefer_slow = resid_tau_s, resid_decay_s, prefer_slow
         self.k_scale, self.elect, self.pull_weight, self.snapshot_laps = k_scale, elect, pull_weight, snapshot_laps
         self.smooth_frac, self.smooth_min_s, self.gate_k, self.gate_floor_px = smooth_frac, smooth_min_s, gate_k, gate_floor_px
-        self.alpha_gap = min(1.0, dt_s / 1.0)             # the gap's level over the last second
         self.slow_tau_s = slow_tau_s
         self.reset()
 
@@ -163,7 +164,8 @@ class PhaseMap:
         self.axis = _Axis(self.dt_s)
         self.filtered = np.array([np.nan, np.nan])       # the input stage: gated, period-scaled smoothing
         self.rejected = 0
-        self.gap = np.nan                                 # smoothed observation-vs-map gap over all samples
+        self.gaps = deque(maxlen=200)                     # observation-vs-map gaps over the last second, all samples
+        self.accepted = True
 
     def _input_stage(self, obs: np.ndarray) -> np.ndarray:
         """Smooth the observation over a fixed fraction of the locked period, and once
@@ -178,10 +180,12 @@ class PhaseMap:
             expected = c.read(c.phi + c.omega * tau)[0]          # the map is learned from the lagged input
             if np.isfinite(expected).all():
                 gap = float(np.hypot(*(obs - expected)))
-                self.gap = gap if np.isnan(self.gap) else self.gap + self.alpha_gap * (gap - self.gap)
-                if gap > self.gate_k * self.gap + self.gate_floor_px / self.resolution[0]:
+                self.gaps.append(gap)
+                if gap > self.gate_k * float(np.median(self.gaps)) + self.gate_floor_px / self.resolution[0]:
                     self.rejected += 1
+                    self.accepted = False
                     return unseen
+        self.accepted = True
         a = min(1.0, self.dt_s / tau)
         self.filtered = obs if not np.isfinite(self.filtered).all() else self.filtered + a * (obs - self.filtered)
         return self.filtered

@@ -158,7 +158,8 @@ class LiveOverlay:
             if self.clip.gt is not None and tw + self.horizon_s <= self.clip.duration_us / 1e6:
                 err = float(np.hypot(*(pred - np.asarray(self.clip.gt(tw + self.horizon_s), dtype=float) * self.scale)))
             self.step = {"obs_px": np.array([x, y]) * self.scale, "pred_px": pred,
-                         "score": float(self.memory.deviation_score()), "err_px": err, "horizon_s": self.horizon_s}
+                         "score": float(self.memory.deviation_score()), "err_px": err, "horizon_s": self.horizon_s,
+                         "accepted": bool(getattr(self.memory, "accepted", True))}
 
 
 def _draw_model(view, step: dict, name: str, z: float) -> None:
@@ -171,8 +172,9 @@ def _draw_model(view, step: dict, name: str, z: float) -> None:
         if not np.isnan(ox):
             cv2.line(view, (int(round(ox * z)), int(round(oy * z))), p, (255, 0, 255), 1)
         cv2.circle(view, p, 10, (255, 0, 255), 2)
-    if not np.isnan(ox):
-        cv2.circle(view, (int(round(ox * z)), int(round(oy * z))), 4, (255, 220, 0), -1)
+    if not np.isnan(ox):                                  # dim when the memory did not believe this sample
+        colour = (255, 220, 0) if step.get("accepted", True) else (90, 90, 90)
+        cv2.circle(view, (int(round(ox * z)), int(round(oy * z))), 4, colour, -1)
     err = "err  n/a" if np.isnan(step["err_px"]) else f"err {step['err_px']:5.1f} px"
     hud = f"{name}  +{step['horizon_s'] * 1000:.0f} ms: {err}   surprise {step['score']:5.2f}"
     cv2.putText(view, hud, (8, view.shape[0] - 32), cv2.FONT_HERSHEY_SIMPLEX, 0.5,

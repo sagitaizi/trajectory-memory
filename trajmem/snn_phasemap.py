@@ -12,6 +12,8 @@ scale adaptation and the deviation snapshot are as in the prototype.
 """
 from __future__ import annotations
 
+from collections import deque
+
 import numpy as np
 import torch
 
@@ -72,7 +74,6 @@ class SpikingPhaseMap:
         self.resolution, self.seed = np.asarray(resolution, dtype=float), seed
         self.gate_k, self.gate_floor_px = gate_k, gate_floor_px
         self.slow_tau_s = slow_tau_s
-        self.alpha_gap = min(1.0, dt_s / 1.0)
         self.device = torch.device(device or "cpu")
         torch.set_num_threads(min(4, torch.get_num_threads()))
         wc = build_dynamics(n_clock, 4, 1.7, clock_dynamics(tau_syn_s, gamma, k_phase), in_dims=4,
@@ -104,7 +105,7 @@ class SpikingPhaseMap:
         self.err_snap = np.full(B, np.nan)
         self.resid = np.zeros((B, 2))
         self.best, self.t_elected, self._err_hist = None, None, []
-        self.gap, self.rejected, self.snap_age = np.nan, 0, 0.0
+        self.gaps, self.rejected, self.snap_age, self.accepted = deque(maxlen=200), 0, 0.0, True
         self.last = np.array([np.nan, np.nan])
         self.n_learned = 0
 
@@ -120,10 +121,12 @@ class SpikingPhaseMap:
         if not np.isfinite(expected).all():
             return obs
         gap = float(np.hypot(*(obs - expected)))
-        self.gap = gap if np.isnan(self.gap) else self.gap + self.alpha_gap * (gap - self.gap)
-        if gap > self.gate_k * self.gap + self.gate_floor_px / self.resolution[0]:
+        self.gaps.append(gap)
+        if gap > self.gate_k * float(np.median(self.gaps)) + self.gate_floor_px / self.resolution[0]:
             self.rejected += 1
+            self.accepted = False
             return np.array([np.nan, np.nan])
+        self.accepted = True
         return obs
 
     def observe(self, x: float, y: float) -> None:
