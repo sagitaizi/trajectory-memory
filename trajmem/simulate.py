@@ -37,9 +37,16 @@ def iter_frames(spec: TrajectorySpec, cfg, intrinsics=None):
     optional `string` is a line from a fixed pivot to it, drawn underneath; a target
     on a string hangs along it, as the brush targets in the real corpus do. An
     optional `texture` fills the body with a fixed pattern that moves rigidly with
-    it, so events fire inside the target too, as they do on a real brush.
+    it, so events fire inside the target too, as they do on a real brush. A blob of
+    `kind` "sheet" is the wall-target setup instead: a small rectangle outline (the
+    printed target, whose centre is the path) on a large rectangle outline (the sheet
+    it is held on) that moves rigidly with it -- only the edges make events.
     """
     import cv2
+
+    if cfg["blob"].get("kind") == "sheet":
+        yield from _iter_sheet_frames(spec, cfg, intrinsics)
+        return
 
     w, h = cfg["resolution"]
     if intrinsics is not None and (w, h) != (intrinsics.width, intrinsics.height):
@@ -78,6 +85,31 @@ def iter_frames(spec: TrajectorySpec, cfg, intrinsics=None):
             m[:, 2] += (px[i, 0] - mid, px[i, 1] - mid)
             warped = cv2.warpAffine(patch, m, (w, h), flags=cv2.INTER_LINEAR, borderValue=fg)
             frame[mask > 0] = warped[mask > 0]
+        yield frame
+
+
+def _iter_sheet_frames(spec: TrajectorySpec, cfg, intrinsics=None):
+    import cv2
+
+    w, h = cfg["resolution"]
+    fps = cfg["fps"]
+    n = int(round(cfg["duration_s"] * fps))
+    px = _path_pixels(spec, np.arange(n) / fps, (w, h), intrinsics)
+    blob = cfg["blob"]
+    bg, fg = float(blob["bg_intensity"]), float(blob["fg_intensity"])
+    tw, th = (int(v) for v in blob["target_px"])              # the printed target, full size
+    sw, sh = (int(v) for v in blob["sheet_px"])                # the sheet around it
+    ox, oy = (float(v) for v in blob["sheet_offset"])          # target centre in the sheet, 0-1 of its size
+    thick = int(blob.get("thickness_px", 3))
+    angle = float(blob.get("angle", 0.0))
+    for i in range(n):
+        frame = np.full((h, w), bg, dtype=np.float32)
+        cx, cy = float(px[i, 0]), float(px[i, 1])
+        sheet_c = (cx + (0.5 - ox) * sw, cy + (0.5 - oy) * sh)
+        sheet_fg = bg + float(blob.get("sheet_contrast", 0.35)) * (fg - bg)     # paper edges are faint
+        for centre, size, colour in ((sheet_c, (sw, sh), sheet_fg), ((cx, cy), (tw, th), fg)):
+            box = cv2.boxPoints((centre, size, np.degrees(angle))).astype(np.int32)
+            cv2.polylines(frame, [box], isClosed=True, color=colour, thickness=thick, lineType=cv2.LINE_AA)
         yield frame
 
 

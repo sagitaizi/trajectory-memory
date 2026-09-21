@@ -124,6 +124,17 @@ def random_sim_cfg(rng: np.random.Generator, sim_cfg: dict) -> dict:
                        "scale_px": float(rng.uniform(*ranges["texture_scale_px"])),
                        "seed": int(rng.integers(0, 2**31))}
     blob["string"] = None
+    if sim_cfg.get("kind") == "sheet":                       # the wall-target setup: outlines only
+        blob["kind"] = "sheet"
+        blob["target_px"] = [int(rng.integers(50, 200)), int(rng.integers(25, 100))]
+        blob["sheet_px"] = [int(rng.integers(280, 560)), int(rng.integers(180, 400))]
+        blob["sheet_offset"] = [float(rng.uniform(0.15, 0.85)), float(rng.uniform(0.15, 0.85))]
+        blob["thickness_px"] = int(rng.integers(2, 5))
+        blob["sheet_contrast"] = float(rng.uniform(0.2, 0.5))
+        blob["fg_intensity"] = float(rng.uniform(60, 130))
+        blob["angle"] = float(rng.uniform(-0.15, 0.15))
+        blob["texture"] = {"depth": 0.0, "scale_px": 4.0, "seed": 0}
+        return cfg
     if rng.uniform() < ranges["string_fraction"]:
         lo, hi = ranges["string_thickness_px"]
         blob["string"] = {                       # the pivot sits above the frame
@@ -152,7 +163,7 @@ def manifest_row(name: str, clip) -> dict:
         "fg_intensity": f"{cfg['blob']['fg_intensity']:.1f}",
         "radius_px": cfg["blob"]["radius_px"],
         "aspect": f"{cfg['blob']['aspect']:.2f}",
-        "string": "yes" if cfg["blob"].get("string") else "",
+        "string": "yes" if cfg["blob"].get("string") else ("sheet" if cfg["blob"].get("kind") == "sheet" else ""),
         "texture_depth": f"{cfg['blob']['texture']['depth']:.2f}",
     }
 
@@ -173,15 +184,23 @@ def main(argv=None) -> None:
     parser.add_argument("--params", default="params.yaml")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--no-distortion", action="store_true", help="skip the lens model")
+    parser.add_argument("--start", type=int, default=0, help="first clip index (continue a corpus)")
+    parser.add_argument("--kind", default="blob", choices=("blob", "sheet"),
+                        help="blob (the fan / pendulum targets) or sheet (the wall target on its sheet)")
     args = parser.parse_args(argv)
 
     base = sim_params(args.params)
     base["duration_s"], base["fps"] = args.duration, args.fps
+    if args.kind == "sheet":
+        base["kind"] = "sheet"
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
 
     rows = {}
-    for i in range(args.n):
+    if (out / "manifest.csv").exists():                        # keep the rows of clips made earlier
+        with open(out / "manifest.csv", encoding="utf-8") as fh:
+            rows = {r["name"]: r for r in csv.DictReader(fh)}
+    for i in range(args.start, args.start + args.n):
         name = f"sim_{i:03d}"
         path = out / f"{name}.npz"
         if path.exists():
