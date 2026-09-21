@@ -486,3 +486,22 @@ snapshot is now a **slow map** that consolidates toward the working map, quickly
 young (rate 1/age) and with a 30 s constant once old — a frozen snapshot taken during a
 re-locking transient stayed 25–35 px off on a clean path. Development set after all of
 this: prototype pred 13.5 / path 13.5 / AUC 1.00; spiking 14.5 / 13.4 / 0.98.
+
+**Run 14 — code review, slow clips, and the spiking regression (2026-09-21).** The review
+(eight findings, all fixed) included one behavioural bug: the drive's zero-crossing clock
+advanced only on seen samples, so unseen or gate-rejected windows shortened the measured
+period. Sagi's live look at slow rig scans found the centroid pure noise there: stuck
+pixels carry 20–31 % of all events on the rig recordings (`frontend.without_hot_pixels`,
+> 100 events/s over the clip, clips longer than 5 s), and the slow pans' periods (6–8 s)
+exceeded the clocks' 6 s ceiling (range now 0.4–12 s, a 7 s starting clock, and no
+commitment until the zero-crossing rhythm agrees with the elected clock or 20 s pass —
+otherwise a fast clock commits on a slow, locally linear motion). `scan_pan_slow_02`
+(6.0 s) now locks at 6.41 s with 6 px mismatch; the tilt scan (31 px of motion) and the
+early-stopped break scan do not lock. Residual-fade hypothesis for the 200 ms horizon
+disproven (faster fade: 19.3 → 22.6 px); the residual is informative there.
+
+The spiking version had slipped to 22.7 px prediction (deterministic across runs), the
+prototype not: the gate. Its map read is noisier than the prototype's table, so the same
+tolerance rejected legitimate samples and starved the clock's drive. Development set,
+spiking: gate 2.0 → 16.6 / 14.1 / 0.96; off → 13.8 / 13.0 / 0.95; **3.0 → 13.5 / 12.9 /
+0.98** (default now). Prototype 14.5 / 13.1 / 1.00. Kalman 14.7 / 14.0 / 0.80.

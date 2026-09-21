@@ -64,7 +64,7 @@ class SpikingPhaseMap:
                  eta_start: float = 0.3, eta_tau_s: float = 2.0, score_tau_s: float = 0.2, settle_s: float = 3.0,
                  resid_tau_s: float = 0.02, resid_decay_s: float = 2.0, k_scale: float = 1.0,
                  elect: str = "zero_crossings", snapshot_laps: float = 2.0, kick_s: float = 0.1,
-                 tau_syn_s: float = 0.02, tau_ring_s: float = 0.01, gate_k: float = 2.0, gate_floor_px: float = 10.0,
+                 tau_syn_s: float = 0.02, tau_ring_s: float = 0.01, gate_k: float = 3.0, gate_floor_px: float = 10.0,
                  slow_tau_s: float = 30.0, commit_cap_s: float = 20.0, resolution=(640, 480), seed: int = 1, device=None):
         self.dt_s, self.periods_s, self.n_clock, self.n_ring = dt_s, tuple(periods_s), n_clock, n_ring
         self.gamma, self.k_phase, self.k_rate = gamma, k_phase, k_rate
