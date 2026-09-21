@@ -26,12 +26,14 @@ INPUT_SCALE = 1.0                       # counts per cell -> input current
 def augment_frames(frames: np.ndarray, gt: np.ndarray, present: np.ndarray, rng: np.random.Generator,
                    stuck=(50, 400), rate=(50.0, 1500.0), background=(0.0, 0.5), flips: bool = True,
                    blanks=(0, 3), blank_s=(0.1, 0.6), blank_radius: int = 6, brightness=(0.08, 2.0),
-                   dt_s: float = 0.005):
+                   polarity_swap: bool = True, dt_s: float = 0.005):
     """What the real cameras add that the simulator does not: a set of stuck pixels firing
     at random high rates for the whole clip, a uniform noise floor, the two mirror flips
-    (with the truth), and a brightness scale (a faint real target drives the neurons
-    weakly, and a neuron below threshold answers late -- the network must not depend on
-    the event rate) -- and what the target does on its own: a few stretches where its
+    (with the truth), a brightness scale (a faint real target drives the neurons weakly,
+    and a neuron below threshold answers late -- the network must not depend on the
+    event rate), and an ON/OFF swap (a dark target on a light ground reverses which edge
+    leads; keyed on one polarity the network puts a moving target at its back, which
+    looks like a lag) -- and what the target does on its own: a few stretches where its
     events are gone (the target removed within `blank_radius` cells of the truth,
     `present` False), so the network learns to say "not seen". Frames come back float32."""
     out = frames.astype(np.float32)
@@ -39,6 +41,8 @@ def augment_frames(frames: np.ndarray, gt: np.ndarray, present: np.ndarray, rng:
     gt, present = gt.copy(), present.copy()
     if brightness is not None:
         out *= float(np.exp(rng.uniform(np.log(brightness[0]), np.log(brightness[1]))))
+    if polarity_swap and rng.random() < 0.5:
+        out = out[:, ::-1].copy()
     for _ in range(int(rng.integers(blanks[0], blanks[1] + 1))):
         length = int(rng.uniform(blank_s[0], blank_s[1]) / dt_s)
         start = int(rng.integers(0, max(1, n - length)))

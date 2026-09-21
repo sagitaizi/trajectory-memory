@@ -24,26 +24,26 @@ def test_augmentation_adds_stuck_pixels_and_noise_and_flips_the_truth():
     fs = a_frame_set()
     rng = np.random.default_rng(0)
     f, g, p = augment_frames(fs.frames, fs.gt, fs.present, rng, stuck=(100, 100), rate=(1000, 1000),
-                             background=(0.0, 0.0), flips=False, blanks=(0, 0), brightness=None)
+                             background=(0.0, 0.0), flips=False, blanks=(0, 0), brightness=None, polarity_swap=False)
     assert f.shape == fs.frames.shape and f.dtype == np.float32 and np.array_equal(g, fs.gt) and np.array_equal(p, fs.present)
     added = f - fs.frames
     assert added.min() >= 0 and (added.sum(axis=(0, 1)) > 0).sum() <= 100         # at most 100 stuck cells
     assert added.sum() == pytest.approx(100 * 1000 * 0.005 * len(fs.t), rel=0.15)   # Poisson at rate x dt per frame
     f2, g2, _ = augment_frames(fs.frames, fs.gt, fs.present, np.random.default_rng(1), stuck=(0, 0),
-                               background=(0.3, 0.3), flips=False, blanks=(0, 0), brightness=None)
+                               background=(0.3, 0.3), flips=False, blanks=(0, 0), brightness=None, polarity_swap=False)
     assert (f2 - fs.frames).mean() == pytest.approx(0.3, rel=0.1)
     flipped = False
     for seed in range(20):                                                         # some seed flips horizontally
-        f3, g3, _ = augment_frames(fs.frames, fs.gt, fs.present, np.random.default_rng(seed), stuck=(0, 0), background=(0, 0), blanks=(0, 0), brightness=None)
+        f3, g3, _ = augment_frames(fs.frames, fs.gt, fs.present, np.random.default_rng(seed), stuck=(0, 0), background=(0, 0), blanks=(0, 0), brightness=None, polarity_swap=False)
         if not np.array_equal(g3[:, 0], fs.gt[:, 0]):
             assert np.allclose(g3[:, 0], 1 - fs.gt[:, 0])
             flipped = True
     assert flipped
     f4, _, p4 = augment_frames(fs.frames, fs.gt, fs.present, np.random.default_rng(2), stuck=(0, 0), background=(0, 0),
-                               flips=False, blanks=(2, 2), blank_s=(0.2, 0.2), brightness=None)
+                               flips=False, blanks=(2, 2), blank_s=(0.2, 0.2), brightness=None, polarity_swap=False)
     assert 0 < (~p4).sum() <= 80 and f4[~p4].sum() < fs.frames[~p4].sum() * 0.1     # the target is gone there
     f5, _, _ = augment_frames(fs.frames, fs.gt, fs.present, np.random.default_rng(3), stuck=(0, 0), background=(0, 0),
-                              flips=False, blanks=(0, 0), brightness=(0.5, 0.5))
+                              flips=False, blanks=(0, 0), brightness=(0.5, 0.5), polarity_swap=False)
     assert np.allclose(f5, fs.frames * 0.5)
 
 
