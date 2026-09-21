@@ -168,6 +168,8 @@ def state_radii(positions, q: int, theta: float, dt: float, margin: float = 1.25
     lmu = ExactLmu(q, theta, dt, n_channels=2)
     peaks = []
     for u in positions:
+        u = np.asarray(u, dtype=float)
+        u = u[np.isfinite(u).all(axis=1)]                    # rows without truth are skipped, not integrated
         st = lmu.init_state(1)
         for i in range(len(u)):
             st = lmu.step(u[None, i], st)

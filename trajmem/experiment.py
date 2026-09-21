@@ -70,7 +70,9 @@ def clip_period(clip: Clip) -> float:
         return float(clip.meta["spec"].period_s)
     t_break = min(clip.deviation_times) if clip.deviation_times else clip.duration_us / 1e6
     t = np.arange(0.0, t_break, 0.05)
-    return search_period(t, np.atleast_2d(clip.gt(t)))
+    xy = np.atleast_2d(clip.gt(t))
+    ok = np.isfinite(xy).all(axis=1)
+    return search_period(t[ok], xy[ok])
 
 
 def reference_cycle(clip: Clip, n: int = CYCLE_POINTS, n_harmonics: int = 3,
@@ -80,7 +82,9 @@ def reference_cycle(clip: Clip, n: int = CYCLE_POINTS, n_harmonics: int = 3,
     period_s = clip_period(clip) if period_s is None else period_s
     t_break = min(clip.deviation_times) if clip.deviation_times else clip.duration_us / 1e6
     t = np.arange(0.0, t_break, 0.01)
-    coef, _ = _harmonic_fit(t, np.atleast_2d(clip.gt(t)), period_s, n_harmonics)
+    xy = np.atleast_2d(clip.gt(t))
+    ok = np.isfinite(xy).all(axis=1)
+    coef, _ = _harmonic_fit(t[ok], xy[ok], period_s, n_harmonics)
     phase = np.linspace(0.0, 2.0 * np.pi, n, endpoint=False)
     cols = [np.ones_like(phase)]
     for k in range(1, n_harmonics + 1):

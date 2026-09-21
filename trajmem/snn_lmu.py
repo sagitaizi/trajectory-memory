@@ -225,7 +225,7 @@ class LmuMemory(SpikingMemory):
             mh = np.zeros((n, len(self.horizons_s)), dtype=bool)
             for j, h in enumerate(self.horizons_s):
                 k = round(h / self.dt_s)
-                mh[: n - k, j] = (t[: n - k] >= tr.period_s) & (t[: n - k] + h < dev)
+                mh[: n - k, j] = (t[: n - k] >= tr.period_s) & (t[: n - k] + h < dev) & np.isfinite(gt[k:]).all(-1)
             yp = path_targets(t, gt, tr.period_s, until_s=dev)
             mp = (t >= tr.period_s) & (t < dev)
             out.append({"obs": torch.tensor(obs, dtype=torch.float32), "gt": torch.tensor(gt, dtype=torch.float32),

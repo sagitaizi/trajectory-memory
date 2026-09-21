@@ -161,17 +161,16 @@ class LiveOverlay:
             self.step = {"obs_px": np.array([x, y]) * self.scale, "pred_px": pred,
                          "score": float(self.memory.deviation_score()), "err_px": err, "horizon_s": self.horizon_s,
                          "accepted": bool(getattr(self.memory, "accepted", True)),
-                         "cycle_px": self._cycle(), "period_s": self._period()}
+                         "cycle_px": self._cycle(tw), "period_s": self._period()}
 
     def _period(self) -> float:
         return float(self.memory.period()) if hasattr(self.memory, "period") else np.nan
 
-    def _cycle(self):
+    def _cycle(self, t_now: float):
         """The remembered path as a closed curve (px), every 100 ms of clip time."""
         if not hasattr(self.memory, "path_points") or not np.isfinite(self._period()):
             return getattr(self, "_last_cycle", None)
         self._cycle_due = getattr(self, "_cycle_due", 0.0)
-        t_now = self.pending[0] if self.pending is not None else self._cycle_due
         if t_now >= self._cycle_due:
             pts = self.memory.path_points(np.arange(48) / 48)
             self._last_cycle = None if pts is None or not np.isfinite(pts).all() else np.asarray(pts) * self.scale

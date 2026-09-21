@@ -42,7 +42,7 @@ def open_clip(path, window=None):
     path = pathlib.Path(path)
     clip = load_clip(path) if path.suffix == ".npz" else load_recording(path)
     if clip.gt is None:
-        raise SystemExit(f"{path}: no ground truth to score against")
+        raise SystemExit(f"{path}: no ground truth to score against (replay_gt.py --model plays it unlabelled)")
     return slice_clip(clip, *window) if window else clip
 
 

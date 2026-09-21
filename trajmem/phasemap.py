@@ -107,6 +107,7 @@ class _Axis:
         return float(np.median(gaps)) if gaps.std() < 0.15 * gaps.mean() else np.nan     # only when steady
 
     def drive(self, obs: np.ndarray) -> float:
+        self.t += self.dt                                     # clip time, whether or not the target was seen
         if not np.isfinite(obs).all():
             return np.nan
         self.n += 1
@@ -122,7 +123,6 @@ class _Axis:
             u = -u if hasattr(self, "u") else u
         self.u = u
         f = float(d @ u) / np.sqrt(2.0 * var)              # unit amplitude for a sinusoid
-        self.t += self.dt
         if f > 0.3 and self.sign <= 0:
             if self.sign < 0:
                 self.crossings.append(self.t)
@@ -163,6 +163,7 @@ class PhaseMap:
         self.last = np.array([np.nan, np.nan])
         self.axis = _Axis(self.dt_s)
         self.filtered = np.array([np.nan, np.nan])       # the input stage: gated, period-scaled smoothing
+        self._err_hist = []
         self.rejected = 0
         self.gaps = deque(maxlen=200)                     # observation-vs-map gaps over the last second, all samples
         self.accepted = True
@@ -227,7 +228,7 @@ class PhaseMap:
             return False
         if since >= min(6 * lap, 12.0):
             return True
-        hist = getattr(self, "_err_hist", [])
+        hist = self._err_hist
         hist.append((self.t, c.err))
         self._err_hist = [(t, e) for t, e in hist if t >= self.t - lap]
         return len(self._err_hist) > 1 and self._err_hist[-1][1] > 0.9 * self._err_hist[0][1]

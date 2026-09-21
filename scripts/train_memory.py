@@ -63,7 +63,8 @@ def main(argv=None) -> None:
     p.add_argument("--path-weight", type=float, default=1.0, help="weight of the path-head loss")
     p.add_argument("--path-loss", default="geometric", choices=("geometric", "mse"),
                    help="px of the drawn cycle + phase + period (geometric), or MSE on the raw numbers")
-    p.add_argument("--anchor-tau-s", type=float, default=0.0, help="smoothing of the anchor position (s)")
+    p.add_argument("--anchor-tau-s", type=float, default=None,
+                   help="smoothing of the anchor position (s); default: none for two_layer, 20 ms for lmu")
     p.add_argument("--heads-from", default="fast", choices=("fast", "both", "split"),
                    help="which layer the horizon heads read; split = 25/50 ms fast, 100/200 ms slow")
     p.add_argument("--arch", default="two_layer", choices=("two_layer", "lmu"),
@@ -102,14 +103,15 @@ def main(argv=None) -> None:
         from trajmem.snn_lmu import LmuMemory
 
         memory = LmuMemory(dt_s=dt_s, device=args.device, n_per_axis=args.n_per_axis, n_fast=args.n_fast,
-                           anchor_tau_s=args.anchor_tau_s, q=args.lmu_q, n_per_dim=args.lmu_n,
+                           anchor_tau_s=0.02 if args.anchor_tau_s is None else args.anchor_tau_s,
+                           q=args.lmu_q, n_per_dim=args.lmu_n,
                            theta_s=args.lmu_theta, path_from=args.path_from, path_readout=args.path_readout,
                            seed=args.seed)
         memory.set_radii_from(train)
         fit_extra = {"blank_prob": args.blank_prob, "path_pretrain_steps": args.path_pretrain_steps}
     else:
         memory = SpikingMemory(dt_s=dt_s, device=args.device, n_per_axis=args.n_per_axis,
-                               n_fast=args.n_fast, n_slow=args.n_slow, anchor_tau_s=args.anchor_tau_s,
+                               n_fast=args.n_fast, n_slow=args.n_slow, anchor_tau_s=args.anchor_tau_s or 0.0,
                                heads_from=args.heads_from, seed=args.seed)
         fit_extra = {}
 
