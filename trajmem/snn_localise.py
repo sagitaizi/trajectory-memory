@@ -150,6 +150,7 @@ class SpikingLocaliser:
         self.in_hw, self.resolution, self.seed, self.learn_tau = tuple(in_hw), tuple(resolution), seed, learn_tau
         self.cells = PlaceCells(n_cells)
         self.net = SpikingLocaliserNet(n_cells, ch, hidden, dt_s, in_hw=in_hw, seed=seed, learn_tau=learn_tau).to(self.device)
+        self.val_clips: list[str] | None = None          # names of the clips held out while fitting
         self.reset()
 
     # -- persistence --
@@ -161,7 +162,8 @@ class SpikingLocaliser:
     def save(self, path) -> Path:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        torch.save({"arch": "localiser", "config": self.config(), "state": self.net.state_dict()}, path)
+        torch.save({"arch": "localiser", "config": self.config(), "state": self.net.state_dict(),
+                    "val_clips": self.val_clips}, path)
         return path
 
     @classmethod
@@ -169,6 +171,7 @@ class SpikingLocaliser:
         ck = torch.load(Path(path), map_location="cpu", weights_only=False)
         m = cls(device=device, **{"learn_tau": True, **ck["config"]})       # older checkpoints learned them
         m.net.load_state_dict(ck["state"])
+        m.val_clips = ck.get("val_clips")
         m.reset()
         return m
 

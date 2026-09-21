@@ -21,7 +21,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import _thesis_path  # noqa: F401,E402  (adds the thesis repo to sys.path)
 import numpy as np  # noqa: E402
 
-from trajmem.localise import load_frame_set  # noqa: E402
+from trajmem.localise import load_frame_set, split_frame_sets  # noqa: E402
 from trajmem.snn_localise import SpikingLocaliser  # noqa: E402
 
 
@@ -46,14 +46,12 @@ def main(argv=None) -> None:
     paths = sorted(d.glob("sim_*.npz"))
     if not paths:
         raise SystemExit(f"no frame sets in {d}; run scripts/make_frames.py first")
-    rng = np.random.default_rng(args.seed)
-    order = rng.permutation(len(paths))
-    n_val = max(1, round(len(paths) * args.val_fraction))
-    val = [load_frame_set(paths[i], 5000, 8) for i in order[:n_val]]
-    train = [paths[i] for i in order[n_val:]]                     # loaded per batch
+    train, val_paths = split_frame_sets(paths, args.val_fraction, args.seed)   # train loaded per batch
+    val = [load_frame_set(p, 5000, 8) for p in val_paths]
     print(f"{len(paths)} frame sets: {len(train)} train, {len(val)} validation", flush=True)
 
     loc = SpikingLocaliser(n_cells=args.n_cells, ch=tuple(args.ch), hidden=args.hidden, seed=args.seed, device=args.device)
+    loc.val_clips = [p.stem for p in val_paths]
     out = pathlib.Path(args.out)
     t0 = time.time()
 

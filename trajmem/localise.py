@@ -70,6 +70,15 @@ def load_frame_set(path, window_us: int, downsample: int) -> FrameSet:
         return FrameSet(Path(path).stem, z["frames"], z["t"], z["gt"], window_us, downsample, present)
 
 
+def split_frame_sets(paths, val_fraction: float = 0.1, seed: int = 0) -> tuple[list, list]:
+    """(train, validation) paths: a seeded shuffle, the first tenth validating. The
+    trainer and anything asking "was this clip trained on?" share it."""
+    paths = sorted(paths)
+    order = np.random.default_rng(seed).permutation(len(paths))
+    n_val = max(1, round(len(paths) * val_fraction))
+    return [paths[i] for i in order[n_val:]], [paths[i] for i in order[:n_val]]
+
+
 def load_frame_sets(corpus, window_us: int = 5000, downsample: int = 8) -> list[FrameSet]:
     d = Path(corpus) / f"frames_{downsample}x_{window_us}us"
     return [load_frame_set(p, window_us, downsample) for p in sorted(d.glob("sim_*.npz"))]

@@ -39,3 +39,13 @@ def test_present_marks_frames_where_the_target_can_be_seen():
     assert (~fs2.present[50:80]).all() and fs2.present[:50].all() and fs2.present[80:].all()
     off = FrameSet("z", fs.frames, fs.t, np.full_like(fs.gt, 1.5), 5000, 8)     # truth off the sensor
     assert not off.present.any()
+
+
+def test_split_frame_sets_is_seeded_and_disjoint():
+    from trajmem.localise import split_frame_sets
+
+    paths = [f"sim_{i:03d}" for i in range(50)]
+    train, val = split_frame_sets(paths, 0.1, 0)
+    assert len(val) == 5 and len(train) == 45 and not set(train) & set(val)
+    assert split_frame_sets(paths, 0.1, 0) == (train, val)
+    assert split_frame_sets(paths, 0.1, 1) != (train, val)

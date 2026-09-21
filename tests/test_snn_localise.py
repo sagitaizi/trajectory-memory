@@ -63,7 +63,7 @@ def test_localiser_satisfies_the_protocol_and_learns_to_find_the_blob(tmp_path):
     loc = tiny()
     assert isinstance(loc, Localiser)
     before = score_track(evaluate_localiser(loc, sets[5]), sets[5])
-    log = loc.fit(sets[:5], val_sets=sets[5:], epochs=15, batch=5, augment_kw={"stuck": (20, 60)})
+    log = loc.fit(sets[:5], val_sets=sets[5:], epochs=15, batch=5, augment_kw={"stuck": (20, 60), "brightness": None, "polarity_swap": False})
     after = score_track(evaluate_localiser(loc, sets[5]), sets[5])
     assert np.isfinite(log[-1]["val_px"]) and after["median"] < 60
     empty = FrameSet("e", np.zeros((40, 2, 60, 80), np.uint8), np.arange(40) * 0.005, np.full((40, 2), 0.5), 5000, 8)
@@ -71,3 +71,10 @@ def test_localiser_satisfies_the_protocol_and_learns_to_find_the_blob(tmp_path):
     loc.save(tmp_path / "loc.pt")
     back = SpikingLocaliser.load(tmp_path / "loc.pt")
     assert np.allclose(evaluate_localiser(back, sets[5]), evaluate_localiser(loc, sets[5]), equal_nan=True)
+
+
+def test_checkpoint_keeps_the_validation_clip_names(tmp_path):
+    loc = SpikingLocaliser(n_cells=4, ch=(2, 3), hidden=8, in_hw=(12, 16))
+    loc.val_clips = ["sim_003", "sim_017"]
+    loc.save(tmp_path / "l.pt")
+    assert SpikingLocaliser.load(tmp_path / "l.pt").val_clips == ["sim_003", "sim_017"]
