@@ -11,11 +11,11 @@ ground truth has just been, the marked anchor, and a HUD. The point is to catch 
 ground truth whose *shape* is right but whose scale or sign is not: a marker that
 drifts off the target over a sweep is a calibration error, not a labelling one.
 
-With --model a memory runs over the clip first and its output is drawn on playback: the
+With --model a memory is stepped as the frames play and its output drawn live: the
 measured position (cyan), the prediction for t+horizon (magenta, joined to it), and the
-error and surprise score in a second HUD line. --live steps the memory as the frames
-play instead (the clock-and-map memories keep up with real time; playback pauses while
-a slower model catches up).
+error and surprise score in a second HUD line. The clock-and-map memories keep up with
+real time; a slower model holds the playback while it catches up. --precompute runs the
+model over the whole clip first instead.
 
 Needs a clip that has ground truth -- a marked anchor (Setup 4a) or hand-labels -- unless
 --model is given, in which case an unlabelled clip plays with the model's output alone.
@@ -365,8 +365,8 @@ def main() -> None:
                    help="draw a memory's live output (kalman, harmonic, phasemap, snn_phasemap, snn)")
     p.add_argument("--checkpoint", metavar="PATH", help="SNN weights (default runs/memory/snn.pt)")
     p.add_argument("--horizon", type=float, default=0.1, help="model prediction horizon (s)")
-    p.add_argument("--live", action="store_true",
-                   help="step the model as the frames play instead of running it over the clip first")
+    p.add_argument("--precompute", action="store_true",
+                   help="run the model over the whole clip first instead of stepping it as the frames play")
     p.add_argument("--window-us", type=int, default=5000, help="model input window")
     p.add_argument("--warmup", type=float, default=5.0, help="model period warm-up (s)")
     p.add_argument("--save", nargs="?", const="", metavar="PATH",
@@ -386,11 +386,11 @@ def main() -> None:
 
         memory = make_memory(args.model, dt_s=args.window_us / 1e6, warmup_s=args.warmup,
                              checkpoint=args.checkpoint)
-        if args.live:
-            overlay = LiveOverlay(memory, clip, args.window_us, args.horizon, args.model)
-        else:
+        if args.precompute:
             trace = evaluate_clip(memory, clip, args.window_us, args.horizon)
             overlay = ModelOverlay(trace, clip.meta["resolution"], args.model)
+        else:
+            overlay = LiveOverlay(memory, clip, args.window_us, args.horizon, args.model)
         label = f"{label} + {args.model}"
 
     if args.save is None:
