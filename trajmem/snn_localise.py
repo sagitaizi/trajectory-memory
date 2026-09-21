@@ -65,19 +65,22 @@ class SpikingLocaliserNet(nn.Module):
     """conv -> LIF -> conv -> LIF -> dense LIF -> linear readouts (place cells x, y; present)."""
 
     def __init__(self, n_cells: int = 32, ch=(8, 16), hidden: int = 128, dt_s: float = 0.005,
-                 tau=(0.01, 0.02), readout_tau_s: float = 0.015, in_hw=(60, 80), seed: int = 0):
+                 tau=(0.01, 0.02), readout_tau_s: float = 0.015, in_hw=(60, 80), seed: int = 0,
+                 learn_tau: bool = False):
         super().__init__()
         gen = torch.Generator().manual_seed(seed)
         grad = surrogate.fast_sigmoid(slope=25)
         c1, c2 = ch
+        # Time constants are fixed by default: learnable ones ran to beta = 1 (integrators
+        # that never leak), and the network's answer then trails its input by ~100 ms.
         self.conv1 = nn.Conv2d(2, c1, 5, stride=2, padding=2)
-        self.lif1 = snn.Leaky(beta=_betas(c1, tau, dt_s, gen)[:, None, None], learn_beta=True, spike_grad=grad)
+        self.lif1 = snn.Leaky(beta=_betas(c1, tau, dt_s, gen)[:, None, None], learn_beta=learn_tau, spike_grad=grad)
         self.conv2 = nn.Conv2d(c1, c2, 5, stride=2, padding=2)
-        self.lif2 = snn.Leaky(beta=_betas(c2, tau, dt_s, gen)[:, None, None], learn_beta=True, spike_grad=grad)
+        self.lif2 = snn.Leaky(beta=_betas(c2, tau, dt_s, gen)[:, None, None], learn_beta=learn_tau, spike_grad=grad)
         h, w = in_hw
         self.hw = (c1, math.ceil(h / 2), math.ceil(w / 2)), (c2, math.ceil(h / 4), math.ceil(w / 4))
         self.fc = nn.Linear(c2 * self.hw[1][1] * self.hw[1][2], hidden)
-        self.lif3 = snn.Leaky(beta=_betas(hidden, tau, dt_s, gen), learn_beta=True, spike_grad=grad)
+        self.lif3 = snn.Leaky(beta=_betas(hidden, tau, dt_s, gen), learn_beta=learn_tau, spike_grad=grad)
         self.read = nn.Linear(hidden, 2 * n_cells + 1)
         self.n_cells, self.hidden = n_cells, hidden
         self.alpha = math.exp(-dt_s / readout_tau_s)
@@ -128,23 +131,23 @@ class SpikingLocaliser:
 
     def __init__(self, dt_s: float = 0.005, n_cells: int = 32, ch=(8, 16), hidden: int = 128,
                  present_threshold: float = 0.5, rate_target: float = 0.1, rate_weight: float = 10.0,
-                 in_hw=(60, 80), resolution=(640, 480), seed: int = 0, device=None):
+                 in_hw=(60, 80), resolution=(640, 480), seed: int = 0, learn_tau: bool = False, device=None):
         self.device = torch.device(device or "cpu")
         if self.device.type == "cpu":
             torch.set_num_threads(min(4, torch.get_num_threads()))
             _prefer_performance_cores()
         self.dt_s, self.n_cells, self.ch, self.hidden = dt_s, n_cells, tuple(ch), hidden
         self.present_threshold, self.rate_target, self.rate_weight = present_threshold, rate_target, rate_weight
-        self.in_hw, self.resolution, self.seed = tuple(in_hw), tuple(resolution), seed
+        self.in_hw, self.resolution, self.seed, self.learn_tau = tuple(in_hw), tuple(resolution), seed, learn_tau
         self.cells = PlaceCells(n_cells)
-        self.net = SpikingLocaliserNet(n_cells, ch, hidden, dt_s, in_hw=in_hw, seed=seed).to(self.device)
+        self.net = SpikingLocaliserNet(n_cells, ch, hidden, dt_s, in_hw=in_hw, seed=seed, learn_tau=learn_tau).to(self.device)
         self.reset()
 
     # -- persistence --
 
     def config(self) -> dict:
         return {k: getattr(self, k) for k in ("dt_s", "n_cells", "ch", "hidden", "present_threshold", "rate_target",
-                                              "rate_weight", "in_hw", "resolution", "seed")}
+                                              "rate_weight", "in_hw", "resolution", "seed", "learn_tau")}
 
     def save(self, path) -> Path:
         path = Path(path)
@@ -155,7 +158,7 @@ class SpikingLocaliser:
     @classmethod
     def load(cls, path, device=None) -> "SpikingLocaliser":
         ck = torch.load(Path(path), map_location="cpu", weights_only=False)
-        m = cls(device=device, **ck["config"])
+        m = cls(device=device, **{"learn_tau": True, **ck["config"]})       # older checkpoints learned them
         m.net.load_state_dict(ck["state"])
         m.reset()
         return m
