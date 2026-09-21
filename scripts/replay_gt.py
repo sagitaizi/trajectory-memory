@@ -12,8 +12,9 @@ ground truth whose *shape* is right but whose scale or sign is not: a marker tha
 drifts off the target over a sweep is a calibration error, not a labelling one.
 
 With --model a memory is stepped as the frames play and its output drawn live: the
-measured position (cyan), the prediction for t+horizon (magenta, joined to it), and the
-error and surprise score in a second HUD line. The clock-and-map memories keep up with
+measured position (cyan; grey when the memory rejected it), the prediction for t+horizon
+(magenta, joined to it), the remembered path as a closed orange curve once the memory has
+one, and the error, surprise score and period in a second HUD line. The clock-and-map memories keep up with
 real time; a slower model holds the playback while it catches up. --precompute runs the
 model over the whole clip first instead.
 
@@ -159,12 +160,32 @@ class LiveOverlay:
                 err = float(np.hypot(*(pred - np.asarray(self.clip.gt(tw + self.horizon_s), dtype=float) * self.scale)))
             self.step = {"obs_px": np.array([x, y]) * self.scale, "pred_px": pred,
                          "score": float(self.memory.deviation_score()), "err_px": err, "horizon_s": self.horizon_s,
-                         "accepted": bool(getattr(self.memory, "accepted", True))}
+                         "accepted": bool(getattr(self.memory, "accepted", True)),
+                         "cycle_px": self._cycle(), "period_s": self._period()}
+
+    def _period(self) -> float:
+        return float(self.memory.period()) if hasattr(self.memory, "period") else np.nan
+
+    def _cycle(self):
+        """The remembered path as a closed curve (px), every 100 ms of clip time."""
+        if not hasattr(self.memory, "path_points") or not np.isfinite(self._period()):
+            return getattr(self, "_last_cycle", None)
+        self._cycle_due = getattr(self, "_cycle_due", 0.0)
+        t_now = self.pending[0] if self.pending is not None else self._cycle_due
+        if t_now >= self._cycle_due:
+            pts = self.memory.path_points(np.arange(48) / 48)
+            self._last_cycle = None if pts is None or not np.isfinite(pts).all() else np.asarray(pts) * self.scale
+            self._cycle_due = t_now + 0.1
+        return getattr(self, "_last_cycle", None)
 
 
 def _draw_model(view, step: dict, name: str, z: float) -> None:
     import cv2
 
+    cycle = step.get("cycle_px")
+    if cycle is not None:                                 # the remembered path, as the memory would draw it
+        pts = np.round(cycle * z).astype(np.int32).reshape(-1, 1, 2)
+        cv2.polylines(view, [pts], isClosed=True, color=(0, 160, 255), thickness=1, lineType=cv2.LINE_AA)
     ox, oy = step["obs_px"]
     px, py = step["pred_px"]
     if not np.isnan(px):
@@ -176,7 +197,9 @@ def _draw_model(view, step: dict, name: str, z: float) -> None:
         colour = (255, 220, 0) if step.get("accepted", True) else (90, 90, 90)
         cv2.circle(view, (int(round(ox * z)), int(round(oy * z))), 4, colour, -1)
     err = "err  n/a" if np.isnan(step["err_px"]) else f"err {step['err_px']:5.1f} px"
-    hud = f"{name}  +{step['horizon_s'] * 1000:.0f} ms: {err}   surprise {step['score']:5.2f}"
+    period = step.get("period_s", np.nan)
+    per = "" if period is None or np.isnan(period) else f"   period {period:.2f} s"
+    hud = f"{name}  +{step['horizon_s'] * 1000:.0f} ms: {err}   surprise {step['score']:5.2f}{per}"
     cv2.putText(view, hud, (8, view.shape[0] - 32), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                 (255, 0, 255), 1, cv2.LINE_AA)
     bar = int(min(step["score"], 10.0) / 10.0 * 120)
