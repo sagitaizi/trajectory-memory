@@ -37,6 +37,7 @@ def main(argv=None) -> None:
     p.add_argument("--no-augment", action="store_true")
     p.add_argument("--n-cells", type=int, default=32)
     p.add_argument("--hidden", type=int, default=128)
+    p.add_argument("--ch", type=int, nargs=2, default=(8, 16), metavar=("C1", "C2"), help="conv channels")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--device", default=None)
     args = p.parse_args(argv)
@@ -52,7 +53,7 @@ def main(argv=None) -> None:
     train = [paths[i] for i in order[n_val:]]                     # loaded per batch
     print(f"{len(paths)} frame sets: {len(train)} train, {len(val)} validation", flush=True)
 
-    loc = SpikingLocaliser(n_cells=args.n_cells, hidden=args.hidden, seed=args.seed, device=args.device)
+    loc = SpikingLocaliser(n_cells=args.n_cells, ch=tuple(args.ch), hidden=args.hidden, seed=args.seed, device=args.device)
     out = pathlib.Path(args.out)
     t0 = time.time()
 
