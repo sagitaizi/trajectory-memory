@@ -238,6 +238,19 @@ def _motor_track(clip):
     return MotorTrack.from_csv(motor_sidecar_path(d / f"{clip.meta['slug']}.aedat4"))
 
 
+def _window_events(clip, t: float, window_s: float) -> np.ndarray:
+    """The events in [t, t + window_s), rebased to start at 0. The timestamp field of a
+    structured array is not contiguous, so searching it copies every timestamp; a
+    contiguous copy is kept on the clip and searched instead."""
+    ts = clip.meta.get("_timestamps")
+    if ts is None:
+        ts = clip.meta["_timestamps"] = np.ascontiguousarray(clip.events["timestamp"])
+    lo, hi = np.searchsorted(ts, int(t * 1e6)), np.searchsorted(ts, int((t + window_s) * 1e6))
+    ev = clip.events[lo:hi].copy()
+    ev["timestamp"] -= int(t * 1e6)
+    return ev
+
+
 def render(clip, t: float, view_window_s: float, view_brightness: int, trail_s: float,
            view_zoom: float, label: str, track=None, overlay: ModelOverlay | None = None):
     """One overlaid frame: events in [t, t+view_window) with the ground truth on top.
@@ -248,7 +261,7 @@ def render(clip, t: float, view_window_s: float, view_brightness: int, trail_s: 
     """
     res = clip.meta["resolution"]
     mid = t + view_window_s / 2
-    img = accumulate(clip.events, t, view_window_s, res, gain=view_brightness)
+    img = accumulate(_window_events(clip, t, view_window_s), 0.0, view_window_s, res, gain=view_brightness)
     if clip.gt is None:                                   # unlabelled: the model alone is drawn
         gt_px, trail_px = np.array([np.nan, np.nan]), np.empty((0, 2))
     else:
@@ -300,16 +313,21 @@ def play(clip, fps: float, view_window_s: float, view_brightness: int, trail_s: 
 
     track = _motor_track(clip)
     times = frame_times(clip.duration_us / 1e6, fps)
+    import time
+
     i, playing = 0, True
-    delay = max(1, int(1000 / fps))
+    frame_ms = 1000.0 / fps
 
     cv2.namedWindow(_WINDOW, cv2.WINDOW_AUTOSIZE)
     try:
         while True:
+            t0 = time.perf_counter()
             cv2.imshow(_WINDOW, render(clip, times[i], view_window_s, view_brightness,
                                        trail_s, view_zoom, label, track, overlay))
             if cv2.getWindowProperty(_WINDOW, cv2.WND_PROP_VISIBLE) < 1:
                 break                           # the human closed the window
+            spent = (time.perf_counter() - t0) * 1000.0
+            delay = max(1, int(frame_ms - spent))          # the wait pays for the frame's work
             key = cv2.waitKeyEx(delay if playing else 20)
             if key in (ord("q"), 27):
                 break
