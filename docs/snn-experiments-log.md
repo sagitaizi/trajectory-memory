@@ -555,3 +555,30 @@ clips 17–20 → 19–23; `loop_01` 18 / 16 → 41 / 22; `loop_break_01` 13 / 2
 localiser calls the sheet absent most of the time, so the memory coasts). Pooled 13.5 /
 12.9 / AUC 0.98 → 32.4 / 21.8 / 0.79. The localiser is the memory's better input on the
 fan only; the centroid stays the default.
+
+**Run 16 — the sheet target (2026-09-21, day).** `simulate.py` gained a `sheet` target
+kind: a small rectangle outline (the printed target, its centre the path) on a large
+rectangle outline (the sheet) that moves with it, only the edges making events, the sheet
+at 0.2–0.5 of the target's contrast (`make_sim_dataset.py --kind sheet --start 200 --n
+40`; 0.5–1.7 M events/s, the real wall clips 0.3–1.0). Retrained on all 240 clips (216 /
+24, wide configuration): 9.2 px at the best epoch by validation loss (14; the last epoch
+had 8.4 px with a worse "present" loss). Development clips, median / p90 px, offset
+removed:
+
+| clip | centroid | blob-trained | with sheets |
+|---|---|---|---|
+| `fan_brush_slow_02` | 5.2 / 15.3 | 7.9 / 12.7 | 8.5 / 18.8 |
+| `small_01` | 7.6 / 15.1 | 23.1 / 35.9 | 22.5 / 34.4 |
+| `loop_01` | 16.2 / 52.2 | 45.0 / 77.7 (absent 3 %) | 35.5 / 73.4 (absent 0 %) |
+| `loop_break_01` | 14.0 / 26.4 | 46.7 / 108 (absent 77 %) | 53.9 / 81.7 (absent 29 %) |
+
+The sheets taught it to *see* the wall target (absent 77–93 % → 12–29 %) and its y track
+is far cleaner than the centroid's (every reversal spike gone), but in the sweep
+direction it trails the label by ~100–200 ms and undershoots, which at ~500 px/s is the
+whole 36 px. Cause found: the learnable membrane constants ran away — most dense-layer
+neurons and some conv neurons sit at β = 1 (an infinite time constant, integrators that
+reset only by spiking), so the network's answer lags its input. Clamping the loaded
+model's constants to 5–40 ms does not repair it (the readout was trained on the
+integrated activity); the fix is bounded or frozen time constants in training and a
+retrain. Checkpoints: `runs/localiser/snn_wide.pt` (blob corpus), `snn_sheet.pt` (with
+sheets); `runs/localiser/snn.pt` is the blob one.
