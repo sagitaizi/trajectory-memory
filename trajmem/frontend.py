@@ -17,7 +17,7 @@ def without_hot_pixels(clip: Clip, max_rate: float = HOT_PIXEL_RATE) -> Clip:
     """The clip minus the events of pixels that fire faster than `max_rate` over its whole
     length -- stuck pixels, which on the noisier recordings carry a fifth to a third of all
     events and form dense clusters a centroid mistakes for the target."""
-    if max_rate <= 0 or len(clip.events) == 0:
+    if max_rate <= 0 or len(clip.events) == 0 or clip.duration_us < 5e6:   # a rate needs a few seconds
         return clip
     w, h = clip.meta["resolution"]
     idx = clip.events["y"].astype(np.int64) * w + clip.events["x"].astype(np.int64)

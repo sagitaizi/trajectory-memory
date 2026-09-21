@@ -99,3 +99,22 @@ def test_count_frames_reject_a_downsample_that_does_not_divide_the_sensor():
     ev = events_at([1], [1], [10])
     with pytest.raises(ValueError, match="divide"):
         list(to_frames(a_clip(ev, 1000), 1000, kind="count", downsample=5))   # 48 / 5
+
+
+def test_without_hot_pixels_drops_stuck_pixels_on_a_long_clip_only():
+    from trajmem.frontend import without_hot_pixels
+    from trajmem.simulate import EVENT_DTYPE
+
+    rng = np.random.default_rng(0)
+    n_target, n_stuck = 2000, 3000
+    ev = np.zeros(n_target + n_stuck, dtype=EVENT_DTYPE)
+    ev["x"][:n_target] = rng.integers(100, 140, n_target)                # a target region, 40 x 40 px
+    ev["y"][:n_target] = rng.integers(100, 140, n_target)
+    ev["x"][n_target:], ev["y"][n_target:] = 5, 5                         # one stuck pixel, 300 ev/s
+    ev["timestamp"] = rng.integers(0, 10_000_000, len(ev))
+    ev.sort(order="timestamp")
+    clip = Clip(events=ev, duration_us=10_000_000, gt=None, meta={"resolution": (640, 480)})
+    out = without_hot_pixels(clip)
+    assert len(out.events) == n_target and out.meta["hot_pixels"] == 1
+    short = Clip(events=ev, duration_us=2_000_000, gt=None, meta={"resolution": (640, 480)})
+    assert len(without_hot_pixels(short).events) == len(ev)
