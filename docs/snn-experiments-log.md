@@ -547,3 +547,11 @@ fails: the target is a small rectangle printed on a large hand-held sheet whose 
 also makes events, nothing like the simulator's filled blobs, and the network mostly
 calls it absent. A simulator-content gap, not a network one: a "sheet" target family in
 the simulator is the fix.
+
+End to end (memory = `snn_phasemap`, development set, offset-subtracted), centroid input
+vs localiser input, prediction / path: fan **7.3 / 6.6 → 7.8 / 5.2** (path better,
+prediction a little worse); `small_01` 12.5 / 10.7 → 13.4 / 13.5; the wide pendulum
+clips 17–20 → 19–23; `loop_01` 18 / 16 → 41 / 22; `loop_break_01` 13 / 24 → 83 / 63 (the
+localiser calls the sheet absent most of the time, so the memory coasts). Pooled 13.5 /
+12.9 / AUC 0.98 → 32.4 / 21.8 / 0.79. The localiser is the memory's better input on the
+fan only; the centroid stays the default.
