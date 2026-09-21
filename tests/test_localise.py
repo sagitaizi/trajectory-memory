@@ -27,3 +27,15 @@ def test_frame_centroid_finds_a_clean_blob_and_reports_empty_frames(tmp_path):
     np.savez(tmp_path / "sim_000.npz", frames=fs.frames, t=fs.t, gt=fs.gt)
     back = load_frame_set(tmp_path / "sim_000.npz", 5000, 8)
     assert back.name == "sim_000" and np.array_equal(back.frames, fs.frames)
+
+
+def test_present_marks_frames_where_the_target_can_be_seen():
+    clip = a_clip_of_events(a_spec(), duration_s=1.0)
+    fs = frame_set(clip, 5000, 8)
+    assert fs.present.shape == (200,) and fs.present.all()
+    frames = fs.frames.copy()
+    frames[50:80] = 0                                             # the target's events removed for 150 ms
+    fs2 = FrameSet("y", frames, fs.t, fs.gt, 5000, 8)
+    assert (~fs2.present[50:80]).all() and fs2.present[:50].all() and fs2.present[80:].all()
+    off = FrameSet("z", fs.frames, fs.t, np.full_like(fs.gt, 1.5), 5000, 8)     # truth off the sensor
+    assert not off.present.any()

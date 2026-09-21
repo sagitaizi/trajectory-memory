@@ -17,16 +17,40 @@ from .data import Clip
 from .frontend import to_frames
 
 
+PRESENT_MIN_EVENTS = 8            # counts within PRESENT_RADIUS cells of the truth for "target present"
+PRESENT_RADIUS = 5                # cells; 40 px at 8x
+
+
 @dataclass
 class FrameSet:
     """One clip as the localiser sees it: (N, 2, H, W) uint8 ON/OFF counts per window,
-    window centres `t` (s), true position `gt` (N, 2, normalised; NaN where unknown)."""
+    window centres `t` (s), true position `gt` (N, 2, normalised; NaN where unknown), and
+    `present` (N,) -- whether the target is there to be seen in that frame."""
     name: str
     frames: np.ndarray
     t: np.ndarray
     gt: np.ndarray
     window_us: int
     downsample: int
+    present: np.ndarray = None
+
+    def __post_init__(self):
+        if self.present is None:
+            self.present = present_labels(self.frames, self.gt)
+
+
+def present_labels(frames: np.ndarray, gt: np.ndarray) -> np.ndarray:
+    """True where the truth is on the sensor and the frame holds at least
+    PRESENT_MIN_EVENTS counts within PRESENT_RADIUS cells of it."""
+    n, _, h, w = frames.shape
+    out = np.zeros(n, dtype=bool)
+    on = np.isfinite(gt).all(axis=1) & (gt >= 0).all(axis=1) & (gt < 1).all(axis=1)
+    cx, cy = (gt[:, 0] * w).astype(int), (gt[:, 1] * h).astype(int)
+    r = PRESENT_RADIUS
+    for i in np.flatnonzero(on):
+        patch = frames[i, :, max(0, cy[i] - r):cy[i] + r + 1, max(0, cx[i] - r):cx[i] + r + 1]
+        out[i] = patch.sum() >= PRESENT_MIN_EVENTS
+    return out
 
 
 def frame_set(clip: Clip, window_us: int, downsample: int, name: str = "") -> FrameSet:
@@ -42,7 +66,8 @@ def frame_set(clip: Clip, window_us: int, downsample: int, name: str = "") -> Fr
 def load_frame_set(path, window_us: int, downsample: int) -> FrameSet:
     """A make_frames.py .npz."""
     with np.load(path) as z:
-        return FrameSet(Path(path).stem, z["frames"], z["t"], z["gt"], window_us, downsample)
+        present = z["present"] if "present" in z.files else None
+        return FrameSet(Path(path).stem, z["frames"], z["t"], z["gt"], window_us, downsample, present)
 
 
 def load_frame_sets(corpus, window_us: int = 5000, downsample: int = 8) -> list[FrameSet]:

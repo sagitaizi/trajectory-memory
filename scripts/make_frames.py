@@ -4,7 +4,8 @@ downsampled, as uint8, with the true position per window.
     python scripts/make_frames.py --corpus corpus/sim --window-us 5000 --downsample 8
 
 Writes <corpus>/frames_<downsample>x_<window_us>us/<name>.npz with `frames`
-(N, 2, H/d, W/d) uint8, `t` (s) and `gt` (N, 2, normalised). A 15 s clip at 5 ms and 8x
+(N, 2, H/d, W/d) uint8, `t` (s), `gt` (N, 2, normalised) and `present` (N,), whether the
+target is there to be seen (localise.present_labels). A 15 s clip at 5 ms and 8x
 is ~29 MB; the window and factor are the localiser's input choices, so pass them.
 """
 from __future__ import annotations
@@ -19,16 +20,12 @@ import _thesis_path  # noqa: F401,E402  (adds the thesis repo to sys.path)
 import numpy as np  # noqa: E402
 
 from trajmem.data import load_clip  # noqa: E402
-from trajmem.frontend import to_frames  # noqa: E402
+from trajmem.localise import frame_set  # noqa: E402
 
 
 def frames_of(clip, window_us: int, downsample: int) -> dict:
-    ts, frames = [], []
-    for t0, frame in to_frames(clip, window_us, kind="count", downsample=downsample):
-        ts.append((t0 + window_us / 2) / 1e6)
-        frames.append(np.minimum(frame, 255).astype(np.uint8))
-    t = np.array(ts)
-    return {"t": t, "frames": np.stack(frames), "gt": np.atleast_2d(clip.gt(t))}
+    fs = frame_set(clip, window_us, downsample)
+    return {"t": fs.t, "frames": fs.frames, "gt": fs.gt, "present": fs.present}
 
 
 def main(argv=None) -> None:

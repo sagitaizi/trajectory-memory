@@ -48,7 +48,7 @@ def to_frames(clip: Clip, window_us: int, kind: str = "count", downsample: int =
     if kind == "count" and (w % downsample or h % downsample):
         raise ValueError(f"downsample {downsample} must divide the sensor {w}x{h}")
     if kind == "count":
-        for t0, ev in windows(clip, window_us):
+        for t0, ev in windows(without_hot_pixels(clip), window_us):
             yield t0, _count_frame(ev, w, h, downsample)
     elif kind == "surface":
         from pipeline.time_surface import TimeSurface
