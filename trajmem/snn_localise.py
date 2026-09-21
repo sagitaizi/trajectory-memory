@@ -25,13 +25,23 @@ INPUT_SCALE = 1.0                       # counts per cell -> input current
 
 def augment_frames(frames: np.ndarray, gt: np.ndarray, present: np.ndarray, rng: np.random.Generator,
                    stuck=(50, 400), rate=(50.0, 1500.0), background=(0.0, 0.5), flips: bool = True,
-                   dt_s: float = 0.005):
+                   blanks=(0, 3), blank_s=(0.1, 0.6), blank_radius: int = 6, dt_s: float = 0.005):
     """What the real cameras add that the simulator does not: a set of stuck pixels firing
     at random high rates for the whole clip, a uniform noise floor, and the two mirror
-    flips (with the truth). Frames come back as float32."""
+    flips (with the truth) -- and what the target does on its own: a few stretches where
+    its events are gone (the target removed within `blank_radius` cells of the truth,
+    `present` False), so the network learns to say "not seen". Frames come back float32."""
     out = frames.astype(np.float32)
     n, _, h, w = out.shape
-    gt = gt.copy()
+    gt, present = gt.copy(), present.copy()
+    for _ in range(int(rng.integers(blanks[0], blanks[1] + 1))):
+        length = int(rng.uniform(blank_s[0], blank_s[1]) / dt_s)
+        start = int(rng.integers(0, max(1, n - length)))
+        for i in range(start, min(n, start + length)):
+            if np.isfinite(gt[i]).all():
+                cx, cy = int(gt[i, 0] * w), int(gt[i, 1] * h)
+                out[i, :, max(0, cy - blank_radius):cy + blank_radius + 1, max(0, cx - blank_radius):cx + blank_radius + 1] = 0
+            present[i] = False
     k = int(rng.integers(stuck[0], stuck[1] + 1))
     if k > 0:
         ys, xs = rng.integers(0, h, k), rng.integers(0, w, k)
@@ -46,7 +56,7 @@ def augment_frames(frames: np.ndarray, gt: np.ndarray, present: np.ndarray, rng:
         out, gt[:, 0] = out[..., ::-1].copy(), 1.0 - gt[:, 0]
     if flips and rng.random() < 0.5:
         out, gt[:, 1] = out[..., ::-1, :].copy(), 1.0 - gt[:, 1]
-    return out, gt, present.copy()
+    return out, gt, present
 
 
 # --- the network ----------------------------------------------------------------------
@@ -184,7 +194,7 @@ class SpikingLocaliser:
         loss_p = lp.mean() if lp.numel() else cells.sum() * 0
         return loss_p + lb + self.rate_weight * (rate - self.rate_target) ** 2, loss_p.item(), lb.item()
 
-    def _run_chunks(self, sets, chunk: int, rng, optimiser=None, augment: bool = True):
+    def _run_chunks(self, sets, chunk: int, rng, optimiser=None, augment: bool = True, augment_kw=None):
         """One batch of frame sets (or paths to them, loaded here so a corpus need not sit
         in memory), chunk by chunk with the state carried. Returns the mean losses (total,
         position, present) and per-step (px error on present frames, present hit)."""
@@ -192,7 +202,7 @@ class SpikingLocaliser:
         n = min(len(fs.t) for fs in sets)
         fr, gt, pr = [], [], []
         for fs in sets:
-            f, g, p = (augment_frames(fs.frames[:n], fs.gt[:n], fs.present[:n], rng) if augment and optimiser is not None
+            f, g, p = (augment_frames(fs.frames[:n], fs.gt[:n], fs.present[:n], rng, **(augment_kw or {})) if augment and optimiser is not None
                        else (fs.frames[:n].astype(np.float32), fs.gt[:n], fs.present[:n]))
             fr.append(f); gt.append(g); pr.append(p)
         frames = torch.tensor(np.stack(fr, axis=1))                                          # (T, B, 2, H, W)
@@ -227,8 +237,8 @@ class SpikingLocaliser:
         return np.mean(losses, axis=0), np.concatenate(errs), np.concatenate(hits)
 
     def fit(self, sets: list[FrameSet], val_sets: list[FrameSet] | None = None, epochs: int = 20,
-            chunk_s: float = 0.25, batch: int = 8, lr: float = 1e-2, augment: bool = True, seed: int = 0,
-            schedule: str = "cosine", log_fn=None) -> list[dict]:
+            chunk_s: float = 0.25, batch: int = 8, lr: float = 1e-2, augment: bool = True, augment_kw=None,
+            seed: int = 0, schedule: str = "cosine", log_fn=None) -> list[dict]:
         rng = np.random.default_rng(seed)
         torch.manual_seed(seed)
         chunk = max(1, round(chunk_s / self.dt_s))
@@ -260,7 +270,7 @@ class SpikingLocaliser:
             order = rng.permutation(len(sets))
             for b in range(0, len(sets), batch):
                 group = [sets[i] for i in order[b:b + batch]]
-                losses.append(self._run_chunks(group, chunk, rng, optimiser, augment)[0][0])
+                losses.append(self._run_chunks(group, chunk, rng, optimiser, augment, augment_kw)[0][0])
             if scheduler is not None:
                 scheduler.step()
             val_loss = validate(epoch, float(np.mean(losses)))
