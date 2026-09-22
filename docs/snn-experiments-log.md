@@ -582,3 +582,32 @@ model's constants to 5–40 ms does not repair it (the readout was trained on th
 integrated activity); the fix is bounded or frozen time constants in training and a
 retrain. Checkpoints: `runs/localiser/snn_wide.pt` (blob corpus), `snn_sheet.pt` (with
 sheets); `runs/localiser/snn.pt` is the blob one.
+
+**Run 17 — what the wall-target lag was (2026-09-22).** Three suspects, tested one at a
+time on `loop_01` at epoch 2 of otherwise identical retrains (lag = the x-track's best
+cross-correlation shift against the labels): fixed 10/20 ms membrane constants, +195 ms;
+brightness augmentation ×0.25–2, +245 ms; ×0.08–2 (the real target is 3–7× fainter than
+the simulated sheets), +285 ms. None of them. Then polarity: feeding `snn_sheet.pt` the
+same clip with ON and OFF swapped flips the lag from +240 to −160 ms (35.5 → 25.6 px),
+and the fan improves too (8.5 → 6.7 px, lag +40 → +5 ms) — the real camera's polarity
+is the reverse of v2e's, and on an outline-only target the network had keyed on which
+edge leads. Fix: a random ON/OFF swap on half the training clips (`augment_frames(...,
+polarity_swap=True)`). Retrain (wide, 240 clips), same-stage comparison:
+
+| clip | sheet run, final | polarity run, epoch 2 | epoch 10 | epoch 16 (stopped) |
+|---|---|---|---|---|
+| `loop_01` | 35.5 / 73.4, lag +240 | 24.4 / 66.5, +120 | 34.2 / 88.2, +120 | — |
+| `loop_break_01` | 53.9 / 81.7 | 41.5 / 76.5, +65 | 53.9 / 78.2, +130 | — |
+| `fan_brush_slow_02` | 8.5 / 18.8, +40 | 8.8 / 16.1, +35 | 11.1 / 24.7, +45 | — |
+| `small_01` | 22.5 / 34.4 | 23.6 / 35.3, +35 | 28.2 / 47.3, +50 | — |
+
+The lag halves and the wall error drops a third at epoch 2, then nothing more with
+epochs (simulated validation 11–13 px from epoch 7 on; stopped at 16 to free the CPU).
+The reason is in the simulated validation split itself, scored per target kind: blobs
+8.0 px, sheets 13.5 px for the sheet run; 11.2 / 18.4 for the polarity run at epoch 10,
+still 11 vs 18 px between the two polarities — the sheet family (40 of 240 clips) is
+under-learned and the invariance not yet learned. On the wall clips the classical
+centroid (16 / 14 / 7.6 px, lag ~15 ms) still beats every spiking localiser 2–3×.
+Next: 60 more sheet clips (`sim_240`–`sim_299`, sheets 100 of 300) and a retrain with
+the swap. Checkpoints `runs/localiser/snn_pol_e{2,10,16}.pt`. The visual bench
+(`scripts/bench.py`, `corpus/bench.yaml`) dates from this run.
