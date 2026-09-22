@@ -26,19 +26,23 @@ INPUT_SCALE = 1.0                       # counts per cell -> input current
 def augment_frames(frames: np.ndarray, gt: np.ndarray, present: np.ndarray, rng: np.random.Generator,
                    stuck=(50, 400), rate=(50.0, 1500.0), background=(0.0, 0.5), flips: bool = True,
                    blanks=(0, 3), blank_s=(0.1, 0.6), blank_radius: int = 6, brightness=(0.08, 2.0),
-                   polarity_swap: bool = True, dt_s: float = 0.005):
+                   polarity_swap: bool = True, rotate: float = 0.25, dt_s: float = 0.005):
     """What the real cameras add that the simulator does not: a set of stuck pixels firing
     at random high rates for the whole clip, a uniform noise floor, the two mirror flips
     (with the truth), a brightness scale (a faint real target drives the neurons weakly,
     and a neuron below threshold answers late -- the network must not depend on the
     event rate), and an ON/OFF swap (a dark target on a light ground reverses which edge
     leads; keyed on one polarity the network puts a moving target at its back, which
-    looks like a lag) -- and what the target does on its own: a few stretches where its
-    events are gone (the target removed within `blank_radius` cells of the truth,
-    `present` False), so the network learns to say "not seen". Frames come back float32."""
+    looks like a lag), a quarter turn with probability `rotate` (the frame transposed and
+    cropped back to its shape, so tall targets and vertical sweeps exist in training) --
+    and what the target does on its own: a few stretches where its events are gone (the
+    target removed within `blank_radius` cells of the truth, `present` False), so the
+    network learns to say "not seen". Frames come back float32."""
     out = frames.astype(np.float32)
-    n, _, h, w = out.shape
     gt, present = gt.copy(), present.copy()
+    if rotate and rng.random() < rotate:
+        out, gt, present = rotate_frames(out, gt, present)
+    n, _, h, w = out.shape
     if brightness is not None:
         out *= float(np.exp(rng.uniform(np.log(brightness[0]), np.log(brightness[1]))))
     if polarity_swap and rng.random() < 0.5:
@@ -66,6 +70,21 @@ def augment_frames(frames: np.ndarray, gt: np.ndarray, present: np.ndarray, rng:
     if flips and rng.random() < 0.5:
         out, gt[:, 1] = out[..., ::-1, :].copy(), 1.0 - gt[:, 1]
     return out, gt, present
+
+
+def rotate_frames(frames: np.ndarray, gt: np.ndarray, present: np.ndarray):
+    """A quarter turn of a (N, 2, h, w) frame set with h < w: transpose, keep the middle
+    `h` rows, pad the columns back to `w`. The truth follows; a target that leaves the
+    kept rows is marked absent."""
+    n, _, h, w = frames.shape
+    top, left = (w - h) // 2, (w - h) // 2
+    turned = np.zeros_like(frames)
+    turned[:, :, :, left:left + h] = frames.transpose(0, 1, 3, 2)[:, :, top:top + h, :]
+    px, py = gt[:, 0] * w, gt[:, 1] * h
+    gt = np.stack([(py + left) / w, (px - top) / h], axis=1)
+    out_of_frame = np.isfinite(gt).all(1) & ((gt[:, 1] < 0) | (gt[:, 1] > 1))
+    present = present & ~out_of_frame
+    return turned, gt, present
 
 
 # --- the network ----------------------------------------------------------------------
