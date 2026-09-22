@@ -38,6 +38,8 @@ def main(argv=None) -> None:
     p.add_argument("--n-cells", type=int, default=32)
     p.add_argument("--hidden", type=int, default=128)
     p.add_argument("--ch", type=int, nargs=2, default=(8, 16), metavar=("C1", "C2"), help="conv channels")
+    p.add_argument("--polarity", default="both", choices=("both", "sum"),
+                   help="both: ON and OFF as two input channels; sum: folded into one (polarity-blind)")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--device", default=None)
     args = p.parse_args(argv)
@@ -50,7 +52,8 @@ def main(argv=None) -> None:
     val = [load_frame_set(p, 5000, 8) for p in val_paths]
     print(f"{len(paths)} frame sets: {len(train)} train, {len(val)} validation", flush=True)
 
-    loc = SpikingLocaliser(n_cells=args.n_cells, ch=tuple(args.ch), hidden=args.hidden, seed=args.seed, device=args.device)
+    loc = SpikingLocaliser(n_cells=args.n_cells, ch=tuple(args.ch), hidden=args.hidden, seed=args.seed,
+                           polarity=args.polarity, device=args.device)
     loc.val_clips = [p.stem for p in val_paths]
     out = pathlib.Path(args.out)
     t0 = time.time()

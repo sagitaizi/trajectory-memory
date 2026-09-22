@@ -78,3 +78,17 @@ def test_checkpoint_keeps_the_validation_clip_names(tmp_path):
     loc.val_clips = ["sim_003", "sim_017"]
     loc.save(tmp_path / "l.pt")
     assert SpikingLocaliser.load(tmp_path / "l.pt").val_clips == ["sim_003", "sim_017"]
+
+
+def test_summed_polarity_is_blind_to_an_on_off_swap(tmp_path):
+    net = SpikingLocaliserNet(n_cells=6, ch=(3, 4), hidden=16, polarity="sum")
+    frames = torch.rand(2, 2, 60, 80) * 5
+    state = net.init_state(2, "cpu")
+    a = net.step(frames, state)[0]
+    b = net.step(frames.flip(1), state)[0]
+    assert torch.allclose(a, b)
+    loc = SpikingLocaliser(n_cells=6, ch=(3, 4), hidden=16, polarity="sum")
+    loc.save(tmp_path / "s.pt")
+    assert SpikingLocaliser.load(tmp_path / "s.pt").net.polarity == "sum"
+    with pytest.raises(ValueError):
+        SpikingLocaliserNet(polarity="mean")

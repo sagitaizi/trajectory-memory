@@ -75,14 +75,17 @@ class SpikingLocaliserNet(nn.Module):
 
     def __init__(self, n_cells: int = 32, ch=(8, 16), hidden: int = 128, dt_s: float = 0.005,
                  tau=(0.01, 0.02), readout_tau_s: float = 0.015, in_hw=(60, 80), seed: int = 0,
-                 learn_tau: bool = False):
+                 learn_tau: bool = False, polarity: str = "both"):
         super().__init__()
+        if polarity not in ("both", "sum"):
+            raise ValueError(f"polarity must be 'both' or 'sum', not {polarity!r}")
+        self.polarity = polarity                  # "sum" folds ON and OFF into one channel: polarity-blind by construction
         gen = torch.Generator().manual_seed(seed)
         grad = surrogate.fast_sigmoid(slope=25)
         c1, c2 = ch
         # Time constants are fixed by default: learnable ones ran to beta = 1 (integrators
         # that never leak), and the network's answer then trails its input by ~100 ms.
-        self.conv1 = nn.Conv2d(2, c1, 5, stride=2, padding=2)
+        self.conv1 = nn.Conv2d(1 if polarity == "sum" else 2, c1, 5, stride=2, padding=2)
         self.lif1 = snn.Leaky(beta=_betas(c1, tau, dt_s, gen)[:, None, None], learn_beta=learn_tau, spike_grad=grad)
         self.conv2 = nn.Conv2d(c1, c2, 5, stride=2, padding=2)
         self.lif2 = snn.Leaky(beta=_betas(c2, tau, dt_s, gen)[:, None, None], learn_beta=learn_tau, spike_grad=grad)
@@ -98,6 +101,10 @@ class SpikingLocaliserNet(nn.Module):
         z = lambda *s: torch.zeros(batch, *s, device=device)  # noqa: E731
         return (z(*self.hw[0]), z(*self.hw[1]), z(self.hidden), z(self.hidden))     # mem1, mem2, mem3, readout trace
 
+    def _input(self, frame: torch.Tensor) -> torch.Tensor:
+        frame = frame * INPUT_SCALE
+        return frame.sum(1, keepdim=True) if self.polarity == "sum" else frame
+
     @torch.no_grad()
     def calibrate(self, frames: torch.Tensor, target: float = 1.5) -> None:
         """Scale each layer's weights so its input current reaches `target` at the 99.9th
@@ -109,7 +116,7 @@ class SpikingLocaliserNet(nn.Module):
             st = self.init_state(1, frames.device)
             for f in frames:
                 m1, m2, m3, r = st
-                c1 = self.conv1(f[None] * INPUT_SCALE); s1, m1 = self.lif1(c1, m1)
+                c1 = self.conv1(self._input(f[None])); s1, m1 = self.lif1(c1, m1)
                 c2 = self.conv2(s1); s2, m2 = self.lif2(c2, m2)
                 c3 = self.fc(s2.flatten(1)); s3, m3 = self.lif3(c3, m3)
                 st = (m1, m2, m3, r)
@@ -123,7 +130,7 @@ class SpikingLocaliserNet(nn.Module):
         """frame (B, 2, H, W) counts -> cells (B, 2, n_cells) logits, present (B,) logit,
         state, the layers' mean spike fraction (with gradient)."""
         m1, m2, m3, r = state
-        s1, m1 = self.lif1(self.conv1(frame * INPUT_SCALE), m1)
+        s1, m1 = self.lif1(self.conv1(self._input(frame)), m1)
         s2, m2 = self.lif2(self.conv2(s1), m2)
         s3, m3 = self.lif3(self.fc(s2.flatten(1)), m3)
         r = self.alpha * r + (1.0 - self.alpha) * s3
@@ -140,7 +147,8 @@ class SpikingLocaliser:
 
     def __init__(self, dt_s: float = 0.005, n_cells: int = 32, ch=(8, 16), hidden: int = 128,
                  present_threshold: float = 0.5, rate_target: float = 0.1, rate_weight: float = 10.0,
-                 in_hw=(60, 80), resolution=(640, 480), seed: int = 0, learn_tau: bool = False, device=None):
+                 in_hw=(60, 80), resolution=(640, 480), seed: int = 0, learn_tau: bool = False,
+                 polarity: str = "both", device=None):
         self.device = torch.device(device or "cpu")
         if self.device.type == "cpu":
             torch.set_num_threads(min(4, torch.get_num_threads()))
@@ -148,8 +156,10 @@ class SpikingLocaliser:
         self.dt_s, self.n_cells, self.ch, self.hidden = dt_s, n_cells, tuple(ch), hidden
         self.present_threshold, self.rate_target, self.rate_weight = present_threshold, rate_target, rate_weight
         self.in_hw, self.resolution, self.seed, self.learn_tau = tuple(in_hw), tuple(resolution), seed, learn_tau
+        self.polarity = polarity
         self.cells = PlaceCells(n_cells)
-        self.net = SpikingLocaliserNet(n_cells, ch, hidden, dt_s, in_hw=in_hw, seed=seed, learn_tau=learn_tau).to(self.device)
+        self.net = SpikingLocaliserNet(n_cells, ch, hidden, dt_s, in_hw=in_hw, seed=seed, learn_tau=learn_tau,
+                                       polarity=polarity).to(self.device)
         self.val_clips: list[str] | None = None          # names of the clips held out while fitting
         self.reset()
 
@@ -157,7 +167,7 @@ class SpikingLocaliser:
 
     def config(self) -> dict:
         return {k: getattr(self, k) for k in ("dt_s", "n_cells", "ch", "hidden", "present_threshold", "rate_target",
-                                              "rate_weight", "in_hw", "resolution", "seed", "learn_tau")}
+                                              "rate_weight", "in_hw", "resolution", "seed", "learn_tau", "polarity")}
 
     def save(self, path) -> Path:
         path = Path(path)
