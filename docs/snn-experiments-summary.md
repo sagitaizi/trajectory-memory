@@ -227,3 +227,29 @@ where it doesn't; the gap is simulator content, not the network. Next: a "sheet"
 family in the simulator (a rectangle outline with a small rectangle inside) and a retrain;
 until then the classical centroid stays the memory's default input, with the spiking
 localiser as the fan's better alternative.
+
+
+## Where it stands (2026-09-23, morning) — the localiser after the wall-target work
+
+**What was wrong.** The spiking localiser trailed the wall target by ~200 ms. Not the
+neurons' time constants, not the target's faintness (each tested alone): the real
+camera's ON/OFF polarity is the reverse of the simulator's, and on an outline-only
+target the network had learned "the leading edge is ON" — so it sat on the trailing edge.
+Swapping the channels of a real clip flipped the lag from +240 to −160 ms.
+
+**What changed.** Training now swaps ON and OFF on half the clips, turns a quarter of
+them by 90° (the real target is sometimes held tall; every simulated sheet was wide),
+and sees 100 sheet targets among 300 clips. The lag is gone (+35 ms everywhere — the
+neurons' own delay), `loop_01` is on par with the classical centroid (15.8 vs 16.2 px),
+and `loop_break_01` halved (40 → 22 px). A polarity-blind input (ON + OFF summed) was
+tried and is worse: the two edges are a cue to the centre.
+
+**Where it is not enough.** On the pendulum the network's estimate drifts slowly along
+the brush (20–26 px against the centroid's 8–12), and end to end the classical centroid
+still feeds the memory better (pooled 13.5 / 12.9 px vs 18.7 / 21.4). The drift is not
+jitter (smoothing does nothing); it is where the network puts the "centre" of an
+elongated shape. Next candidate: an elongated head-and-tail target family in the
+simulator. Until then the centroid stays the default input and the spiking localiser is
+the ablation, with its specific wins (no string flips on the fan; the wall target
+tracked without lag). A visual bench (`scripts/bench.py`) renders every iteration on a
+fixed clip list, three pipelines side by side.

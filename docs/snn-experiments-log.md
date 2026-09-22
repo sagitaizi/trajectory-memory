@@ -611,3 +611,44 @@ centroid (16 / 14 / 7.6 px, lag ~15 ms) still beats every spiking localiser 2–
 Next: 60 more sheet clips (`sim_240`–`sim_299`, sheets 100 of 300) and a retrain with
 the swap. Checkpoints `runs/localiser/snn_pol_e{2,10,16}.pt`. The visual bench
 (`scripts/bench.py`, `corpus/bench.yaml`) dates from this run.
+
+**Run 18 — 300 clips, the quarter turn, and the polarity variants (2026-09-22, night).**
+Sixty more sheet clips (`sim_240`–`sim_299`; sheets now 100 of 300, split 270 / 30) and
+three retrains of the wide configuration, every epoch's weights kept
+(`runs/localiser/snn_<run>_e<N>.pt`) because the real-clip result swings from epoch to
+epoch while the simulated validation loss barely moves:
+
+- **A `pol300`** — polarity swap only. Epoch 5 fixed the wall-target lag (`loop_01`
+  14.8 / 33.0 px, +35 ms — the neurons' own delay, the fan's too); epoch 10 swung back
+  (17.8 / 51.2, +90 ms). Stopped at 11.
+- **B `rot300`** — swap + a quarter turn on a quarter of the clips (`augment_frames(...,
+  rotate=0.25)`): the real target on `loop_break_01` is held tall and the network's
+  estimate wandered along its long axis; every simulated sheet is wide. The best run,
+  steadier with epochs: mean over the five development clips 19.9 → 18.2 px (e2 → e11).
+- **C `sum300`** — ON and OFF folded into one channel (`--polarity sum`), blind to
+  polarity by construction, plus the quarter turn. Worse and no steadier (mean 23–32 px
+  over epochs 1–6): the two channels' leading/trailing edges are a cue to the centre that
+  the swap keeps and the sum discards. Stopped at 6.
+
+Median px against the labels, constant offset removed (`runs/eval_all.txt`):
+
+| checkpoint | fan_brush_slow_02 | small_01 | wide_02/steady | loop_01 | loop_break_01 | mean |
+|---|---|---|---|---|---|---|
+| centroid | 5.2 | 7.6 | 11.9 | 16.2 | 14.0 | 11.0 |
+| pol300 e5 | 10.4 | 23.1 | 23.8 | 14.8 | 40.0 | 22.4 |
+| rot300 e2 | 8.1 | 19.8 | 25.9 | 23.5 | 22.4 | 19.9 |
+| rot300 e11 | 7.8 | 19.7 | 26.2 | 15.8 | 21.5 | 18.2 |
+| sum300 e5 | 9.3 | 20.6 | 29.9 | 21.4 | 36.1 | 23.5 |
+
+End to end (`run_experiment --set development --memory snn_phasemap --subtract-offset`,
+pooled prediction / path px): centroid → spiking memory 13.5 / 12.9; rot300 e11 →
+spiking memory 18.7 / 21.4; Kalman 13.7 / 14.1. The localiser's wall-target lag is gone
+and `loop_01` is on par with the centroid, but the pendulum (28–31 vs 15–20 px) keeps
+the all-spiking chain behind the classical input. The error is not jitter — smoothing the
+track over 25–105 ms changes it by under a pixel — but a slow drift along the target's
+long axis (fan: brush plus string; pendulum: the brush; `loop_break_01`: the tall
+rectangle), where the densest-cells centroid sits on the head. Two housekeeping finds
+on the way: Windows parks hidden background jobs on the efficiency cores and throttles
+them (the clip generator went 95 → 2169 s per clip; a trainer 12 → 34 min per epoch),
+so `_prefer_performance_cores` now also raises the priority and the generator calls it.
+Visual bench: `scripts/bench.py` (three pipelines side by side, `corpus/bench.yaml`).

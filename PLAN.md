@@ -183,15 +183,21 @@ freely moving real target, with a break signal.
   needs the two-layer recipe (flips, 40 epochs) before a fair comparison; self-feeding
   through blanks drifts (52–65 px in a 1 s blank).**
 - **Localiser (Stage 1's other half)**: `trajmem/snn_localise.py` — a spiking conv net over
-  the 5 ms count frames (place cells + a "present" unit), trained on the simulated clips
-  only with stuck pixels, noise, flips and blank stretches added; `--localiser snn` in
-  `run_experiment.py`, `replay_gt.py`, `check_localiser.py`; spec in
-  `docs/superpowers/specs/2026-09-21-spiking-localiser-design.md`. 6.7 px on simulated
-  validation (centroid ~11). On real clips it transfers to the fan (string flips gone, tail
-  tighter, median 7.9 vs 5.2), partly to the pendulum (no jumps, median worse), and not to
-  the wall target (a rectangle on a moving sheet: nothing like it in the simulator; called
-  absent most of the time). **Open: a "sheet" target family in the simulator, then retrain;
-  the pendulum's reference point.** The classical centroid stays the default input.
+  the 5 ms count frames (place cells + a "present" unit), trained on 300 simulated clips
+  (200 blob targets, 100 "sheet" targets — the wall target on its sheet) with the real
+  cameras' quirks added in training: stuck pixels, a noise floor, mirror flips, a quarter
+  turn, blank stretches, a brightness scale and an ON/OFF swap (the real camera's polarity
+  is the reverse of v2e's). `--localiser snn` in `run_experiment.py`, `replay_gt.py`,
+  `check_localiser.py`, `bench.py`; spec in
+  `docs/superpowers/specs/2026-09-21-spiking-localiser-design.md`. Against the labels
+  (median px, constant offset removed; centroid in brackets): fan 7.8 (5.2), pendulum
+  16–26 (7.6–11.9), wall target 16–22 (14–16); no lag beyond the neurons' own ~35 ms.
+  End to end it feeds the memory worse than the centroid on the development set
+  (pooled 18.7 / 21.4 px vs 13.5 / 12.9), the pendulum being the gap: on an elongated
+  target the network's "centre" drifts along the long axis while the densest-cells
+  centroid sits on the head. **Open: an elongated head-and-tail target family in the
+  simulator; checkpoint selection (real-clip results swing epoch to epoch).** The
+  classical centroid stays the default input; the spiking localiser is the ablation.
 - **Done when:** on real repetitive clips, Stage 1 prediction error beats the classical
   baseline *or* matches it with a stated event-native/latency argument; lock-on within N
   cycles. Bar: Kalman 24.2 px pooled (8.0 on the fan), ~3 px on sim.
