@@ -63,12 +63,13 @@ def to_frames(clip: Clip, window_us: int, kind: str = "count", downsample: int =
 
 
 def _count_frame(ev, w: int, h: int, downsample: int) -> np.ndarray:
-    frame = np.zeros((2, h, w), dtype=np.float32)
-    np.add.at(frame, (ev["polarity"].astype(np.intp), ev["y"].astype(np.intp),
-                      ev["x"].astype(np.intp)), 1.0)
-    if downsample > 1:
-        frame = frame.reshape(2, h // downsample, downsample, w // downsample, downsample).sum(axis=(2, 4))
-    return frame
+    """Counts straight into the downsampled grid: one bincount over flat cell indices
+    (np.add.at on the full-resolution frame was the pipeline's slowest step)."""
+    hh, ww = h // downsample, w // downsample
+    idx = (ev["polarity"].astype(np.intp) * (hh * ww)
+           + (ev["y"].astype(np.intp) // downsample) * ww
+           + (ev["x"].astype(np.intp) // downsample))
+    return np.bincount(idx, minlength=2 * hh * ww).astype(np.float32).reshape(2, hh, ww)
 
 
 def to_position(clip: Clip, window_us: int, min_events: int = 5, cell_px: int = 16,
