@@ -244,7 +244,8 @@ class TwoLayerNet(nn.Module):
 
 def _prefer_performance_cores() -> None:
     """On a hybrid Intel CPU Windows parks a background process on the efficiency cores
-    (measured: 2-3x slower). Pin to the performance cores; harmless elsewhere."""
+    and throttles it (measured: 3-8x slower). Pin to the performance cores at above-normal
+    priority; harmless elsewhere."""
     import os
     if os.name != "nt" or (os.cpu_count() or 0) < 12:
         return
@@ -255,6 +256,8 @@ def _prefer_performance_cores() -> None:
         k32.GetCurrentProcess.restype = wintypes.HANDLE
         k32.SetProcessAffinityMask.argtypes = [wintypes.HANDLE, ctypes.c_size_t]
         k32.SetProcessAffinityMask(k32.GetCurrentProcess(), 0xFFF)
+        k32.SetPriorityClass.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        k32.SetPriorityClass(k32.GetCurrentProcess(), 0x8000)          # ABOVE_NORMAL_PRIORITY_CLASS
     except Exception:
         pass
 
