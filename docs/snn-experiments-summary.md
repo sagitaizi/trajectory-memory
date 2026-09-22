@@ -246,7 +246,7 @@ tried and is worse: the two edges are a cue to the centre.
 
 **Where it is not enough.** On the pendulum the network's estimate drifts slowly along
 the brush (20–26 px against the centroid's 8–12), and end to end the classical centroid
-still feeds the memory better (pooled 13.5 / 12.9 px vs 18.7 / 21.4). The drift is not
+still feeds the memory better (pooled 13.5 / 12.9 px vs 17.7 / 24.4). The drift is not
 jitter (smoothing does nothing); it is where the network puts the "centre" of an
 elongated shape. Next candidate: an elongated head-and-tail target family in the
 simulator. Until then the centroid stays the default input and the spiking localiser is

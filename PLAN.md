@@ -193,7 +193,7 @@ freely moving real target, with a break signal.
   (median px, constant offset removed; centroid in brackets): fan 7.8 (5.2), pendulum
   16–26 (7.6–11.9), wall target 16–22 (14–16); no lag beyond the neurons' own ~35 ms.
   End to end it feeds the memory worse than the centroid on the development set
-  (pooled 18.7 / 21.4 px vs 13.5 / 12.9), the pendulum being the gap: on an elongated
+  (pooled 17.7 / 24.4 px vs 13.5 / 12.9), the pendulum being the gap: on an elongated
   target the network's "centre" drifts along the long axis while the densest-cells
   centroid sits on the head. **Open: an elongated head-and-tail target family in the
   simulator; checkpoint selection (real-clip results swing epoch to epoch).** The

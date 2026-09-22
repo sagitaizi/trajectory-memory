@@ -638,11 +638,18 @@ Median px against the labels, constant offset removed (`runs/eval_all.txt`):
 | pol300 e5 | 10.4 | 23.1 | 23.8 | 14.8 | 40.0 | 22.4 |
 | rot300 e2 | 8.1 | 19.8 | 25.9 | 23.5 | 22.4 | 19.9 |
 | rot300 e11 | 7.8 | 19.7 | 26.2 | 15.8 | 21.5 | 18.2 |
+| rot300 e13 | 9.1 | 13.0 | 19.3 | 17.1 | 20.3 | 15.8 |
+| **rot300 e20 (final, best by validation loss)** | 8.0 | 14.8 | 20.9 | 17.2 | 19.7 | **16.1** |
 | sum300 e5 | 9.3 | 20.6 | 29.9 | 21.4 | 36.1 | 23.5 |
 
-End to end (`run_experiment --set development --memory snn_phasemap --subtract-offset`,
-pooled prediction / path px): centroid → spiking memory 13.5 / 12.9; rot300 e11 →
-spiking memory 18.7 / 21.4; Kalman 13.7 / 14.1. The localiser's wall-target lag is gone
+B ran to the end: 14.2 px on simulated validation at epoch 20, its own best, and the
+real-clip mean settled at 16.1–16.8 over epochs 16–20 (no more swings once the learning
+rate was low). `runs/localiser/snn_rot300.pt` is the checkpoint and is now the default
+`runs/localiser/snn.pt` (the blob-only model stays as `snn_wide.pt`). End to end
+(`run_experiment --set development --memory snn_phasemap --subtract-offset`, pooled
+prediction / path px): centroid → spiking memory 13.5 / 12.9; rot300 → spiking memory
+17.7 / 24.4 (fan 10.1 / 9.2, `loop_01` 17.7 / 24.5, `wide_02` 27.6 / 29.2); Kalman
+13.7 / 14.1. The localiser's wall-target lag is gone
 and `loop_01` is on par with the centroid, but the pendulum (28–31 vs 15–20 px) keeps
 the all-spiking chain behind the classical input. The error is not jitter — smoothing the
 track over 25–105 ms changes it by under a pixel — but a slow drift along the target's
