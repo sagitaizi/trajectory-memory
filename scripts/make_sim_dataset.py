@@ -188,6 +188,9 @@ def main(argv=None) -> None:
     parser.add_argument("--kind", default="blob", choices=("blob", "sheet"),
                         help="blob (the fan / pendulum targets) or sheet (the wall target on its sheet)")
     args = parser.parse_args(argv)
+    from trajmem.snn import _prefer_performance_cores
+
+    _prefer_performance_cores()                               # a background v2e run parked on the E-cores is 5-8x slower
 
     base = sim_params(args.params)
     base["duration_s"], base["fps"] = args.duration, args.fps
