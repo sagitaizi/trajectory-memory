@@ -73,10 +73,19 @@ def csv_row(set_name: str, memory: str, r: dict) -> dict:
             "unseen_fraction": r["unseen_fraction"], "offset_x_px": ox, "offset_y_px": oy}
 
 
+def threshold_rule(name: str):
+    """The deviation alarm bar: "ratchet" (the detector), "oracle" (the label-using
+    reference), or a fixed number of pixels."""
+    if name == "oracle":
+        return None
+    return "ratchet" if name == "ratchet" else float(name)
+
+
 def run_on_set(set_name: str, names, args) -> None:
     import csv
 
     clips = open_set(set_name)
+    threshold = threshold_rule(args.threshold)
     localiser = make_localiser(args.localiser, args.localiser_checkpoint)
     print(f"set {set_name}: {len(clips)} clips with ground truth  window {args.window_us} us  "
           f"horizon {args.horizon} s  warm-up {args.warmup} s  localiser {args.localiser}")
@@ -86,7 +95,7 @@ def run_on_set(set_name: str, names, args) -> None:
         rows, pooled = run_set(lambda: make_memory(name, dt_s=args.window_us / 1e6, warmup_s=args.warmup,
                                                    checkpoint=args.checkpoint),
                                clips, args.window_us, args.horizon, args.tol_px, args.settle,
-                               subtract_offset=args.subtract_offset, localiser=localiser)
+                               threshold=threshold, subtract_offset=args.subtract_offset, localiser=localiser)
         print(f"\n[{name}]\n{HEADER}")
         for r in rows:
             print(row(r["name"], r))
@@ -113,6 +122,9 @@ def main(argv=None) -> None:
     p.add_argument("--tol-px", type=float, default=15.0, help="lock-on tolerance")
     p.add_argument("--warmup", type=float, default=5.0, help="period estimated from this much (s)")
     p.add_argument("--settle", type=float, default=6.0, help="ignore errors before this (s)")
+    p.add_argument("--threshold", default="ratchet",
+                   help="deviation alarm bar: 'ratchet' (the memory's own settled score, the detector we report), "
+                        "'oracle' (99th percentile of each clip's pre-break scores, a reference), or a number in px")
     p.add_argument("--subtract-offset", action="store_true",
                    help="remove each clip's constant label-vs-centroid offset before scoring (reported)")
     p.add_argument("--slice", nargs=2, type=float, metavar=("T0", "T1"), help="time window (s)")
@@ -126,6 +138,7 @@ def main(argv=None) -> None:
         return
     if not args.clip:
         p.error("give a clip or --set")
+    threshold = threshold_rule(args.threshold)
     clip = open_clip(args.clip, args.slice)
     print(f"{args.clip}  {clip.duration_us / 1e6:.1f} s  breaks at {clip.deviation_times or '-'}  "
           f"window {args.window_us} us  horizon {args.horizon} s")
@@ -134,7 +147,8 @@ def main(argv=None) -> None:
         memory = make_memory(name, dt_s=args.window_us / 1e6, warmup_s=args.warmup, checkpoint=args.checkpoint)
         trace = evaluate_clip(memory, clip, args.window_us, args.horizon, blank=args.blank,
                               localiser=make_localiser(args.localiser, args.localiser_checkpoint))
-        print(row(name, score_trace(trace, clip, args.tol_px, args.settle, subtract_offset=args.subtract_offset)))
+        print(row(name, score_trace(trace, clip, args.tol_px, args.settle, threshold=threshold,
+                                    subtract_offset=args.subtract_offset)))
 
 
 if __name__ == "__main__":

@@ -53,26 +53,66 @@ def lock_on_time(errors, tol: float, dt: float) -> float:
     return float(after[0] * dt) if len(after) else np.inf
 
 
-def deviation_roc(scores, times, deviation_times, threshold: float | None = None,
+RATCHET_K = 25.0                   # spreads above the settled score: the smallest of 3..30 that raised
+                                   # no false alarm on the development clips (breaks still caught in 0.23 s)
+
+
+def ratchet_threshold(scores, times, k: float = RATCHET_K, window_s: float = 2.0,
+                      warmup_s: float = 5.0, floor_px: float = 5.0) -> np.ndarray:
+    """The alarm bar per step: the lowest `median + k x spread` of the score the memory
+    has managed so far, over a trailing `window_s`.
+
+    Causal -- each step sees only the past -- and one-way: the bar tightens while the
+    memory settles on the path and never loosens again, so a deviation cannot raise the
+    bar meant to catch it, and a slow drift away from the path is still caught. Before
+    `warmup_s` there is no bar (inf): the memory has not learned the path yet.
+    """
+    s, t = np.asarray(scores, dtype=float), np.asarray(times, dtype=float)
+    out = np.full(len(s), np.inf)
+    if len(s) == 0:
+        return out
+    step = float(np.median(np.diff(t))) if len(t) > 1 else 1.0
+    n_win = max(4, int(round(window_s / step)))
+    bar = np.inf
+    for i in range(len(s)):
+        if t[i] >= warmup_s and i >= n_win:
+            w = s[i - n_win + 1:i + 1]
+            w = w[np.isfinite(w)]
+            if len(w) >= 4:
+                med = float(np.median(w))
+                mad = float(np.median(np.abs(w - med))) * 1.4826
+                bar = min(bar, max(med + k * mad, floor_px))
+        out[i] = bar
+    return out
+
+
+def deviation_roc(scores, times, deviation_times, threshold=None,
                   hold_n: int = 3) -> dict:
     """Score the deviation signal as a detector.
 
     Positives are steps at or after the first break, negatives the steps before it
     (all steps, on a clip without a break). `auc` is threshold-free. At the operating
-    `threshold` (default: the 99th percentile of the negatives), a flag is `hold_n`
+    `threshold` -- a number, a per-step array, or "ratchet" for `ratchet_threshold`;
+    the default, the 99th percentile of the negatives, needs the labels and so is a
+    reference rather than a detector -- a flag is `hold_n`
     consecutive steps above it: `latency_s` is the first flag after the break,
     `fp_per_min` the flags raised on negative steps.
     """
     s, t = np.asarray(scores, dtype=float), np.asarray(times, dtype=float)
     t_break = min(deviation_times) if len(deviation_times) else np.inf
     positive = t >= t_break
-    if threshold is None:
+    if isinstance(threshold, str):
+        if threshold != "ratchet":
+            raise ValueError(f"unknown threshold rule {threshold!r}")
+        threshold = ratchet_threshold(s, t)
+    elif threshold is None:
         threshold = float(np.nanpercentile(s[~positive], 99)) if (~positive).any() else np.inf
 
     flags = _sustained(s > threshold, hold_n)
     step = float(np.median(np.diff(t))) if len(t) > 1 else np.nan
     neg_minutes = (~positive).sum() * step / 60
-    out = {"threshold": threshold, "auc": np.nan, "latency_s": np.nan,
+    out = {"threshold": float(np.min(threshold)) if np.ndim(threshold) else float(threshold),
+           "auc": np.nan, "latency_s": np.nan,
            "fp_per_min": float(_rising_edges(flags & ~positive) / neg_minutes) if neg_minutes else np.nan}
     if positive.any() and (~positive).any():
         out["auc"] = _auc(s[positive], s[~positive])

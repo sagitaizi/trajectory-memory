@@ -183,7 +183,7 @@ def label_offset(trace: Trace, clip: Clip, settle_s: float = 0.0) -> np.ndarray:
 
 
 def score_trace(trace: Trace, clip: Clip, tol_px: float, settle_s: float = 0.0,
-                threshold: float | None = None, subtract_offset: bool = False) -> dict:
+                threshold=None, subtract_offset: bool = False) -> dict:
     """Prediction error (px, on steps before any break and after `settle_s`), path-shape
     error (px, same steps; `last` = median over the final cycle before the break), the
     memory's period over the true one, lock-on times (s, from the clip's start), and the
@@ -264,7 +264,7 @@ def open_set(name: str, path=None) -> list[tuple[str, Clip]]:
 
 
 def run_set(make_memory_fn, clips, window_us: int, horizon_s: float, tol_px: float,
-            settle_s: float, threshold: float | None = None, subtract_offset: bool = False, localiser=None):
+            settle_s: float, threshold=None, subtract_offset: bool = False, localiser=None):
     """Score a fresh memory on every clip; return the per-clip rows and a pooled row
     (medians of the per-clip numbers; detection numbers over the break clips only)."""
     rows = []

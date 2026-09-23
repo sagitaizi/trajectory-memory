@@ -107,3 +107,30 @@ def test_path_shape_error_needs_matching_point_counts():
 
     with pytest.raises(ValueError):
         path_shape_error(a_cycle(1.0, n=32), a_cycle(1.0, n=64))
+
+
+def test_ratchet_threshold_tightens_but_never_loosens():
+    from trajmem.metrics import ratchet_threshold
+
+    t = np.arange(0, 30, 0.005)
+    rng = np.random.default_rng(0)
+    score = np.where(t < 8, 40.0, 10.0) + rng.normal(0, 1.0, len(t))     # settles after 8 s
+    score[t > 20] += 60.0                                                # then a sustained break
+    bar = ratchet_threshold(score, t, k=6.0)
+    assert np.isinf(bar[t < 5]).all()                                    # no bar during warm-up
+    settled, during_break = bar[(t > 9) & (t < 10)].max(), bar[t > 25].min()
+    assert settled > 40                                                  # set while the score was still high
+    assert during_break <= bar[(t > 15) & (t < 16)].min()                # never rises again
+    assert np.all(np.diff(bar[t >= 5]) <= 1e-9)                          # one-way
+    assert (score[t > 25] > bar[t > 25]).mean() > 0.9                    # the break stays flagged
+
+
+def test_deviation_roc_takes_the_ratchet_rule():
+    from trajmem.metrics import deviation_roc
+
+    t = np.arange(0, 30, 0.005)
+    score = np.where(t < 20, 10.0, 80.0) + np.random.default_rng(1).normal(0, 1.0, len(t))
+    out = deviation_roc(score, t, [20.0], threshold="ratchet")
+    assert out["latency_s"] < 0.5 and out["fp_per_min"] == 0 and out["auc"] > 0.99
+    with pytest.raises(ValueError):
+        deviation_roc(score, t, [20.0], threshold="sideways")
