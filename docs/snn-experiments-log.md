@@ -659,3 +659,46 @@ on the way: Windows parks hidden background jobs on the efficiency cores and thr
 them (the clip generator went 95 → 2169 s per clip; a trainer 12 → 34 min per epoch),
 so `_prefer_performance_cores` now also raises the priority and the generator calls it.
 Visual bench: `scripts/bench.py` (three pipelines side by side, `corpus/bench.yaml`).
+
+**Run 19 — Phase D: an alarm that needs no labels (2026-09-23).** Until now the
+deviation numbers used each clip's own pre-break scores (99th percentile) as the
+operating point, which needs the answer to compute the question. Replaced by a
+*ratcheting* bar (`metrics.ratchet_threshold`): the lowest `median + k x spread` the
+score has reached over a trailing 2 s, causal and one-way. It tightens while the memory
+settles on the path and never loosens, so a deviation cannot lift the bar meant to catch
+it and a slow drift is still caught; before 5 s there is no bar. Sagi's objection to a
+fixed calibration window — the score is still falling for seconds after lock-on — is what
+the ratchet answers.
+
+`k` was chosen on the development clips (held-out untouched), sweeping 3..30: the break is
+never missed at any k, so k only trades latency against false alarms. k = 25 is the
+smallest value that raises no false alarm at all; median latency 0.23 s. The same sweep on
+20 new 45 s simulated clips (`sim_400`-`sim_419`, breaks in the middle third) has the same
+shape but keeps ~3 false alarms a minute and misses 4 of 10 breaks at any k -- its
+deviations include gradual ones (drift, shrink, speed change) and its clips settle later,
+so simulation is the harder case, not the calibration set.
+
+Development set, the same rule applied to each method's own score (pooled medians):
+
+| memory | prediction px | path px | AUC | latency s | false alarms/min |
+|---|---|---|---|---|---|
+| snn_phasemap (spiking) | 13.5 | 12.9 | 0.98 | 0.23 | 0.00 |
+| phasemap (arithmetic) | 14.5 | 13.1 | 1.00 | 0.15 | 0.00 |
+| kalman | 13.7 | 14.1 | 0.86 | 0.42 | 39.93 |
+| harmonic | 23.4 | 10.0 | 0.72 | 0.14 | 0.00 |
+
+The Kalman's signal is unusable at a threshold it must set for itself: 40 false alarms a
+minute against the clock-and-map memories' none. `--threshold oracle` keeps the old
+label-using percentile as a reference, `--threshold <px>` a fixed bar.
+
+**Not fixed: the half-period lock.** On `loop_break_01` (a diagonal sweep out and back)
+the memory clocks at half the true period, which describes *position* just as well
+because the path retraces itself; only the direction of travel distinguishes the two
+halves. A direction test was implemented and measured: comparing the target's movement
+with the map's tangent over a 100 ms baseline scores only 0.4-0.7 on correctly locked
+clips, so any threshold that catches the genuine half-lock also trips the good ones. It
+fired on 5 of 8 development clips and made every one worse -- `loop_break_01` prediction
+23.6 -> 39.5 px and AUC 0.97 -> 0.70, the pendulum `wide_02` 20.5 -> 68.8 px. Reverted.
+The half-period lock costs only the path-shape number (the remembered cycle is half of
+the reference cycle); prediction is *better* at the half period. Reported as a property,
+not repaired.
