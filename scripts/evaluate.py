@@ -30,8 +30,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import _thesis_path  # noqa: F401,E402  (adds the thesis repo to sys.path)
 import numpy as np  # noqa: E402
 
-from trajmem.experiment import (evaluate_clip, make_localiser, make_memory,  # noqa: E402
-                                open_set, score_trace)
+from trajmem.experiment import (evaluate_clip, load_set, make_localiser,  # noqa: E402
+                                make_memory, open_one, score_trace)
 from trajmem.metrics import RATCHET_K  # noqa: E402
 
 MEMORIES = ("snn_phasemap", "phasemap", "kalman", "harmonic")
@@ -41,9 +41,15 @@ FIELDS = ("set", "memory", "input", "horizon_s", "clip", "err_median_px", "err_i
           "fp_per_min", "unseen_fraction", "offset_x_px", "offset_y_px", "n_steps")
 
 
-def rows_for(set_name, clips, memory: str, input_name: str, args, localiser) -> list[dict]:
+def rows_for(set_name, entries, memory: str, input_name: str, args, localiser) -> list[dict]:
+    """One clip at a time: a simulated clip is ~300 MB of events, so the whole set must
+    never be resident at once."""
     out = []
-    for clip_name, clip in clips:
+    for entry in entries:
+        clip = open_one(entry)
+        if clip is None:
+            continue
+        clip_name = entry["name"]
         mem = make_memory(memory, dt_s=args.window_us / 1e6, warmup_s=args.warmup, checkpoint=args.checkpoint)
         traces = evaluate_clip(mem, clip, args.window_us, args.horizons, localiser=localiser)
         for tr in traces:
@@ -157,20 +163,20 @@ def main(argv=None) -> None:
     args.threshold_rule = None if args.threshold == "oracle" else (
         "ratchet" if args.threshold == "ratchet" else float(args.threshold))
 
-    clips = open_set(args.set_name)
-    if args.sample and args.sample < len(clips):
-        idx = np.random.default_rng(args.seed).permutation(len(clips))[:args.sample]
-        clips = [clips[i] for i in sorted(idx)]
+    entries = load_set(args.set_name)
+    if args.sample and args.sample < len(entries):
+        idx = np.random.default_rng(args.seed).permutation(len(entries))[:args.sample]
+        entries = [entries[i] for i in sorted(idx)]
     out_dir = pathlib.Path(args.out) / args.set_name
     out_dir.mkdir(parents=True, exist_ok=True)
-    print(f"set {args.set_name}: {len(clips)} clips  memories {args.memories}  inputs {args.inputs}  "
+    print(f"set {args.set_name}: {len(entries)} clips  memories {args.memories}  inputs {args.inputs}  "
           f"horizons {args.horizons}  alarm {args.threshold}", flush=True)
 
     rows, t0 = [], time.time()
     for input_name in args.inputs:
         localiser = make_localiser(input_name, args.localiser_checkpoint) if input_name != "centroid" else None
         for memory in args.memories:
-            rows += rows_for(args.set_name, clips, memory, input_name, args, localiser)
+            rows += rows_for(args.set_name, entries, memory, input_name, args, localiser)
             print(f"  {memory:13} {input_name:14} done  {time.time() - t0:5.0f} s", flush=True)
 
     pooled = pool(rows)

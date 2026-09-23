@@ -256,21 +256,32 @@ def load_set(name: str, path=None) -> list[dict]:
     return out
 
 
-def open_set(name: str, path=None) -> list[tuple[str, Clip]]:
-    """The set's clips, loaded and sliced; entries without ground truth yet are skipped."""
+def open_one(entry) -> Clip | None:
+    """One set entry loaded and sliced; None when it has no ground truth yet."""
     from .data import load_clip, load_recording, slice_clip
 
-    clips = []
+    p = Path(entry["clip"])
+    clip = load_clip(p) if p.suffix == ".npz" else load_recording(p)
+    if clip.gt is None:
+        return None
+    if entry["slice"] is not None:
+        t0, t1 = entry["slice"]
+        clip = slice_clip(clip, t0 or 0.0, clip.duration_us / 1e6 if t1 is None else t1)
+    return clip
+
+
+def iter_set(name: str, path=None):
+    """(name, clip) one at a time, so a large corpus is never all in memory at once."""
     for e in load_set(name, path):
-        p = Path(e["clip"])
-        clip = load_clip(p) if p.suffix == ".npz" else load_recording(p)
-        if clip.gt is None:
-            continue
-        if e["slice"] is not None:
-            t0, t1 = e["slice"]
-            clip = slice_clip(clip, t0 or 0.0, clip.duration_us / 1e6 if t1 is None else t1)
-        clips.append((e["name"], clip))
-    return clips
+        clip = open_one(e)
+        if clip is not None:
+            yield e["name"], clip
+
+
+def open_set(name: str, path=None) -> list[tuple[str, Clip]]:
+    """The set's clips, loaded and sliced; entries without ground truth yet are skipped.
+    A simulated clip holds tens of millions of events, so prefer `iter_set` for big sets."""
+    return list(iter_set(name, path))
 
 
 def run_set(make_memory_fn, clips, window_us: int, horizon_s: float, tol_px: float,

@@ -10,7 +10,9 @@ def test_evaluate_writes_the_paper_tables(tmp_path, monkeypatch):
     steady = a_clip_of_events(a_spec(), duration_s=12.0)
     broken = a_clip_of_events(a_spec([Deviation(at_t=8.0, kind="shrink", params={"factor": 0.4})]), duration_s=12.0)
     broken.deviation_times.append(8.0)
-    monkeypatch.setattr(evaluate, "open_set", lambda name: [("steady", steady), ("broken", broken)])
+    monkeypatch.setattr(evaluate, "load_set", lambda name: [{"name": "steady", "clip": "steady"},
+                                                            {"name": "broken", "clip": "broken"}])
+    monkeypatch.setattr(evaluate, "open_one", lambda e: {"steady": steady, "broken": broken}[e["clip"]])
     monkeypatch.chdir(tmp_path)
 
     evaluate.main(["--set", "development", "--memories", "kalman", "harmonic",
