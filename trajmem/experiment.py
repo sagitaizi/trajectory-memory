@@ -124,10 +124,16 @@ def positions(clip: Clip, window_us: int, localiser=None):
         yield (t0 + window_us / 2) / 1e6, float(x), float(y)
 
 
-def evaluate_clip(memory, clip: Clip, window_us: int, horizon_s: float, blank=None, localiser=None) -> Trace:
+def evaluate_clip(memory, clip: Clip, window_us: int, horizon_s, blank=None, localiser=None):
     """Stream the clip through the memory. With `blank` = (t0, t1) the observations in
     that window are hidden (NaN), the test of a memory that runs on its own. With a
-    `localiser` the positions come from it instead of the classical centroid."""
+    `localiser` the positions come from it instead of the classical centroid.
+
+    `horizon_s` may be a sequence, in which case the clip is streamed once -- the memory's
+    state does not depend on how far ahead it is asked about -- and one Trace per horizon
+    comes back in that order."""
+    many = np.ndim(horizon_s) > 0
+    horizons = tuple(float(h) for h in horizon_s) if many else (float(horizon_s),)
     memory.reset()
     period_s = clip_period(clip) if clip.gt is not None else np.nan
     rows, periods, cycles = [], [], []
@@ -135,18 +141,22 @@ def evaluate_clip(memory, clip: Clip, window_us: int, horizon_s: float, blank=No
         if blank is not None and blank[0] <= t < blank[1]:
             x = y = np.nan
         memory.observe(x, y)
-        rows.append((t, x, y, *memory.predict(horizon_s), memory.deviation_score()))
+        preds = [v for h in horizons for v in memory.predict(h)]
+        rows.append((t, x, y, *preds, memory.deviation_score()))
         periods.append(memory.period())
         cycles.append(remembered_path(memory, period_s))
     a = np.array(rows, dtype=float)
-    ahead = a[:, 0] + horizon_s
-    gt = np.full((len(a), 2), np.nan)
-    inside = ahead <= clip.duration_us / 1e6
-    if clip.gt is not None and inside.any():
-        gt[inside] = np.atleast_2d(clip.gt(ahead[inside]))
-    return Trace(t=a[:, 0], obs=a[:, 1:3], pred=a[:, 3:5], gt_ahead=gt, score=a[:, 5],
-                 horizon_s=horizon_s, window_us=window_us, period=np.array(periods), cycles=np.array(cycles),
-                 blank=blank)
+    traces = []
+    for k, h in enumerate(horizons):
+        ahead = a[:, 0] + h
+        gt = np.full((len(a), 2), np.nan)
+        inside = ahead <= clip.duration_us / 1e6
+        if clip.gt is not None and inside.any():
+            gt[inside] = np.atleast_2d(clip.gt(ahead[inside]))
+        traces.append(Trace(t=a[:, 0], obs=a[:, 1:3], pred=a[:, 3 + 2 * k:5 + 2 * k], gt_ahead=gt, score=a[:, -1],
+                            horizon_s=h, window_us=window_us, period=np.array(periods), cycles=np.array(cycles),
+                            blank=blank))
+    return traces if many else traces[0]
 
 
 def remembered_path(memory, period_s: float, n: int = CYCLE_POINTS) -> np.ndarray:

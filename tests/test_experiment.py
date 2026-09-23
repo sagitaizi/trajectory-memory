@@ -256,3 +256,14 @@ def test_evaluate_clip_with_a_frame_localiser_matches_the_centroid_path():
     assert make_localiser("centroid") is None and isinstance(make_localiser("frame_centroid"), FrameCentroid)
     with pytest.raises(ValueError):
         make_localiser("sideways")
+
+
+def test_evaluate_clip_serves_several_horizons_from_one_pass():
+    clip = a_clip_of_events(a_spec())
+    many = evaluate_clip(HarmonicFit(dt_s=0.005, warmup_s=3.0), clip, 5000, (0.05, 0.1))
+    assert [tr.horizon_s for tr in many] == [0.05, 0.1]
+    for tr in many:
+        one = evaluate_clip(HarmonicFit(dt_s=0.005, warmup_s=3.0), clip, 5000, tr.horizon_s)
+        assert np.allclose(tr.pred, one.pred, equal_nan=True)
+        assert np.allclose(tr.gt_ahead, one.gt_ahead, equal_nan=True)
+        assert np.allclose(tr.score, one.score, equal_nan=True)
