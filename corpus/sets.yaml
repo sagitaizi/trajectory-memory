@@ -29,4 +29,9 @@ held_out:
   - {clip: corpus/real/wall/scan_diag_break_01}
 
 sim:
-  - {glob: corpus/sim/sim_*.npz}
+  - {glob: "corpus/sim/sim_[0-3]*.npz"}
+
+# Long simulated clips (45 s, break in the middle third): the clock-and-map memories need
+# a few laps to learn a path before a break means anything, which a 15 s clip barely gives.
+sim_long:
+  - {glob: corpus/sim/sim_4*.npz}
