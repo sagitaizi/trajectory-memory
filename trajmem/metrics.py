@@ -1,15 +1,21 @@
-"""Prediction error, path-shape error, lock-on time, deviation-detection ROC + latency.
-Definitions follow materials/02-methods/metrics.md."""
+"""Displacement error (ADE/FDE), path-shape error, lock-on time, deviation-detection
+ROC + latency. Definitions follow materials/02-methods/metrics.md."""
 from __future__ import annotations
+
+from collections import deque
 
 import numpy as np
 
 SUB_SHIFTS = 8                     # phase-alignment resolution of path_shape_error, in fractions of a point
 
 
-def prediction_error(pred, gt) -> dict:
+def displacement_error(pred, gt) -> dict:
     """Distance between prediction and truth per step; median / IQR / mean over the
-    steps where both are known. Units are whatever the inputs are in."""
+    steps where both are known. Units are whatever the inputs are in.
+
+    At one horizon h this is the trajectory-prediction literature's FDE(h), pooled over
+    the clip's steps rather than over a set of trajectories; `ade_fde` combines the
+    horizons."""
     pred, gt = np.asarray(pred, dtype=float), np.asarray(gt, dtype=float)
     errors = np.hypot(pred[:, 0] - gt[:, 0], pred[:, 1] - gt[:, 1])
     e = errors[np.isfinite(errors)]
@@ -18,6 +24,17 @@ def prediction_error(pred, gt) -> dict:
     q1, q3 = np.percentile(e, [25, 75])
     return {"errors": errors, "median": float(np.median(e)), "iqr": float(q3 - q1),
             "mean": float(e.mean()), "n": int(len(e))}
+
+
+def ade_fde(by_horizon: dict) -> dict:
+    """ADE and FDE from one `displacement_error` per horizon, in the trajectory-prediction
+    convention: FDE is the error at the longest horizon, ADE the mean over every horizon
+    up to it. Our horizons are the future instants we predict, so their mean is the
+    average displacement over the predicted stretch."""
+    hs = sorted(h for h, e in by_horizon.items() if np.isfinite(e))
+    if not hs:
+        return {"ade": np.nan, "fde": np.nan}
+    return {"ade": float(np.mean([by_horizon[h] for h in hs])), "fde": float(by_horizon[hs[-1]])}
 
 
 def path_shape_error(cycle, reference) -> float:
@@ -84,6 +101,32 @@ def ratchet_threshold(scores, times, k: float = RATCHET_K, window_s: float = 2.0
                 bar = min(bar, max(med + k * mad, floor_px))
         out[i] = bar
     return out
+
+
+class RatchetAlarm:
+    """`ratchet_threshold` one step at a time, for a memory that is running live.
+
+    `update(score, t)` returns True while the deviation is flagged: the score has stood
+    above the bar for `hold_n` steps. Same rule and defaults as the batch function, so a
+    live run and a scored one agree.
+    """
+
+    def __init__(self, k: float = RATCHET_K, window_s: float = 2.0, warmup_s: float = 5.0,
+                 floor_px: float = 5.0, hold_n: int = 3, dt_s: float = 0.005):
+        self.k, self.warmup_s, self.floor_px, self.hold_n = k, warmup_s, floor_px, hold_n
+        self.window = deque(maxlen=max(4, int(round(window_s / dt_s))))
+        self.bar, self.above = np.inf, 0
+
+    def update(self, score: float, t: float) -> bool:
+        if np.isfinite(score):
+            self.window.append(float(score))
+        if t >= self.warmup_s and len(self.window) == self.window.maxlen:
+            w = np.array(self.window)
+            med = float(np.median(w))
+            mad = float(np.median(np.abs(w - med))) * 1.4826
+            self.bar = min(self.bar, max(med + self.k * mad, self.floor_px))
+        self.above = self.above + 1 if (np.isfinite(score) and score > self.bar) else 0
+        return self.above >= self.hold_n
 
 
 def deviation_roc(scores, times, deviation_times, threshold=None,

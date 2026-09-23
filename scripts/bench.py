@@ -28,6 +28,7 @@ import yaml  # noqa: E402
 from scripts.mark_anchors import accumulate  # noqa: E402
 from scripts.replay_gt import (LiveOverlay, _draw, _window_events, frame_times,  # noqa: E402
                                open_clip, to_pixels, trail_points)
+from trajmem.metrics import RatchetAlarm  # noqa: E402
 
 BENCH = pathlib.Path("corpus/bench.yaml")
 PIPELINES = (("centroid -> Kalman", "kalman", "centroid"),
@@ -84,6 +85,8 @@ class Panels:
         self.view_window_s, self.view_brightness, self.trail_s, self.zoom = view_window_s, view_brightness, trail_s, zoom
         self.max_width = max_width
         self.errors = [[] for _ in overlays]
+        self.alarms = [RatchetAlarm() for _ in overlays]        # the same rule the scoring uses
+        self.flagged = [False] * len(overlays)
         # The pipelines are independent and torch drops the GIL, so stepping them in
         # parallel costs about the slowest one instead of the sum.
         self.pool = concurrent.futures.ThreadPoolExecutor(max_workers=len(overlays))
@@ -105,12 +108,20 @@ class Panels:
         for k, (ov, step) in enumerate(zip(self.overlays, steps)):
             if np.isfinite(step["err_px"]):
                 self.errors[k].append(step["err_px"])
+            self.flagged[k] = self.alarms[k].update(step.get("score", np.nan), mid)
             view = _draw(img, gt_px, trail_px, None, self.zoom, ov.name, t, self.view_window_s,
                          self.view_brightness, None, model={"step": step, "name": ov.memory.__class__.__name__},
                          footer="")
             if self.errors[k]:
                 cv2.putText(view, f"median err {np.median(self.errors[k]):5.1f} px", (view.shape[1] - 190, 42),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1, cv2.LINE_AA)
+            if self.flagged[k]:                                  # the memory says: not the remembered path
+                cv2.rectangle(view, (2, 2), (view.shape[1] - 3, view.shape[0] - 3), (0, 0, 255), 4)
+                cv2.putText(view, "DEVIATION", (view.shape[1] // 2 - 80, 64), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.9, (0, 0, 255), 2, cv2.LINE_AA)
+            bar = f"alarm bar {self.alarms[k].bar:5.1f} px" if np.isfinite(self.alarms[k].bar) else "alarm settling"
+            cv2.putText(view, bar, (8, view.shape[0] - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
+                        (120, 200, 255), 1, cv2.LINE_AA)
             panels.append(view)
         tiled = np.hstack(panels)
         header = np.zeros((_HEADER_PX, tiled.shape[1], 3), np.uint8)
