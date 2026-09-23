@@ -20,7 +20,7 @@ freely moving real target, with a break signal.
 | A — Data | 🟨 Real corpus recorded and split; development set labelled; sim corpus generated. **Open: label the held-out clips.** |
 | B — Frontend + baselines | ✅ |
 | C — Trajectory memory, Stage 1 | 🟨 **In progress.** Network, training and evaluation built; 13.6 px at 100 ms on sim (Kalman 7.5), at the Kalman bar on the development set. Open: the cycle memory. |
-| D — Deviation detection | ⬜ Scoring exists; thresholds must be chosen on development clips. |
+| D — Deviation detection | ✅ Label-free ratcheting alarm, k = 25 chosen on development: AUC 0.98, 0.23 s, no false alarms (Kalman 0.86, 39.9/min). Held-out pending labels. |
 | E — Raw events, Stage 2 | ⬜ Only if Stage 1 lands. |
 | F — Paper | 🟨 Written as sections unlock; draft due 2026-10-01. |
 
@@ -202,11 +202,20 @@ freely moving real target, with a break signal.
   baseline *or* matches it with a stated event-native/latency argument; lock-on within N
   cycles. Bar: Kalman 24.2 px pooled (8.0 on the fan), ~3 px on sim.
 
-## D — Deviation detection
+## D — Deviation detection ✅
 
-- Score = prediction error against the learned path; a flag is `hold_n` steps above a
-  threshold chosen on development clips and applied unchanged to held-out ones.
-- **Done when:** AUC, latency and false-alarm rate reported on real break clips.
+- Score = how far the raw observation sits from where the memory's map expects it (px),
+  scored before the input gate. A flag is 3 consecutive steps above the bar.
+- The bar is **ratcheting** (`metrics.ratchet_threshold`): the lowest `median + k x spread`
+  the score has reached over a trailing 2 s, causal and one-way, so it tightens while the
+  memory settles and never loosens. No labels, no calibration window to place.
+- `k = 25`, the smallest of 3..30 that raises no false alarm on the development clips;
+  both breaks still caught, 0.23 s median. Held-out untouched. `--threshold oracle` keeps
+  the old label-using percentile as a reference.
+- Development set, same rule on each method's own score (pooled): spiking memory AUC 0.98,
+  0.23 s, 0.00 false alarms/min; arithmetic prototype 1.00, 0.15 s, 0.00; Kalman 0.86,
+  0.42 s, **39.9**; harmonic 0.72, 0.14 s, 0.00.
+- **Open:** the same numbers on the held-out break clips, once they are labelled.
 
 ## E — Raw events, Stage 2 (upside)
 
