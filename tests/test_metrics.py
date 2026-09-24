@@ -1,24 +1,24 @@
 import numpy as np
 import pytest
 
-from trajmem.metrics import deviation_roc, lock_on_time, prediction_error
+from trajmem.metrics import ade_fde, deviation_roc, displacement_error, lock_on_time
 
 
 # --- prediction error -----------------------------------------------------------
 
-def test_prediction_error_summarises_the_distance_per_step():
+def test_displacement_error_summarises_the_distance_per_step():
     pred = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 3.0], [np.nan, 0.0]])
     gt = np.array([[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
-    r = prediction_error(pred, gt)
+    r = displacement_error(pred, gt)
     assert np.allclose(r["errors"], [0.0, 1.0, 3.0, np.nan], equal_nan=True)
     assert r["median"] == 1.0 and r["mean"] == pytest.approx(4 / 3) and r["n"] == 3
     assert r["iqr"] == pytest.approx(np.percentile([0, 1, 3], 75) - np.percentile([0, 1, 3], 25))
 
 
-def test_prediction_error_ignores_steps_with_unknown_ground_truth():
+def test_displacement_error_ignores_steps_with_unknown_ground_truth():
     pred = np.array([[1.0, 0.0], [1.0, 0.0]])
     gt = np.array([[0.0, 0.0], [np.nan, np.nan]])
-    assert prediction_error(pred, gt)["n"] == 1
+    assert displacement_error(pred, gt)["n"] == 1
 
 
 # --- lock-on --------------------------------------------------------------------
@@ -134,3 +134,33 @@ def test_deviation_roc_takes_the_ratchet_rule():
     assert out["latency_s"] < 0.5 and out["fp_per_min"] == 0 and out["auc"] > 0.99
     with pytest.raises(ValueError):
         deviation_roc(score, t, [20.0], threshold="sideways")
+
+
+def test_ratchet_alarm_matches_the_batch_rule_step_by_step():
+    from trajmem.metrics import RatchetAlarm, deviation_roc, ratchet_threshold
+
+    t = np.arange(0, 30, 0.005)
+    score = np.where(t < 8, 40.0, 10.0) + np.random.default_rng(0).normal(0, 1.0, len(t))
+    score[t > 20] += 60.0
+    alarm = RatchetAlarm()
+    live = np.array([alarm.update(s, ti) for s, ti in zip(score, t)])
+    batch = ratchet_threshold(score, t)
+    assert np.allclose(alarm.bar, batch[-1])
+    flagged = deviation_roc(score, t, [20.0], threshold=batch)
+    assert live[t > 21].mean() > 0.9 and not live[t < 20].any()
+    assert flagged["latency_s"] < 0.5
+
+
+def test_ade_is_the_mean_over_horizons_and_fde_the_longest():
+    r = ade_fde({0.05: 2.0, 0.1: 4.0, 0.2: 6.0})
+    assert r["ade"] == 4.0 and r["fde"] == 6.0
+    assert np.isnan(ade_fde({0.05: np.nan})["ade"])
+
+
+def test_k_is_calibrated_per_input():
+    from trajmem.metrics import RATCHET_K_BY_INPUT, k_for_input
+
+    assert k_for_input("centroid") == RATCHET_K_BY_INPUT["centroid"] == 25.0
+    assert k_for_input("snn") == 16.0                      # the learned localiser needs a lower bar
+    assert k_for_input(None) == k_for_input("centroid")    # the default input
+    assert k_for_input("something else") == 25.0

@@ -70,8 +70,18 @@ def lock_on_time(errors, tol: float, dt: float) -> float:
     return float(after[0] * dt) if len(after) else np.inf
 
 
+# Spreads above the settled score, calibrated per input on the development clips: the
+# smallest k that misses no break, and among those the fewest false alarms. The classical
+# centroid affords a k with neither; through the spiking localiser a deviation is less
+# separable from quiet running, and every k costs one or the other.
+RATCHET_K_BY_INPUT = {"centroid": 25.0, "frame_centroid": 25.0, "snn": 16.0}
 RATCHET_K = 25.0                   # spreads above the settled score: the smallest of 3..30 that raised
                                    # no false alarm on the development clips (breaks still caught in 0.23 s)
+
+
+def k_for_input(name: str | None) -> float:
+    """The alarm constant calibrated for that position input (see RATCHET_K_BY_INPUT)."""
+    return RATCHET_K_BY_INPUT.get(name or "centroid", RATCHET_K)
 
 
 def ratchet_threshold(scores, times, k: float = RATCHET_K, window_s: float = 2.0,

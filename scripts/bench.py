@@ -28,7 +28,7 @@ import yaml  # noqa: E402
 from scripts.mark_anchors import accumulate  # noqa: E402
 from scripts.replay_gt import (LiveOverlay, _draw, _window_events, frame_times,  # noqa: E402
                                open_clip, to_pixels, trail_points)
-from trajmem.metrics import RatchetAlarm  # noqa: E402
+from trajmem.metrics import RatchetAlarm, k_for_input  # noqa: E402
 
 BENCH = pathlib.Path("corpus/bench.yaml")
 PIPELINES = (("centroid -> Kalman", "kalman", "centroid"),
@@ -72,7 +72,9 @@ def make_overlays(clip, localiser, window_us: int, horizon_s: float, warmup_s: f
     out = []
     for label, memory, loc in pipelines:
         mem = make_memory(memory, dt_s=window_us / 1e6, warmup_s=warmup_s)
-        out.append(LiveOverlay(mem, clip, window_us, horizon_s, label, localiser if loc == "snn" else None))
+        overlay = LiveOverlay(mem, clip, window_us, horizon_s, label, localiser if loc == "snn" else None)
+        overlay.input_name = loc                              # which alarm constant this panel is scored with
+        out.append(overlay)
     return out
 
 
@@ -85,7 +87,8 @@ class Panels:
         self.view_window_s, self.view_brightness, self.trail_s, self.zoom = view_window_s, view_brightness, trail_s, zoom
         self.max_width = max_width
         self.errors = [[] for _ in overlays]
-        self.alarms = [RatchetAlarm() for _ in overlays]        # the same rule the scoring uses
+        # the same rule and constant the scoring uses, per panel's input
+        self.alarms = [RatchetAlarm(k=k_for_input(getattr(ov, "input_name", "centroid"))) for ov in overlays]
         self.flagged = [False] * len(overlays)
         # The pipelines are independent and torch drops the GIL, so stepping them in
         # parallel costs about the slowest one instead of the sum.
