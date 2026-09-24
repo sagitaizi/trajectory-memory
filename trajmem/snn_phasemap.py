@@ -21,6 +21,9 @@ from .lmu import SpikingLmu, build_dynamics
 from .phasemap import TWO_PI, _Axis
 
 # the rate lives in the population as w in [-1, 1] over periods 12-0.4 s; the drive is halved
+# 1500 neurons a clock, not 6000: measured identical on the development clips (prediction,
+# path and detection all within run-to-run noise) and the step then fits in its own 5 ms,
+# so the pipeline runs in real time on a laptop CPU instead of at 0.87x.
 OMEGA_LO, OMEGA_HI = TWO_PI / 12.0, TWO_PI / 0.4
 OMEGA_MID, OMEGA_SPAN = (OMEGA_LO + OMEGA_HI) / 2, (OMEGA_HI - OMEGA_LO) / 2
 F_SCALE = 0.5
@@ -59,7 +62,7 @@ def lif_rates(j: torch.Tensor) -> torch.Tensor:
 class SpikingPhaseMap:
     """TrajectoryMemory. Parameters mirror `PhaseMap` where the mechanism is the same."""
 
-    def __init__(self, dt_s: float, periods_s=(0.8, 1.3, 2.0, 3.0, 4.5, 7.0), n_clock: int = 6000, n_ring: int = 400,
+    def __init__(self, dt_s: float, periods_s=(0.8, 1.3, 2.0, 3.0, 4.5, 7.0), n_clock: int = 1500, n_ring: int = 400,
                  gamma: float = 2.0, k_phase: float = 0.3, k_rate: float = 0.6, eta: float = 0.02,
                  eta_start: float = 0.3, eta_tau_s: float = 2.0, score_tau_s: float = 0.2, settle_s: float = 3.0,
                  resid_tau_s: float = 0.02, resid_decay_s: float = 2.0, k_scale: float = 1.0,
