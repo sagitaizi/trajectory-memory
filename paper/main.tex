@@ -59,20 +59,22 @@ novelty detection, neuromorphic vision
 \section{Introduction}
 Sight is by far the dominant sense humans use to perceive the world around them \cite{Gallego2022Event}. The retina, a thin sheet of tissue in the eye, converts raw light into nerve signals that we then interpret as visual images. However, a flash of light can evoke a neural response in the brain with a delay of 30--100 ms \cite{Berry1999Anticipation}, during which a moving target can cover a significant distance and should therefore be seen behind its actual position. As this contradicts our daily experience, it has been suggested that the brain acts as a `prediction machine', modelling what comes next and attending to what deviates \cite{Clark2013Whatever}. This is most striking for repetitive motion, where the eyes can lock on to a moving target within a few cycles and follow it with almost no lag \cite{Barnes1991The}.
 
-The retina itself has a silicon counterpart \cite{Mahowald1991The}. Event cameras are low-power sensors that sample light based on the scene dynamics, and report per-pixel brightness changes as a stream of events with microsecond latency \cite{Gallego2022Event}. Spiking neural networks (SNNs) mimic the neurons behind it, computing via asynchronous discrete spikes which are sparse in time and allow for lower energy consumption and use with noisy inputs. Yet most pipelines built using them for tracking purposes react rather than anticipate---locating the target and extrapolating its position. A target that repeats its motion is exactly the case where prediction is possible, and event cameras and SNNs together are the parts from which such a biologically inspired prediction machine can be built. Such a system is useful in any application where a quick signal indicating that a target has deviated from its expected path is needed, for example in industrial inspection, robotics, and autonomous vehicles. 
-% P2 -- The problem, plainly. A single target repeats a path; from the event stream alone,
-% learn that path, predict the target's position a short horizon ahead, and signal when the
-% motion stops matching -- hard because the target is real and freely moving, the path is
-% acquired online rather than from a labelled batch, and the break signal must come from the
-% same model that predicts \cite{debat2021event,pingpong2025egocentric}.
+The retina itself has a silicon counterpart \cite{Mahowald1991The}. Event cameras are low-power sensors that sample light based on the scene dynamics, and report per-pixel brightness changes as a stream of events with microsecond latency \cite{Gallego2022Event}. Spiking neural networks (SNNs) mimic the neurons behind it, computing via asynchronous discrete spikes which are sparse in time and allow for lower energy consumption and use with noisy inputs. Yet most pipelines built using them for tracking purposes react rather than anticipate---locating the target and extrapolating its position. A target that repeats its motion is exactly the case where prediction is possible, and event cameras and SNNs together are the parts from which such a biologically inspired prediction machine can be built. Such a system is useful in any application where a quick signal indicating that a target has deviated from its expected path is needed, for example in industrial inspection, robotics, and autonomous vehicles \cite{Sho2026A,Thoduka2021Using}. 
 
-A target oscillating in a repetitive path generates events in a periodic pattern. A spiking network can learn this pattern and predict the target's position a short horizon ahead, as well as its estimated trajectory shape. When motion events stray from the learned path, the network can fire a deviation signal. Real object movement, however, is not perfectly periodic and can be affected by sensor noise, occlusions, and other imperfections. The system therefore must be robust and able to adapt to these variations while still providing accurate predictions and deviation detection. 
+A target oscillating in a repetitive manner generates events in a periodic pattern. The task is to learn this pattern from the event stream alone, predict the target's position a short horizon ahead, and signal when the motion stops matching. Real object movement, however, is never perfectly periodic--period and amplitude can drift and events can carry sensor noise, so the system must distinguish between these natural variations and actual deviation. For real-world scenarios, learning and detection must be performed online and without prior knowledge of the target's motion.
+%
+% TODO teaser figure, once the model is final: one pendulum clip, one column wide, top of
+% page 1 or 2. Left: an event frame with the learned path, current position, and predicted
+% position overlaid. Right: true vs predicted position over a few swings, and the deviation
+% score below it with the alarm marked. Must show a real deviation (sim clip if no real one).
+%
 % P3 -- Why spiking. Events are spikes, so a spiking network can consume them without a
 % framing step; the network's own dynamics carry the learned pattern and produce the
 % prediction, rather than a separate regressor on top; and the result maps onto neuromorphic
 % hardware -- the claim is event-native operation and dynamics-as-predictor, not better
 % accuracy than a periodic Kalman filter on clean motion.
-%
+
+
 % P4 -- What we do. A pipeline of event front end, localiser, and trajectory memory produces a
 % short-horizon prediction and a deviation score from prediction error; it is pretrained on
 % trajectories rendered through a calibrated event-camera simulator \cite{hu2021v2e} and
