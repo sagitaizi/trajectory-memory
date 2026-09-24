@@ -40,12 +40,18 @@ def iter_frames(spec: TrajectorySpec, cfg, intrinsics=None):
     it, so events fire inside the target too, as they do on a real brush. A blob of
     `kind` "sheet" is the wall-target setup instead: a small rectangle outline (the
     printed target, whose centre is the path) on a large rectangle outline (the sheet
-    it is held on) that moves rigidly with it -- only the edges make events.
+    it is held on) that moves rigidly with it -- only the edges make events. A blob of
+    `kind` "pendulum" is the pendulum brush: a long bar centred on the path, hanging from
+    the spec's pivot on a string that splits in a V to its top corners, with an optional
+    faint textured tuft (the bristles) below it.
     """
     import cv2
 
     if cfg["blob"].get("kind") == "sheet":
         yield from _iter_sheet_frames(spec, cfg, intrinsics)
+        return
+    if cfg["blob"].get("kind") == "pendulum":
+        yield from _iter_pendulum_frames(spec, cfg, intrinsics)
         return
 
     w, h = cfg["resolution"]
@@ -110,6 +116,52 @@ def _iter_sheet_frames(spec: TrajectorySpec, cfg, intrinsics=None):
         for centre, size, colour in ((sheet_c, (sw, sh), sheet_fg), ((cx, cy), (tw, th), fg)):
             box = cv2.boxPoints((centre, size, np.degrees(angle))).astype(np.int32)
             cv2.polylines(frame, [box], isClosed=True, color=colour, thickness=thick, lineType=cv2.LINE_AA)
+        yield frame
+
+
+def _iter_pendulum_frames(spec: TrajectorySpec, cfg, intrinsics=None):
+    import cv2
+
+    w, h = cfg["resolution"]
+    fps = cfg["fps"]
+    n = int(round(cfg["duration_s"] * fps))
+    px = _path_pixels(spec, np.arange(n) / fps, (w, h), intrinsics)
+    pivot = np.array(spec.center, dtype=float) * (w, h)
+    blob = cfg["blob"]
+    bg, fg = float(blob["bg_intensity"]), float(blob["fg_intensity"])
+    length, width = (float(v) for v in blob["bar_px"])
+    string, tuft = blob["string"], blob.get("tuft")
+    colour, thick = float(string["intensity"]), int(string["thickness_px"])
+    if tuft:
+        t_axes = (max(1, round(tuft["length_px"] / 2)), max(1, round(width * 0.6)))
+        t_fg = bg + float(tuft["contrast"]) * (fg - bg)
+        patch = _texture_patch(tuft.get("texture"), t_axes, t_fg, bg)
+    for i in range(n):
+        frame = np.full((h, w), bg, dtype=np.float32)
+        c = px[i]
+        u = (c - pivot) / max(np.hypot(*(c - pivot)), 1e-6)                # down the string
+        v = np.array([-u[1], u[0]])
+        top, bottom = c - u * length / 2, c + u * length / 2
+        knot = top - u * float(string.get("loop_px", 0.0))
+        pt = lambda q: (int(round(q[0])), int(round(q[1])))              # noqa: E731
+        cv2.line(frame, pt(pivot), pt(knot), colour, thick)
+        for side in (-1, 1):
+            cv2.line(frame, pt(knot), pt(top + side * v * width / 2), colour, thick)
+        if tuft:
+            centre = bottom + u * t_axes[0]
+            angle = np.degrees(np.arctan2(u[1], u[0]))
+            mask = np.zeros((h, w), dtype=np.uint8)
+            cv2.ellipse(mask, pt(centre), t_axes, angle, 0, 360, 1, thickness=-1)
+            if patch is None:
+                frame[mask > 0] = t_fg
+            else:
+                mid = (patch.shape[0] - 1) / 2
+                m = cv2.getRotationMatrix2D((mid, mid), -angle, 1.0)
+                m[:, 2] += (centre[0] - mid, centre[1] - mid)
+                warped = cv2.warpAffine(patch, m, (w, h), flags=cv2.INTER_LINEAR, borderValue=t_fg)
+                frame[mask > 0] = warped[mask > 0]
+        box = np.array([top - v * width / 2, top + v * width / 2, bottom + v * width / 2, bottom - v * width / 2])
+        cv2.fillPoly(frame, [np.round(box).astype(np.int32)], fg)
         yield frame
 
 

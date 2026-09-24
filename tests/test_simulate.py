@@ -262,3 +262,30 @@ def test_a_reloaded_sim_clip_rebuilds_its_truth_with_the_calibration_it_was_rend
                         lambda camera_cfg=None: seen.append(camera_cfg) or load_intrinsics())
     load_clip(save_clip(clip, tmp_path / "c")).gt(0.0)
     assert seen == [{"calibration": None}]
+
+
+def a_hanging_bar(tuft=None):
+    cfg = {**SIM_CFG, "resolution": [160, 120],
+           "blob": {"kind": "pendulum", "bg_intensity": 20, "fg_intensity": 180, "bar_px": [40, 8],
+                    "string": {"thickness_px": 1, "intensity": 100, "loop_px": 8}, "tuft": tuft}}
+    spec = TrajectorySpec(shape="pendulum", size=(0.0, 0.0), period_s=1.0, center=(0.5, -0.5), arm=(0.0, 1.0))
+    return spec, cfg                                              # hangs still at (80, 60)
+
+
+def test_a_pendulum_bar_is_centred_on_the_path_and_hangs_along_the_string():
+    spec, cfg = a_hanging_bar()
+    frame = render_frames(spec, cfg)[0]
+    ys, xs = np.where(frame == 180)
+    assert abs(xs.mean() - 80) < 1 and abs(ys.mean() - 60) < 1
+    assert 36 <= np.ptp(ys) <= 42 and 6 <= np.ptp(xs) <= 10
+    assert (frame[:30, 80] == 100).all()                          # the string, from above the frame
+    assert (frame[85:, :] == 20).all()                            # nothing below the bar
+
+
+def test_a_pendulum_tuft_sits_below_the_bar_and_is_fainter():
+    spec, cfg = a_hanging_bar(tuft={"length_px": 12, "contrast": 0.3,
+                                    "texture": {"depth": 0.5, "scale_px": 2, "seed": 1}})
+    frame = render_frames(spec, cfg)[0]
+    below = frame[81:94, 70:91]
+    assert (below > 20).sum() > 30
+    assert below.max() < 180

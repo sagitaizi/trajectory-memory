@@ -290,3 +290,29 @@ def test_search_period_finds_the_fundamental_of_a_figure8_and_a_lissajous():
     t = np.arange(0, 6.0, 0.005)
     for spec in (fig8, liss):
         assert np.isclose(search_period(t, sample(spec, t)), 2.0, rtol=0.02)
+
+
+def pendulum(amp=0.5, arm=(0.5, 0.6), pivot=(0.5, -0.2), period=1.2, deviations=None):
+    return TrajectorySpec(shape="pendulum", size=(amp, amp), period_s=period, center=pivot, arm=arm,
+                          deviations=deviations or [])
+
+
+def test_pendulum_hangs_straight_below_the_pivot_at_phase_zero():
+    assert np.allclose(sample(pendulum(), 0.0), (0.5, -0.2 + 0.6))
+
+
+def test_pendulum_stays_one_arm_from_the_pivot_and_swings_to_the_amplitude():
+    spec = pendulum(amp=0.5)
+    pos = sample(spec, np.linspace(0, spec.period_s, 400))
+    dx, dy = (pos[:, 0] - 0.5) / 0.5, (pos[:, 1] + 0.2) / 0.6
+    assert np.allclose(np.hypot(dx, dy), 1.0)
+    swing = np.arctan2(dx, dy)
+    assert np.isclose(swing.max(), 0.5, atol=1e-3) and np.isclose(swing.min(), -0.5, atol=1e-3)
+
+
+def test_pendulum_shrink_narrows_the_swing_not_the_string():
+    spec = pendulum(amp=0.5, deviations=[Deviation(at_t=0.0, kind="shrink", params={"factor": 0.5})])
+    pos = sample(spec, np.linspace(0, spec.period_s, 400))
+    dx, dy = (pos[:, 0] - 0.5) / 0.5, (pos[:, 1] + 0.2) / 0.6
+    assert np.allclose(np.hypot(dx, dy), 1.0)
+    assert np.isclose(np.arctan2(dx, dy).max(), 0.25, atol=1e-3)

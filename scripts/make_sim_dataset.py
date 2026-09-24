@@ -65,6 +65,35 @@ def random_spec(rng: np.random.Generator, path_cfg: dict, duration_s: float) -> 
     raise RuntimeError("could not draw a path that stays inside the frame")
 
 
+def random_pendulum_spec(rng: np.random.Generator, cfg: dict, wobble_cfg: dict, duration_s: float,
+                         resolution) -> TrajectorySpec:
+    """A swinging bob under a pivot above the frame, drawn in the real pendulum clips'
+    ranges. The wobble beats the swing but never moves the pivot; a break narrows the
+    swing (down to near-still, the pendulum caught) or widens it (a re-push)."""
+    w, h = resolution
+    u = lambda key: float(rng.uniform(*cfg[key]))  # noqa: E731
+    margin = cfg["margin"]
+    for _ in range(200):
+        arm_px, swing = u("arm_px"), u("swing")
+        deviations = []
+        if rng.uniform() < cfg["deviation_fraction"]:
+            factor = rng.uniform(0.05, 0.7) if rng.uniform() < 0.5 else rng.uniform(1.3, 1.6)
+            deviations = [Deviation(at_t=float(rng.uniform(duration_s / 3, 2 * duration_s / 3)), kind="shrink",
+                                    params={"factor": float(factor)})]
+        wobble = _random_wobble(rng, wobble_cfg)
+        if wobble is not None:
+            wobble.drift = (0.0, 0.0)
+        spec = TrajectorySpec(
+            shape="pendulum", size=(swing, swing), period_s=u("period_s"),
+            center=(u("pivot_x"), u("pivot_y")), arm=(arm_px / w, arm_px / h),
+            phase0=float(rng.uniform(0, 2 * np.pi)), rotation=u("tilt"), deviations=deviations, wobble=wobble,
+        )
+        pos = sample(spec, np.linspace(0, duration_s, int(200 * duration_s) + 1))
+        if pos.min() >= margin and pos.max() <= 1 - margin:
+            return spec
+    raise RuntimeError("could not draw a pendulum that stays inside the frame")
+
+
 def _deviation_shows(spec, t, pos, min_shift=0.01) -> bool:
     """A break must move the path: a circle switched to an ellipse is the same path."""
     if not spec.deviations:
@@ -124,6 +153,20 @@ def random_sim_cfg(rng: np.random.Generator, sim_cfg: dict) -> dict:
                        "scale_px": float(rng.uniform(*ranges["texture_scale_px"])),
                        "seed": int(rng.integers(0, 2**31))}
     blob["string"] = None
+    if sim_cfg.get("kind") == "pendulum":                    # the pendulum brush: a bar on a V of string
+        pc = ranges["pendulum"]
+        u = lambda key: float(rng.uniform(*pc[key]))  # noqa: E731
+        blob["kind"] = "pendulum"
+        blob["bar_px"] = [u("bar_px"), u("bar_width_px")]
+        blob["string"] = {"thickness_px": int(rng.integers(ranges["string_thickness_px"][0],
+                                                           ranges["string_thickness_px"][1] + 1)),
+                          "intensity": float(rng.uniform(*ranges["string_intensity"])), "loop_px": u("loop_px")}
+        blob["tuft"] = None
+        if rng.uniform() < pc["tuft_fraction"]:
+            blob["tuft"] = {"length_px": u("tuft_length_px"), "contrast": u("tuft_contrast"),
+                            "texture": {"depth": float(rng.uniform(0.3, 0.8)), "scale_px": float(rng.uniform(1.5, 4.0)),
+                                        "seed": int(rng.integers(0, 2**31))}}
+        return cfg
     if sim_cfg.get("kind") == "sheet":                       # the wall-target setup: outlines only
         blob["kind"] = "sheet"
         blob["target_px"] = [int(rng.integers(50, 200)), int(rng.integers(25, 100))]
@@ -163,7 +206,7 @@ def manifest_row(name: str, clip) -> dict:
         "fg_intensity": f"{cfg['blob']['fg_intensity']:.1f}",
         "radius_px": cfg["blob"]["radius_px"],
         "aspect": f"{cfg['blob']['aspect']:.2f}",
-        "string": "yes" if cfg["blob"].get("string") else ("sheet" if cfg["blob"].get("kind") == "sheet" else ""),
+        "string": cfg["blob"].get("kind") or ("yes" if cfg["blob"].get("string") else ""),
         "texture_depth": f"{cfg['blob']['texture']['depth']:.2f}",
     }
 
@@ -185,8 +228,9 @@ def main(argv=None) -> None:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--no-distortion", action="store_true", help="skip the lens model")
     parser.add_argument("--start", type=int, default=0, help="first clip index (continue a corpus)")
-    parser.add_argument("--kind", default="blob", choices=("blob", "sheet"),
-                        help="blob (the fan / pendulum targets) or sheet (the wall target on its sheet)")
+    parser.add_argument("--kind", default="blob", choices=("blob", "sheet", "pendulum"),
+                        help="blob (the fan / pendulum targets), sheet (the wall target on its sheet) "
+                             "or pendulum (the pendulum brush on its swing only)")
     args = parser.parse_args(argv)
     from trajmem.snn import _prefer_performance_cores
 
@@ -194,8 +238,8 @@ def main(argv=None) -> None:
 
     base = sim_params(args.params)
     base["duration_s"], base["fps"] = args.duration, args.fps
-    if args.kind == "sheet":
-        base["kind"] = "sheet"
+    if args.kind in ("sheet", "pendulum"):
+        base["kind"] = args.kind
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
 
@@ -211,7 +255,11 @@ def main(argv=None) -> None:
             continue
         rng = np.random.default_rng([args.seed, i])
         cfg = random_sim_cfg(rng, base)
-        spec = random_spec(rng, base["randomise"]["path"], args.duration)
+        if args.kind == "pendulum":
+            spec = random_pendulum_spec(rng, base["randomise"]["pendulum"], base["randomise"]["path"]["wobble"],
+                                        args.duration, base["resolution"])
+        else:
+            spec = random_spec(rng, base["randomise"]["path"], args.duration)
         started = time.time()
         clip = load_sim(spec, cfg, seed=args.seed * 10_000 + i, distort=not args.no_distortion)
         clip.meta["sim_cfg"] = cfg

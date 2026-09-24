@@ -107,3 +107,16 @@ def test_rotate_frames_turns_the_target_with_the_frame():
     y, x = np.argwhere(turned[0, 0] > 0)[0]
     assert (round(g2[0, 0] * 80), round(g2[0, 1] * 60)) == (x, y)
     assert p2.tolist() == [True, False]
+
+
+def test_fit_without_calibration_keeps_the_starting_weights_for_fine_tuning():
+    sets = [a_frame_set(seed=i, duration_s=1.0) for i in range(2)]
+
+    def weights_after(calibrate):
+        loc = tiny()
+        start = {k: v.clone() for k, v in loc.net.state_dict().items()}
+        loc.fit(sets, epochs=1, batch=2, lr=0.0, augment=False, calibrate=calibrate)
+        return all(torch.equal(start[k], v) for k, v in loc.net.state_dict().items())
+
+    assert weights_after(calibrate=False)
+    assert not weights_after(calibrate=True)

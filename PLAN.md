@@ -13,13 +13,18 @@ the prediction — not "the same task on a different network." Closest prior wor
 training and no deviation signal; the gap is a repetitive path learned online-style from a
 freely moving real target, with a break signal.
 
+**Main proof of concept: the string pendulum** — one object, one motion, the cleanest
+repetitive trajectory in the corpus. The fan and wall target are the secondary result: the
+same pipeline is still a reasonable predictor on other motions. Pendulum scores subtract
+each clip's constant label offset (27–43 px; the offset is reported separately).
+
 ## Status
 
 | Phase | State |
 |---|---|
 | A — Data | 🟨 Real corpus recorded and split; development set labelled; sim corpus generated. **Open: label the held-out clips.** |
 | B — Frontend + baselines | ✅ |
-| C — Trajectory memory, Stage 1 | 🟨 **In progress.** Network, training and evaluation built; 13.6 px at 100 ms on sim (Kalman 7.5), at the Kalman bar on the development set. Open: the cycle memory. |
+| C — Trajectory memory, Stage 1 | 🟨 **In progress.** Now: a pendulum-specialised localiser, fine-tuned from `snn.pt` on `corpus/sim_pendulum/` (lr 1e-3, 10 epochs), judged against the centroid on the three pendulum development clips; from scratch if it misses. Network, training and evaluation built; 13.6 px at 100 ms on sim (Kalman 7.5), at the Kalman bar on the development set. Open: the cycle memory. |
 | D — Deviation detection | ✅ Label-free ratcheting alarm, k = 25 chosen on development: AUC 0.98, 0.23 s, no false alarms (Kalman 0.86, 39.9/min). Held-out pending labels. |
 | E — Raw events, Stage 2 | ⬜ Only if Stage 1 lands. |
 | F — Paper | 🟨 Written as sections unlock; draft due 2026-10-01. |
@@ -46,7 +51,10 @@ freely moving real target, with a break signal.
   (`scripts/match_sim_real.py`; table in `materials/02-methods/simulation-with-v2e.md`).
   Per clip: random path (five families, T 0.8–4 s, half with a scripted break, 35 % exact
   and the rest with small smooth imperfections), random target (disc to brush, texture,
-  half on a string) and camera settings. Ground truth is the target's *apparent*
+  half on a string) and camera settings. `corpus/sim_pendulum/` (`--kind pendulum`, 100 × 15 s)
+  is the pendulum only: a bar ~200 × 40 px on a V of string, swinging from a pivot above the
+  frame, geometry drawn from circle fits to the real labels (`params.yaml` `sim.randomise.pendulum`);
+  half get a break that narrows or widens the swing. Ground truth is the target's *apparent*
   (lens-distorted) position — what hand-labels record. `corpus/sim/tracks.npz` holds the
   measured and true position per 5 ms window for every clip; `scripts/make_frames.py`
   writes frame sets at a chosen window and downsample.

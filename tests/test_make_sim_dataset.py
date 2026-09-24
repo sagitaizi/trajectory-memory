@@ -4,7 +4,7 @@ import csv
 import numpy as np
 import yaml
 
-from scripts.make_sim_dataset import main, random_sim_cfg, random_spec
+from scripts.make_sim_dataset import main, random_pendulum_spec, random_sim_cfg, random_spec
 from trajmem.data import load_clip
 from trajmem.trajectories import TrajectorySpec, sample
 
@@ -36,6 +36,12 @@ SIM_CFG = {
         "texture_depth": [0.0, 0.8], "texture_scale_px": [2.0, 8.0],
         "lag_fraction": 0.5, "cutoff_hz": [60, 200],
         "path": PATH_CFG,
+        "pendulum": {
+            "pivot_x": [0.35, 0.65], "pivot_y": [-0.5, -0.15], "arm_px": [280, 480], "swing": [0.3, 0.7],
+            "tilt": [-0.15, 0.15], "period_s": [1.05, 1.4], "bar_px": [150, 240], "bar_width_px": [28, 45],
+            "loop_px": [15, 40], "tuft_fraction": 0.7, "tuft_length_px": [10, 40], "tuft_contrast": [0.1, 0.5],
+            "margin": 0.03, "deviation_fraction": 0.5,
+        },
     },
 }
 
@@ -155,3 +161,27 @@ def test_every_scripted_deviation_actually_changes_the_path():
         plain = TrajectorySpec(**{**spec.__dict__, "deviations": []})
         after = t >= spec.deviations[0].at_t
         assert np.abs(sample(spec, t)[after] - sample(plain, t)[after]).max() > 0.01, (i, spec)
+
+
+def test_random_pendulum_spec_hangs_from_above_the_frame_and_stays_in_it():
+    cfg = SIM_CFG["randomise"]["pendulum"]
+    for i in range(40):
+        spec = random_pendulum_spec(np.random.default_rng(i), cfg, PATH_CFG["wobble"], 10.0, (640, 480))
+        assert spec.shape == "pendulum" and spec.center[1] < 0
+        assert 1.05 <= spec.period_s <= 1.4
+        assert np.isclose(spec.arm[0] * 640, spec.arm[1] * 480) and 280 <= spec.arm[0] * 640 <= 480
+        assert spec.wobble is None or spec.wobble.drift == (0.0, 0.0)          # the pivot does not wander
+        pos = sample(spec, np.linspace(0, 10, 2001))
+        assert pos.min() >= 0.03 and pos.max() <= 0.97
+
+
+def test_random_sim_cfg_for_the_pendulum_draws_a_bar_on_a_string():
+    base = {**SIM_CFG, "kind": "pendulum"}
+    cfgs = [random_sim_cfg(np.random.default_rng(i), base) for i in range(40)]
+    for c in cfgs:
+        b = c["blob"]
+        assert b["kind"] == "pendulum"
+        assert 150 <= b["bar_px"][0] <= 240 and 28 <= b["bar_px"][1] <= 45
+        assert 15 <= b["string"]["loop_px"] <= 40
+    tufted = [c for c in cfgs if c["blob"]["tuft"]]
+    assert 15 <= len(tufted) <= 38

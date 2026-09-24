@@ -282,12 +282,13 @@ class SpikingLocaliser:
 
     def fit(self, sets: list[FrameSet], val_sets: list[FrameSet] | None = None, epochs: int = 20,
             chunk_s: float = 0.25, batch: int = 8, lr: float = 1e-2, augment: bool = True, augment_kw=None,
-            seed: int = 0, schedule: str = "cosine", log_fn=None) -> list[dict]:
+            seed: int = 0, schedule: str = "cosine", calibrate: bool = True, log_fn=None) -> list[dict]:
         rng = np.random.default_rng(seed)
         torch.manual_seed(seed)
         chunk = max(1, round(chunk_s / self.dt_s))
-        first = sets[0] if isinstance(sets[0], FrameSet) else load_frame_set(sets[0], round(self.dt_s * 1e6), 8)
-        self.net.calibrate(torch.tensor(first.frames[:400].astype(np.float32), device=self.device))
+        if calibrate:                                      # off when fine-tuning: it rescales trained weights
+            first = sets[0] if isinstance(sets[0], FrameSet) else load_frame_set(sets[0], round(self.dt_s * 1e6), 8)
+            self.net.calibrate(torch.tensor(first.frames[:400].astype(np.float32), device=self.device))
         optimiser = torch.optim.AdamW(self.net.parameters(), lr=lr, weight_decay=1e-4)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimiser, epochs) if schedule == "cosine" else None
         log, best = [], (np.inf, None)

@@ -58,6 +58,21 @@ sim:
         phase_depth: [0.0, 0.15]                             # period jitter
         phase_period_s: [3.0, 10.0]
         growth: [-0.02, 0.03]                                # loop_01 grew ~3 %/s
+    pendulum:                                                # --kind pendulum; px at 640 x 480
+      pivot_x: [0.35, 0.65]                                  # circle fits to the labels: x 295-347 px
+      pivot_y: [-0.5, -0.15]                                 # 93-220 px above the frame
+      arm_px: [280, 480]                                     # 299-458 px
+      swing: [0.3, 0.7]                                      # rad each side; real 20-37 deg
+      tilt: [-0.15, 0.15]                                    # the real swing is off-centre by ~7 deg
+      period_s: [1.05, 1.4]                                  # real 1.18-1.27 s
+      bar_px: [150, 240]                                     # the brush handle, ~200 x 40 px
+      bar_width_px: [28, 45]
+      loop_px: [15, 40]                                      # height of the string's V above the bar
+      tuft_fraction: 0.7                                     # bristles below the handle
+      tuft_length_px: [10, 40]
+      tuft_contrast: [0.1, 0.5]
+      margin: 0.03
+      deviation_fraction: 0.5
 
 frontend:
   frame_window_us: 5000

@@ -6,7 +6,7 @@ from typing import Literal
 
 import numpy as np
 
-Shape = Literal["circle", "ellipse", "figure8", "lissajous"]
+Shape = Literal["circle", "ellipse", "figure8", "lissajous", "pendulum"]
 DeviationKind = Literal["shrink", "speed_change", "drift", "switch_shape"]
 _DEVIATION_KINDS = {"shrink", "speed_change", "drift", "switch_shape"}
 
@@ -33,12 +33,13 @@ class Wobble:
 @dataclass
 class TrajectorySpec:
     shape: Shape
-    size: tuple[float, float]          # circle: (r, r); ellipse/figure8: (a, b); lissajous: (A, B)
+    size: tuple[float, float]          # circle: (r, r); ellipse/figure8: (a, b); lissajous: (A, B); pendulum: swing (rad)
     period_s: float
     center: tuple[float, float] = (0.5, 0.5)   # normalised image coords
     phase0: float = 0.0
     lissajous: tuple[float, float, float] = (3.0, 2.0, np.pi / 2)  # (a, b, delta)
     rotation: float = 0.0              # radians, turns the path about its centre
+    arm: tuple[float, float] = (0.0, 0.0)      # pendulum: string length per axis; centre is the pivot
     deviations: list[Deviation] = field(default_factory=list)
     wobble: Wobble | None = None
 
@@ -110,18 +111,18 @@ def _wobbled(w: Wobble, t, phi, sx, sy, cx, cy):
 
 
 def _offset_with_switches(spec: TrajectorySpec, sx, sy, phi, t):
-    ox, oy = _shape_offset(spec.shape, sx, sy, phi, spec.lissajous)
+    ox, oy = _shape_offset(spec.shape, sx, sy, phi, spec.lissajous, spec.arm)
     for d in spec.deviations:
         if d.kind == "switch_shape":
             active = t >= d.at_t
             liss = d.params.get("lissajous", spec.lissajous)
-            nx, ny = _shape_offset(d.params["to"], sx, sy, phi, liss)
+            nx, ny = _shape_offset(d.params["to"], sx, sy, phi, liss, spec.arm)
             ox = np.where(active, nx, ox)
             oy = np.where(active, ny, oy)
     return ox, oy
 
 
-def _shape_offset(shape: Shape, sx, sy, phi, lissajous):
+def _shape_offset(shape: Shape, sx, sy, phi, lissajous, arm=(0.0, 0.0)):
     if shape == "circle":
         return sx * np.cos(phi), sx * np.sin(phi)
     if shape == "ellipse":
@@ -131,6 +132,9 @@ def _shape_offset(shape: Shape, sx, sy, phi, lissajous):
     if shape == "lissajous":
         a, b, delta = lissajous
         return sx * np.sin(a * phi + delta), sy * np.sin(b * phi)
+    if shape == "pendulum":                                 # image y points down: the bob hangs below
+        swing = sx * np.sin(phi)
+        return arm[0] * np.sin(swing), arm[1] * np.cos(swing)
     raise ValueError(f"unknown shape: {shape!r}")
 
 

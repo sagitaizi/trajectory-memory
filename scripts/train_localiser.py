@@ -2,11 +2,13 @@
 
     python scripts/train_localiser.py                       # -> runs/localiser/snn.pt
     python scripts/train_localiser.py --epochs 30 --batch 8 --out runs/localiser/snn_e30.pt
+    python scripts/train_localiser.py --corpus corpus/sim_pendulum --init runs/localiser/snn.pt --out runs/localiser/pend_ft.pt
 
 Frame sets come from scripts/make_frames.py (<corpus>/frames_8x_5000us/sim_*.npz); a
 tenth of the clips validate. Augmentation (stuck pixels, noise floor, flips, blank
 stretches) is applied to the training clips only. The best epoch by validation loss is
-saved with a per-epoch log next to it.
+saved with a per-epoch log next to it. `--init` fine-tunes a saved localiser instead of
+starting fresh; its architecture comes from the checkpoint.
 """
 from __future__ import annotations
 
@@ -42,6 +44,7 @@ def main(argv=None) -> None:
                    help="both: ON and OFF as two input channels; sum: folded into one (polarity-blind)")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--device", default=None)
+    p.add_argument("--init", metavar="CKPT", help="fine-tune this localiser instead of training a new one")
     args = p.parse_args(argv)
 
     d = pathlib.Path(args.corpus) / "frames_8x_5000us"
@@ -52,8 +55,11 @@ def main(argv=None) -> None:
     val = [load_frame_set(p, 5000, 8) for p in val_paths]
     print(f"{len(paths)} frame sets: {len(train)} train, {len(val)} validation", flush=True)
 
-    loc = SpikingLocaliser(n_cells=args.n_cells, ch=tuple(args.ch), hidden=args.hidden, seed=args.seed,
-                           polarity=args.polarity, device=args.device)
+    if args.init:
+        loc = SpikingLocaliser.load(args.init, device=args.device)
+    else:
+        loc = SpikingLocaliser(n_cells=args.n_cells, ch=tuple(args.ch), hidden=args.hidden, seed=args.seed,
+                               polarity=args.polarity, device=args.device)
     loc.val_clips = [p.stem for p in val_paths]
     out = pathlib.Path(args.out)
     t0 = time.time()
@@ -65,7 +71,7 @@ def main(argv=None) -> None:
         loc.save(out.with_suffix(".partial.pt"))
 
     log = loc.fit(train, val_sets=val, epochs=args.epochs, chunk_s=args.chunk_s, batch=args.batch, lr=args.lr,
-                  augment=not args.no_augment, seed=args.seed, log_fn=show)
+                  augment=not args.no_augment, seed=args.seed, calibrate=not args.init, log_fn=show)
     loc.save(out)
     out.with_suffix(".partial.pt").unlink(missing_ok=True)
     best = min((e for e in log if np.isfinite(e["val_loss"])), key=lambda e: e["val_loss"])
