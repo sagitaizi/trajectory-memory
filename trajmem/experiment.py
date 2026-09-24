@@ -13,7 +13,7 @@ import numpy as np
 
 from .data import Clip
 from .frontend import to_position
-from .metrics import deviation_roc, lock_on_time, path_shape_error, prediction_error
+from .metrics import deviation_roc, displacement_error, lock_on_time, path_shape_error
 from .trajectories import _harmonic_fit, search_period
 
 SETS_PATH = Path(__file__).resolve().parent.parent / "corpus" / "sets.yaml"
@@ -42,7 +42,7 @@ def make_memory(name: str, dt_s: float, **params):
     """A fresh memory by name. The baselines take their own params (`warmup_s`, ...); the
     SNN is loaded from `checkpoint` (default runs/memory/snn.pt, from train_memory.py;
     the checkpoint's `arch` picks the class) and ignores the rest."""
-    from .baseline import HarmonicFit, PeriodicKalman
+    from .baseline import Extrapolator, HarmonicFit, PeriodicKalman
 
     if name == "snn":
         import torch
@@ -56,11 +56,15 @@ def make_memory(name: str, dt_s: float, **params):
     from .phasemap import PhaseMap
     from .snn_phasemap import SpikingPhaseMap
 
-    kinds = {"kalman": PeriodicKalman, "harmonic": HarmonicFit, "phasemap": PhaseMap, "snn_phasemap": SpikingPhaseMap}
+    kinds = {"kalman": PeriodicKalman, "harmonic": HarmonicFit, "phasemap": PhaseMap,
+             "snn_phasemap": SpikingPhaseMap,
+             "constant_velocity": lambda **kw: Extrapolator(order=1, **kw),
+             # the quadratic term needs a longer window to survive centroid noise
+             "constant_acceleration": lambda **kw: Extrapolator(order=2, fit_s=0.2, **kw)}
     if name not in kinds:
         raise ValueError(f"unknown memory {name!r}; one of {sorted(kinds) + ['snn']}")
     params = {k: v for k, v in params.items() if k not in ("checkpoint", "device")}
-    if name in ("phasemap", "snn_phasemap"):
+    if name in ("phasemap", "snn_phasemap", "constant_velocity", "constant_acceleration"):
         params.pop("warmup_s", None)
     return kinds[name](dt_s=dt_s, **params)
 
@@ -204,10 +208,10 @@ def score_trace(trace: Trace, clip: Clip, tol_px: float, settle_s: float = 0.0,
     scale = np.array(clip.meta["resolution"], dtype=float)
     offset = label_offset(trace, clip, settle_s) if subtract_offset else np.zeros(2)
     pred = trace.pred + offset
-    err_all = prediction_error(pred * scale, trace.gt_ahead * scale)["errors"]
+    err_all = displacement_error(pred * scale, trace.gt_ahead * scale)["errors"]
     t_break = min(clip.deviation_times) if clip.deviation_times else np.inf
     steady = (trace.t >= settle_s) & (trace.t + trace.horizon_s < t_break)
-    err = prediction_error(pred[steady] * scale, trace.gt_ahead[steady] * scale)
+    err = displacement_error(pred[steady] * scale, trace.gt_ahead[steady] * scale)
     err.pop("errors")
     before_break = trace.t + trace.horizon_s < t_break
     dt = trace.window_us / 1e6
@@ -217,7 +221,7 @@ def score_trace(trace: Trace, clip: Clip, tol_px: float, settle_s: float = 0.0,
     on_path = (trace.t < t_break) & (trace.t >= min(t_break, trace.t[-1] + dt) - period_s)
     ratio = trace.period[steady] / period_s
     return {
-        "error_px": err,
+        "fde_px": err,
         "path_px": {"median": float(np.nanmedian(path[steady])) if np.isfinite(path[steady]).any() else np.nan,
                     "last": float(np.nanmedian(path[on_path])) if np.isfinite(path[on_path]).any() else np.nan},
         "period_ratio": float(np.nanmedian(ratio)) if np.isfinite(ratio).any() else np.nan,
@@ -308,8 +312,8 @@ def pool(rows: list[dict]) -> dict:
     locks = [r["lock_on_s"] for r in rows]
     return {
         "name": "pooled", "n_clips": len(rows),
-        "error_px": {"median": med(r["error_px"]["median"] for r in rows),
-                     "iqr": med(r["error_px"]["iqr"] for r in rows)},
+        "fde_px": {"median": med(r["fde_px"]["median"] for r in rows),
+                     "iqr": med(r["fde_px"]["iqr"] for r in rows)},
         "path_px": {"median": med(r["path_px"]["median"] for r in rows),
                     "last": med(r["path_px"]["last"] for r in rows)},
         "period_ratio": med(r["period_ratio"] for r in rows),

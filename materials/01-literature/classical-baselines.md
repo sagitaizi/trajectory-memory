@@ -1,6 +1,7 @@
 # Non-neuromorphic approaches to the same problem
 
-These are the comparison points. For **clean periodic motion they will likely beat an SNN on
+These are the comparison points; `repetitive-motion-and-metrics.md` has the fields they
+come from and the numbers they report. For **clean periodic motion they will likely beat an SNN on
 raw prediction accuracy** — which is why the SNN's contribution has to be event-native
 operation, the dynamics-as-solver framing, online acquisition, and deployment substrate, not
 "better numbers". Say this explicitly in the paper.
@@ -15,6 +16,13 @@ Ijspeert, Nakanishi & Schaal 2002; survey Saveriano, Abu-Dakka, Kramberger, Pete
 - Anomaly = residual between the observed motion and the DMP rollout.
 - Equations in `02-methods/rhythmic-dmp.md`. This is the strongest classical baseline for
   "learn and reproduce a repetitive trajectory".
+
+## Constant velocity — the floor
+`baseline.Extrapolator`: a least-squares polynomial over the last `fit_s` of observations,
+extended to t + horizon (order 1 constant velocity, 2 constant acceleration). No period and
+no remembered path. **Schöller et al. 2020** (*RA-L*) is why it is reported rather than
+assumed to be weak — on our development clips it is the best predictor in the table at
+25 ms. Numbers and the `fit_s` sweep in `repetitive-motion-and-metrics.md`.
 
 ## Kalman filter with a periodic model
 - State = position + velocity (constant-velocity), optionally augmented with harmonic

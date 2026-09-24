@@ -4,8 +4,8 @@ Every paper referenced anywhere in this project — to justify a design decision
 or a section of the paper — gets an entry here, with a note on *why* and *where*. Update this
 file in the same change that leans on the paper.
 
-Author lists and venues from a 2026-09-09 literature scan; confirm each before citing in the
-manuscript.
+Author lists and venues come from literature scans, not from the papers themselves; confirm
+each before citing in the manuscript. Entries whose author list could not be checked say so.
 
 ---
 
@@ -206,6 +206,144 @@ between one mixed-τ recurrent layer and a fast→slow layer split for the memor
 - **Why:** model of gaze return/switching; benchmark target if the eye-tracking comparison is
   ever run.
 - **Where:** paper future-work section.
+
+## Repetitive motion in vision — the "how many cycles" literature
+
+Note: `materials/01-literature/repetitive-motion-and-metrics.md` — the five fields that each
+own one piece of this task, the metrics each reports, and the measured floor. This community
+reads a whole clip and returns an integer count. Their two metrics, MAE of the count and OBO
+(fraction within ±1), do not apply to a running prediction; the entries are here so related
+work can say why, and so the framing is not mistaken for ours.
+
+### Dwibedi et al., 2020 — "Counting Out Time: Class Agnostic Video Repetition Counting in the Wild"
+- RepNet. *CVPR 2020*. Authors unverified (Dwibedi, Aytar, Tompson, Sermanet, Zisserman).
+- **Why:** the reference method — temporal self-similarity matrix over frame embeddings,
+  with heads for period and periodicity — and the Countix benchmark. What a reviewer
+  means by "repetitive motion recognition".
+- **Where:** paper related-work; the contrast that our task is prediction, not counting.
+
+### Hu et al., 2022 — "TransRAC: Encoding Multi-Scale Temporal Correlation with Transformers for Repetitive Action Counting"
+- *CVPR 2022*. RepCount dataset. Authors unverified.
+- **Why:** the only repetition benchmark that annotates the start and end of each
+  individual cycle, so it is the nearest thing to a per-cycle ground truth in that field.
+- **Where:** paper related-work.
+
+### "A Short Note on Evaluating RepNet for Temporal Repetition Counting in Videos", 2024
+- arXiv:2411.08878.
+- **Why:** the field's numbers do not reproduce across implementations and evaluation
+  protocols; a reason not to quote counting accuracies as a comparison point.
+- **Where:** paper related-work caveat.
+
+### Cutler & Davis, 2000 — "Robust Real-Time Periodic Motion Detection, Analysis, and Applications"
+- *IEEE TPAMI* 22(8):781–796.
+- **Why:** the classical period estimator — track the object, build the self-similarity
+  matrix over time, read the period from the peak of the average power spectral density.
+  A learning-free comparator for the period alone, which is the half of our memory that
+  can be scored without any model.
+- **Where:** `baseline.py` (candidate); period-accuracy discussion.
+
+### Perevalov et al., 2022 — "Frequency Cam: Imaging Periodic Signals in Real-Time"
+- arXiv:2211.00198. Authors unverified.
+- **Why:** period estimation straight from the event stream, per pixel, in real time —
+  the event-native version of Cutler–Davis, and evidence that periodicity from events is
+  cheap and solved. Sharpens what is new in ours: the *path*, not the period.
+- **Where:** paper related-work.
+
+## Prediction metrics — ADE / FDE and the naive floor
+
+### Alahi et al., 2016 — "Social LSTM: Human Trajectory Prediction in Crowded Spaces"
+- *CVPR 2016*.
+- **Why:** where ADE (mean displacement error over the predicted horizon) and FDE (error
+  at its end) became the standard pair. The naming `metrics.ade_fde` follows.
+- **Where:** `metrics.py`; the results tables.
+
+### Schöller, Aravantinos, Lay & Knoll, 2020 — "What the Constant Velocity Model Can Teach Us About Pedestrian Motion Prediction"
+- *IEEE Robotics and Automation Letters* 5(2):1696–1703.
+- **Why:** the constant-velocity extrapolator beats most learned trajectory predictors on
+  the standard benchmarks; the reason `baseline.Extrapolator` is reported in every table
+  rather than assumed to be bad.
+- **Where:** `baseline.py`; results tables.
+
+### "Residual Kalman Dynamics for Event-Based UAV Forecasting", 2026
+- arXiv:2609.00839. Authors unverified.
+- **Why:** current event-camera forecasting work whose own baselines are the
+  constant-velocity and constant-acceleration filters, with the constant-acceleration one
+  slightly ahead — the same floor, on our kind of input.
+- **Where:** `baseline.py` (`order=2`); paper related-work.
+
+### Monaci et al., 2023 — "Fast Trajectory End-Point Prediction with Event Cameras for Reactive Robot Control"
+- *CVPR Workshops 2023*, arXiv:2302.13796. Authors unverified.
+- **Why:** event-native prediction of where a trajectory ends, on a real robot; an FDE-only
+  point of comparison and a second data point on what event-based prediction reports.
+- **Where:** paper related-work.
+
+## Phase — the gait convention
+
+### Kang, Molinaro, Choi, Camargo & Young, 2022 — "Continuous Locomotion Mode Recognition and Gait Phase Estimation"
+- Accurate real-time phase estimation for normal and asymmetric gait. *IEEE ICORR 2022* /
+  *IEEE TNSRE*. Authors unverified.
+- **Why:** the convention for scoring a learned cycle's phase — RMSE as a percentage of
+  the cycle, with published systems at 2.5–5 %. The units our clock's phase error should
+  be reported in, and the one number that makes a half-period lock visible.
+- **Where:** `metrics.py` (candidate phase metric); results tables.
+
+## Deviation detection — how the field scores a detector
+
+### Ahmad, Lavin, Purdy & Agha, 2017 — "Unsupervised real-time anomaly detection for streaming data"
+- *Neurocomputing* 262:134–147. The Numenta Anomaly Benchmark (NAB); arXiv:1607.02480.
+- **Why:** the published scoring rule closest to ours — an anomaly window per true event,
+  only the first detection inside it counts, scored higher the earlier it lands, and false
+  positives penalised by distance from a window. Our AUC + latency + false-alarms-per-minute
+  triple is a hand-rolled version; NAB is what to cite for it. Its detector, HTM, is also
+  our nearest cousin in kind: an online sequence memory that flags what it did not predict.
+- **Where:** `metrics.py` (`deviation_roc`, `ratchet_threshold`); paper §IV.
+
+### Tatbul, Lee, Zdonik, Alam & Gottschlich, 2018 — "Precision and Recall for Time Series"
+- *NeurIPS 2018*. Range-based precision/recall.
+- **Why:** precision and recall extended from points to intervals, with explicit terms for
+  existence, size, position and cardinality of an overlap. The accepted answer to the fact
+  that point-wise F1 is meaningless on segment anomalies.
+- **Where:** `metrics.py` (candidate second detection metric).
+
+### Kim, Choi, Yoon, Cho & Yoon, 2022 — "Towards a Rigorous Evaluation of Time-series Anomaly Detection"
+- *AAAI 2022*.
+- **Why:** shows the widely used point-adjust F1 is inflated to the point that random
+  scores beat published detectors. The reason we report AUC and latency rather than an
+  adjusted F1, stated in one line rather than assumed.
+- **Where:** paper §IV methodology note.
+
+### Paparrizos et al., 2022 — "Volume Under the Surface: A New Accuracy Evaluation Measure for Time-Series Anomaly Detection"
+- *PVLDB* 15(11):2774–2787. VUS-ROC / VUS-PR.
+- **Why:** threshold-free detection scoring with a tolerance buffer around each labelled
+  event — robust to the boundary fuzziness our hand-labelled break times have.
+- **Where:** paper §IV methodology note.
+
+### Liu, Luo, Lian & Gao, 2018 — "Future Frame Prediction for Anomaly Detection — A New Baseline"
+- *CVPR 2018*.
+- **Why:** the video-anomaly field's statement of our deviation principle — anomaly is
+  prediction error — with frame-level AUC on UCSD Ped2 / CUHK Avenue / ShanghaiTech
+  (92.9 / 90.6 / 74.7 %) as the reference numbers. Ours is the same principle over a
+  learned path rather than over pixels.
+- **Where:** paper related-work; §IV framing.
+
+### "Benchmark AUC Is Not Deployable Reliability: A Cross-Dataset Audit", 2026
+- arXiv:2606.29506.
+- **Why:** same-dataset frame AUC 0.704 falls to 0.499 across datasets; the argument for
+  scoring held-out clips once and for reporting false alarms per minute alongside AUC.
+- **Where:** paper §IV methodology note; the held-out protocol's justification.
+
+### Mendes, Zhang, Peyrard & Berrada, 2021 — "Using Visual Anomaly Detection for Task Execution Monitoring"
+- *IROS 2021*, arXiv:2107.14206. Authors unverified.
+- **Why:** the application-side cousin — model the nominal motion of a repeated task, flag
+  the deviation from it, from vision. Closest published problem statement to ours outside
+  neuromorphic work, on frames and with a robot's own kinematics available.
+- **Where:** paper related-work.
+
+### Neto et al., 2024 — "Warped Time Series Anomaly Detection"
+- arXiv:2404.12134. Authors unverified.
+- **Why:** abnormal *cycles* in a repetitive task, with time warping between cycles — our
+  deviation problem on proprioceptive rather than visual data.
+- **Where:** paper related-work.
 
 ## Non-neuromorphic baselines and surveys
 

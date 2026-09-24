@@ -3,7 +3,7 @@
 All computed on **held-out real clips** (sim is for pretraining). Report per-clip and pooled;
 give spread, not just a mean.
 
-## Prediction error
+## Prediction error — displacement error, ADE / FDE
 At horizon `h` (fixed, e.g. 50 and 100 ms), for every step where a prediction and ground
 truth exist:
 ```
@@ -11,6 +11,13 @@ e_i = || pred_i(t + h)  −  gt(t + h) ||        # normalised image coords, or p
 ```
 Report **median and IQR** (robust to the lock-on transient), and optionally the mean.
 Sweep `h` to show how error grows with horizon.
+
+In the trajectory-prediction literature's names (Social LSTM onwards) the error at one
+horizon is **FDE(h)** and the mean over the horizons up to it is **ADE**; we pool over the
+clip's steps rather than over a set of trajectories, and the tables use those names so the
+numbers read against that field. The floor every such table carries is the **constant
+velocity** extrapolator (`baseline.Extrapolator`, order 1; order 2 is constant
+acceleration) — reported, not assumed to be bad.
 
 ## Path-shape error
 Whether the memory holds the *path*, not just the next step. Every memory exposes its
@@ -41,5 +48,6 @@ Treat the deviation score `s(t)` as a binary detector over time.
 - **Recovery**: does `s(t)` return toward baseline after a transient deviation, or latch?
 
 ## Baseline comparison table (paper)
-Rows: PeriodicKalman, HarmonicFit, RhythmicDMP, SNN-Stage1 (, SNN-Stage2).
-Columns: median pred. error @50ms, @100ms; lock-on (cycles); deviation AUC; detection latency.
+Rows: ConstantVelocity, PeriodicKalman, HarmonicFit, RhythmicDMP, SNN-Stage1 (, SNN-Stage2).
+Columns: FDE @50ms, @100ms; ADE; lock-on (cycles); deviation AUC; detection latency;
+false alarms per minute.

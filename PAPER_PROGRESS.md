@@ -18,27 +18,30 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 `writable*` means write it now, but some values are still missing; the "revisit after" column
 says which phase fills them.
 
-| §      | Section          | Status      | Blocked on   | Revisit after  |
-|--------|------------------|-------------|--------------|----------------|
-| —      | Abstract         | placeholder | everything   | write last     |
-| I      | Introduction     | writable    | —            | results        |
-| II     | Related Work     | writable    | —            | bib verify     |
-| III-A  | Problem Setup    | writable    | —            | —              |
-| III-B  | Event Input      | writable*   | —            | Phase B        |
-| III-C  | Localiser        | blocked     | G-F          | —              |
-| III-D  | Memory network   | blocked     | G-F, Phase C | —              |
-| III-E  | Deviation Score  | blocked     | Phase D      | —              |
-| III-F  | Protocol         | writable    | —            | —              |
-| IV-A   | Simulator        | writable*   | —            | Phase A        |
-| IV-B   | Real Recordings  | writable    | —            | labelling      |
-| IV-C   | Baselines        | writable*   | —            | Phase B        |
-| IV-D   | Metrics          | writable    | —            | —              |
-| V      | Results          | blocked     | Phases C, D  | —              |
-| VI     | Discussion       | blocked     | results      | —              |
-| VII    | Conclusion       | blocked     | results      | —              |
-| —      | Acknowledgment   | writable    | —            | —              |
-| Fig. 1 | System overview  | writable    | —            | G-F            |
-| Fig. 2 | Recording setups | writable    | —            | —              |
+| §      | Section                    | Status      | Blocked on          | Revisit after   |
+|--------|----------------------------|-------------|---------------------|-----------------|
+| —      | Abstract                   | placeholder | everything          | write last      |
+| I      | Introduction               | in progress | —                   | results         |
+| II     | Related Work               | writable    | —                   | bib verify      |
+| III-A  | Problem Setup              | writable    | —                   | —               |
+| III-B  | Event Input                | writable*   | —                   | Phase B         |
+| III-C  | Localiser (incl. training) | writable*   | —                   | sheet retrain   |
+| III-D  | Memory network             | writable*   | —                   | half-period fix |
+| III-E  | Deviation Score            | writable*   | —                   | Phase D         |
+| III-F  | Evaluation Protocol        | writable    | —                   | —               |
+| IV-A   | Simulator                  | writable*   | —                   | Phase A         |
+| IV-B   | Real Recordings            | writable    | —                   | labelling       |
+| IV-C   | Baselines                  | writable*   | —                   | Phase B         |
+| IV-D   | Metrics                    | writable    | —                   | —               |
+| V-A    | Results: Localiser         | blocked     | held-out scoring    | —               |
+| V-B    | Results: Prediction + path | blocked     | held-out scoring    | —               |
+| V-C    | Results: Deviation         | blocked     | Phase D, held-out   | —               |
+| V-D    | Results: Ablations         | writable*   | phasemap reference  | —               |
+| VI     | Discussion                 | blocked     | results             | —               |
+| VII    | Conclusion                 | blocked     | results             | —               |
+| —      | Acknowledgment             | writable    | —                   | —               |
+| Fig. 1 | System overview            | writable    | —                   | —               |
+| Fig. 2 | Recording setups           | writable    | —                   | —               |
 
 ### Where each section's material lives
 
@@ -114,10 +117,10 @@ Nothing in the calibration was changed.
 
 ## Blocked, and on what
 
-- **§III-C/D/E** wait on decision gate **G-F** (framework for the SNN core, `PLAN.md`).
-  G-F needs a bake-off on simulated trajectories, so it needs a machine — it cannot be
-  settled on the flight, and §III's middle stays blocked until it is.
-- **§V–VII and the abstract** wait on results. Nothing to do but hold.
+- **§V-A–C** wait on the held-out set, scored once at the end; §V-C also on Phase D
+  thresholds. **§V-D** can be drafted from the development-set ablation numbers in `PLAN.md`
+  once the spiking-vs-arithmetic comparison is run.
+- **§VI–VII and the abstract** wait on results. Nothing to do but hold.
 
 ## Must revisit before submission
 

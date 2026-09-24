@@ -1,17 +1,93 @@
 """Non-SNN comparators. Same TrajectoryMemory interface as model.py.
 
-Both take one position per step of `dt_s`, estimate the period from the first
-`warmup_s` of observations and keep it, then predict ahead and score surprise. The
-warm-up must cover at least about a cycle; real clips run up to 4 s periods. Three
-harmonics cover every path family in the corpus (a 3:2 Lissajous needs the third).
-A NaN observation (target unseen) is skipped. Positions are in normalised image
-coordinates, like every Clip's ground truth.
+`Extrapolator` is the naive floor: recent motion continued, no memory of the path.
+`HarmonicFit` and `PeriodicKalman` take one position per step of `dt_s`, estimate the
+period from the first `warmup_s` of observations and keep it, then predict ahead and
+score surprise. The warm-up must cover at least about a cycle; real clips run up to 4 s
+periods. Three harmonics cover every path family in the corpus (a 3:2 Lissajous needs
+the third). A NaN observation (target unseen) is skipped. Positions are in normalised
+image coordinates, like every Clip's ground truth.
 """
 from __future__ import annotations
+
+from collections import deque
 
 import numpy as np
 
 from .trajectories import search_period
+
+
+class Extrapolator:
+    """The floor every trajectory-prediction paper reports: continue the recent motion.
+
+    A least-squares polynomial over the last `fit_s` of observations, evaluated at
+    t + horizon; `order` 1 is constant velocity, 2 constant acceleration. It has no
+    memory of the path, so `period` is NaN and `path_points` is None -- it fills the
+    prediction and deviation columns only, and is the number the memories have to beat
+    for the memory itself to be worth anything.
+
+    Surprise is the distance between an observation and what the previous fit expected,
+    over that distance's own running average -- the same shape as `HarmonicFit`'s.
+
+    `fit_s` trades the bias of fitting a straight line to a curve against the noise in
+    the centroid; each order wants its own (0.1 s for order 1, 0.2 s for order 2, both
+    swept on the development clips), so `experiment.make_memory` sets it per order.
+    """
+
+    def __init__(self, dt_s: float, order: int = 1, fit_s: float = 0.1,
+                 score_tau_s: float = 0.1, scale_tau_s: float = 5.0):
+        self.dt_s, self.order, self.fit_s = dt_s, order, fit_s
+        self.score_alpha = min(1.0, dt_s / score_tau_s)
+        self.scale_alpha = min(1.0, dt_s / scale_tau_s)
+        self.reset()
+
+    def reset(self) -> None:
+        self.t_now = -self.dt_s
+        self.times, self.xys = deque(), deque()
+        self.coef, self.t_fit, self.scale = None, None, None
+        self.last_known = (np.nan, np.nan)
+        self.score = 0.0
+
+    def fit(self, tracks) -> None:
+        """Nothing to pretrain: it only ever uses the last `fit_s` of the clip it is on."""
+
+    def period(self) -> float:
+        return np.nan
+
+    def path_points(self, fractions):
+        return None
+
+    def deviation_score(self) -> float:
+        return float(self.score)
+
+    def observe(self, x: float, y: float) -> None:
+        self.t_now += self.dt_s
+        if not (np.isfinite(x) and np.isfinite(y)):
+            return
+        xy = np.array([float(x), float(y)])
+        if self.coef is not None:
+            surprise = float(np.hypot(*(self._at(self.t_now) - xy)))
+            self.scale = surprise if self.scale is None else (
+                self.scale + self.scale_alpha * (surprise - self.scale))
+            self.score += self.score_alpha * (surprise / max(self.scale, 1e-4) - self.score)
+        self.last_known = (xy[0], xy[1])
+        self.times.append(self.t_now)
+        self.xys.append(xy)
+        while self.times[-1] - self.times[0] > self.fit_s:
+            self.times.popleft()
+            self.xys.popleft()
+        if len(self.times) > self.order:
+            self.t_fit = self.t_now
+            self.coef = np.polyfit(np.array(self.times) - self.t_fit, np.array(self.xys), self.order)
+
+    def predict(self, horizon_s: float) -> tuple[float, float]:
+        if self.coef is None:
+            return self.last_known
+        x, y = self._at(self.t_now + horizon_s)
+        return float(x), float(y)
+
+    def _at(self, t: float) -> np.ndarray:
+        return (t - self.t_fit) ** np.arange(self.order, -1, -1) @ self.coef
 
 
 class _Periodic:

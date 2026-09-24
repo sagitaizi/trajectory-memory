@@ -23,7 +23,7 @@ def test_evaluate_writes_the_paper_tables(tmp_path, monkeypatch):
     pooled = (tmp_path / "ev" / "development" / "pooled.csv").read_text(encoding="utf-8").splitlines()
     assert len(pooled) == 1 + 2 * 2                            # header + memories x horizons
     md = (tmp_path / "ev" / "development" / "tables.md").read_text(encoding="utf-8")
-    assert "pred 50 ms" in md and "pred 100 ms" in md and "deviation detection" in md
+    assert "FDE 50 ms" in md and "FDE 100 ms" in md and "deviation detection" in md
     assert "kalman" in md and "harmonic" in md
     tex = (tmp_path / "ev" / "development" / "tables.tex").read_text(encoding="utf-8")
     assert tex.count(r"\begin{tabular}") == 2 and r"\bottomrule" in tex
@@ -31,11 +31,11 @@ def test_evaluate_writes_the_paper_tables(tmp_path, monkeypatch):
 
 def test_pool_takes_medians_per_memory_input_and_horizon():
     rows = [{"set": "s", "memory": "kalman", "input": "centroid", "horizon_s": 0.1, "clip": c,
-             "err_median_px": v, "auc": np.nan if c == "a" else 0.9,
+             "fde_px": v, "auc": np.nan if c == "a" else 0.9,
              **{f: 1.0 for f in evaluate.FIELDS if f not in
-                ("set", "memory", "input", "horizon_s", "clip", "err_median_px", "auc")}}
+                ("set", "memory", "input", "horizon_s", "clip", "fde_px", "auc")}}
             for c, v in (("a", 10.0), ("b", 20.0), ("c", 30.0))]
     pooled = evaluate.pool(rows)
     assert len(pooled) == 1
-    assert pooled[0]["err_median_px"] == 20.0 and pooled[0]["n_clips"] == 3
+    assert pooled[0]["fde_px"] == 20.0 and pooled[0]["n_clips"] == 3
     assert pooled[0]["n_break_clips"] == 2 and pooled[0]["auc"] == 0.9

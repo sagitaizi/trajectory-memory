@@ -57,39 +57,16 @@ novelty detection, neuromorphic vision
 \end{IEEEkeywords}
 
 \section{Introduction}
-% DIRECTION (decided 2026-09-17): the subject is anticipation/memory, not sight. The
-% paragraph above (biological vision is efficient) will be REWRITTEN so prediction is the
-% subject from the first line; its facts and citations are kept as one clause. Final
-% wording of anything that says HOW our network embodies prediction waits for Phase C.
-%
-% P1 -- Anticipation, not reaction. Biological vision does not wait for the image: the
-% retina already fires ahead of a moving object \cite{Berry1999Anticipation} and adapts to
-% predict the scene, passing on what departs from expectation \cite{Hosoya2005Dynamic};
-% the brain is widely described as a prediction machine that models what comes next and
-% attends to what deviates \cite{Rao1999Predictive,Friston2010The,Clark2013Whatever,
-% Keller2018Predictive}; memory, in that picture, is a model that runs ahead of the senses
-% \cite{Hawkins2004On}. One clause: it does this with parts a million times slower and
-% ten-millionth the power of electronics \cite{Mahowald1991The}.
-%   (bib entries for these seven are NOT yet in refs.bib -- add when writing:
-%    Berry, Brivanlou, Jordan, Meister, Nature 398:334-338, 1999, doi 10.1038/18678;
-%    Hosoya, Baccus, Meister, Nature 436:71-77, 2005; Rao & Ballard, Nat. Neurosci.
-%    2(1):79-87, 1999; Friston, Nat. Rev. Neurosci. 11:127-138, 2010; Clark, Behav. Brain
-%    Sci. 36(3):181-204, 2013; Keller & Mrsic-Flogel, Neuron 100(2):424-435, 2018;
-%    Hawkins & Blakeslee, On Intelligence, Times Books, 2004.)
-Sight is by far the dominant sense humans use to perceive the world around them \cite{Gallego2022Event}. The retina, a thin sheet of tissue in the eye, converts raw light into nerve signals that we then interpret as visual images \cite{Mahowald1991The}. However, a flash of light can evoke a neural response in the brain with a delay of 30--100 ms \cite{Berry1999Anticipation}, during which a moving target can cover a significant distance and should therefore be seen behind its actual position. As this contradicts our daily experience, it has been suggested that the brain acts as a `prediction machine', modelling what comes next and attending to what deviates \cite{Clark2013Whatever}. This is most striking for repetitive motion, where the eyes can lock on to a moving target within a few cycles and follow it with almost no lag \cite{Barnes1991The}.
-% P1b -- The engineering counterpart. Event cameras report per-pixel change with
-% microsecond latency \cite{Gallego2022Event} and spiking networks compute in the same
-% currency, so the biological strategy is buildable in silicon -- yet the pipelines built
-% on them still react: locate, then extrapolate. A target that repeats its motion is
-% exactly the case where anticipation is possible.
+Sight is by far the dominant sense humans use to perceive the world around them \cite{Gallego2022Event}. The retina, a thin sheet of tissue in the eye, converts raw light into nerve signals that we then interpret as visual images. However, a flash of light can evoke a neural response in the brain with a delay of 30--100 ms \cite{Berry1999Anticipation}, during which a moving target can cover a significant distance and should therefore be seen behind its actual position. As this contradicts our daily experience, it has been suggested that the brain acts as a `prediction machine', modelling what comes next and attending to what deviates \cite{Clark2013Whatever}. This is most striking for repetitive motion, where the eyes can lock on to a moving target within a few cycles and follow it with almost no lag \cite{Barnes1991The}.
 
-The retina itself has a silicon counterpart \cite{Mahowald1991The}. Event cameras are low-power sensors that sample light based on the scene dynamics and report per-pixel brightness changes as a stream of events with microsecond latency \cite{Gallego2022Event}. Spiking neural networks (SNNs) mimic the neurons behind, computing via asynchronous discrete spikes which are sparse in time and allow for better energy consumption and use with noisy inputs. Yet most pipelines built using them for tracking purposes still react rather than anticipate---locating the target and extrapolating its position. A target that repeats its motion is exactly the case where anticipation is possible, and event cameras and SNNs together are the parts from which a prediction machine can be built. 
+The retina itself has a silicon counterpart \cite{Mahowald1991The}. Event cameras are low-power sensors that sample light based on the scene dynamics, and report per-pixel brightness changes as a stream of events with microsecond latency \cite{Gallego2022Event}. Spiking neural networks (SNNs) mimic the neurons behind it, computing via asynchronous discrete spikes which are sparse in time and allow for lower energy consumption and use with noisy inputs. Yet most pipelines built using them for tracking purposes react rather than anticipate---locating the target and extrapolating its position. A target that repeats its motion is exactly the case where prediction is possible, and event cameras and SNNs together are the parts from which such a biologically inspired prediction machine can be built. Such a system is useful in any application where a quick signal indicating that a target has deviated from its expected path is needed, for example in industrial inspection, robotics, and autonomous vehicles. 
 % P2 -- The problem, plainly. A single target repeats a path; from the event stream alone,
 % learn that path, predict the target's position a short horizon ahead, and signal when the
 % motion stops matching -- hard because the target is real and freely moving, the path is
 % acquired online rather than from a labelled batch, and the break signal must come from the
 % same model that predicts \cite{debat2021event,pingpong2025egocentric}.
-%
+
+A target oscillating in a repetitive path generates events in a periodic pattern. A spiking network can learn this pattern and predict the target's position a short horizon ahead, as well as its estimated trajectory shape. When motion events stray from the learned path, the network can fire a deviation signal. Real object movement, however, is not perfectly periodic and can be affected by sensor noise, occlusions, and other imperfections. The system therefore must be robust and able to adapt to these variations while still providing accurate predictions and deviation detection. 
 % P3 -- Why spiking. Events are spikes, so a spiking network can consume them without a
 % framing step; the network's own dynamics carry the learned pattern and produce the
 % prediction, rather than a separate regressor on top; and the result maps onto neuromorphic
@@ -120,30 +97,35 @@ The retina itself has a silicon counterpart \cite{Mahowald1991The}. Event camera
 % camera, one-shot ballistic motion, offline batch training, and no signal when the motion
 % changes.
 %
-% P2 -- Sequence memory and dynamical prediction in spiking networks. Reservoirs trained with
-% FORCE \cite{sussillo2009generating,nicola2017supervised}, the Legendre Memory Unit
-% \cite{voelker2019lmu}, and local learning rules for recurrent SNNs
-% \cite{bellec2020eprop,gilra2017predicting,kim2018learning} let a spiking network hold and
-% reproduce a periodic low-dimensional signal -- the lineage of "the dynamics solve the
-% prediction" -- but are demonstrated on abstract signals, never driven by a real sensor.
+% P2 -- Oscillator-based rhythm learning: the method's lineage. Adaptive-frequency
+% oscillators lock their phase and rate to a periodic drive (Righetti et al. 2006); rhythmic
+% dynamic movement primitives \cite{ijspeert2002rhythmic,saveriano2023dmp} pair such a
+% canonical oscillator with a learned shape function -- a clock and a map. The NEF and the PES
+% rule give the spiking realisation. None has been driven by an event camera or asked for a
+% deviation signal.
 %
-% P3 -- Novelty and deviation detection with spiking networks. Inhibitory plasticity
+% P3 -- Learned dynamics as the memory: the route we tried and report as ablations.
+% Reservoirs trained with FORCE \cite{sussillo2009generating,nicola2017supervised}, the
+% Legendre Memory Unit \cite{voelker2019lmu}, and local learning rules for recurrent SNNs
+% \cite{bellec2020eprop,gilra2017predicting,kim2018learning} let a spiking network hold and
+% reproduce a periodic low-dimensional signal, but are demonstrated on abstract signals, never
+% driven by a real sensor.
+%
+% P4 -- Novelty and deviation detection with spiking networks. Inhibitory plasticity
 % \cite{schulz2021novelty} and short-term synaptic depression make familiar input quiet and
 % leave novel input loud, and engineered SNN detectors handle generic time series
 % \cite{vacuumspiker2025}, but novelty there means stimulus identity, not departure from a
 % learned spatial motion pattern.
 %
-% P4 -- Classical repetitive-trajectory learning: the baselines. Rhythmic dynamic movement
-% primitives \cite{ijspeert2002rhythmic,saveriano2023dmp}, a Kalman filter with a periodic
-% motion model, and harmonic regression learn and reproduce a repeated path well and may beat
-% a spiking network on raw accuracy for clean periodic motion; the claim here is event-native
-% operation, online acquisition, and a neuromorphic deployment path, not better numbers.
+% Baselines (periodic Kalman, harmonic regression) are described in IV-C, not here.
 %
 % P5 -- The gap. No published system learns a repetitive path from a freely moving real target
 % through an event camera, predicts it a short horizon ahead, and signals when the motion
 % stops matching -- one or two sentences, or fold into the end of P1 if space is tight.
 
 \section{Method}
+% Fig. 1 (system overview) goes here: events -> frames -> localiser -> clock -> ring + map
+% -> prediction; snapshot -> deviation score.
 
 \subsection{Problem Setup}
 % Target position over time; repetition; prediction horizon; deviation definition.
@@ -171,22 +153,27 @@ The retina itself has a silicon counterpart \cite{Mahowald1991The}. Event camera
 % scripts/check_localiser.py --set development, materials/02-methods/event-representations.md.
 
 \subsection{Localiser}
-% Frame -> target position estimate. Spiking, topographic. Fallback: classical centroid.
+% Frame -> target position estimate. Spiking conv net over 5 ms count frames; output place
+% cells + a "present" unit. Fallback: classical centroid.
+% Training lives HERE: simulated clips only, with stuck pixels, noise, flips, brightness
+% scaling, polarity swap and blank stretches added; weights frozen before any real clip is
+% scored. This is the only trained stage -- the memory (III-D) learns online, untrained.
 
 \subsection{Trajectory-Memory Network}
 % Position stream -> short-horizon prediction. Predictive-inference framing.
-% State carries the current pattern; weights carry general motion regularities.
+% A clock and a map: adaptive-frequency oscillator clocks lock to the motion; a ring of
+% phase cells drives a position map learned in the clip (PES). Nothing pretrained.
 % Framework: see Sec.~\ref{sec:impl}.
 
 \subsection{Deviation Score}
-% s(t) = f(prediction error against the learned path); thresholding.
+% s(t) = mismatch between the observed position and the SNAPSHOT of the map taken once
+% lock-on has settled (the remembered path); the working map keeps adapting. Thresholding.
 
-\subsection{Training and Evaluation Protocol}
-% Pretrain on simulated trajectories; freeze; evaluate on held-out real recordings only.
-% Start: three rules. (1) Training data is simulated only (100 clips x 15 s, IV-A).
-% (2) Weights are frozen before any real clip is scored. (3) Real clips split into six
-% development clips, looked at freely while building, and eleven held-out clips, labelled
-% last and scored once (table in PLAN.md; corpus/sets.yaml). The period is never given:
+\subsection{Evaluation Protocol}
+% Localiser training is in III-C; the memory is not trained. Rules: (1) Real clips are never
+% trained on. (2) Real clips split into six development clips, looked at freely while
+% building, and eleven held-out clips, labelled last and scored once (table in PLAN.md;
+% corpus/sets.yaml). The period is never given:
 % every method, baseline or spiking, estimates it from the first 5 s of a clip (warm-up)
 % and keeps it, so predictions and scores start after warm-up and a speed change counts as
 % a deviation. Every method sees identical inputs through one evaluation loop
@@ -260,8 +247,23 @@ The retina itself has a silicon counterpart \cite{Mahowald1991The}. Event camera
 % against the frontend's own track and report localisation against labels separately.
 
 \section{Results}
-% Table: baseline vs Stage 1 (vs Stage 2 if reached), prediction and deviation.
-% Lock-on curves; deviation-detection timing; one external-dataset generalisation check.
+
+\subsection{Localiser}
+% Sim validation and real development clips vs the classical centroid; per-setup transfer.
+
+\subsection{Prediction and Path Memory}
+% Real clips vs periodic Kalman and harmonic fit: prediction error at the horizons, path-shape
+% error, period, lock-on. Two input conditions: centroid input (the fallback row) and the
+% spiking localiser (full Stage 1).
+
+\subsection{Deviation Detection}
+% AUC, median latency, false alarms per minute on the break clips; thresholds from
+% development clips applied unchanged to held-out ones.
+
+\subsection{Ablations}
+% The two learned memories that could not hold the cycle (two-timescale recurrent LIF, LMU
+% window), with their path error; the spiking clock-and-map against its arithmetic reference
+% (phasemap.py) -- what spiking costs.
 
 \section{Discussion}
 % Where the spiking version wins / costs accuracy; event-native and latency arguments.

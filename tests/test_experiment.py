@@ -49,7 +49,7 @@ def test_score_trace_reports_the_three_metrics_in_pixels():
     clip = a_clip_of_events(spec)
     trace = evaluate_clip(HarmonicFit(dt_s=0.005, warmup_s=3.0), clip, window_us=5000, horizon_s=0.1)
     r = score_trace(trace, clip, tol_px=10.0, settle_s=4.0)
-    assert r["error_px"]["median"] < 6.0                 # pre-break steps only
+    assert r["fde_px"]["median"] < 6.0                 # pre-break steps only
     assert 0 < r["lock_on_s"] < 4.0
     assert r["deviation"]["auc"] > 0.95 and r["deviation"]["latency_s"] < 0.5
 
@@ -102,10 +102,10 @@ def test_run_set_scores_each_clip_and_pools_the_medians():
     rows, pooled = run_set(lambda: HarmonicFit(dt_s=0.005, warmup_s=3.0), clips,
                            window_us=5000, horizon_s=0.1, tol_px=10.0, settle_s=4.0)
     assert [r["name"] for r in rows] == ["one", "two"]
-    assert rows[0]["error_px"]["median"] < 6.0 and rows[1]["deviation"]["auc"] > 0.9
+    assert rows[0]["fde_px"]["median"] < 6.0 and rows[1]["deviation"]["auc"] > 0.9
     assert pooled["name"] == "pooled" and pooled["n_clips"] == 2
-    assert pooled["error_px"]["median"] == pytest.approx(
-        np.median([rows[0]["error_px"]["median"], rows[1]["error_px"]["median"]]))
+    assert pooled["fde_px"]["median"] == pytest.approx(
+        np.median([rows[0]["fde_px"]["median"], rows[1]["fde_px"]["median"]]))
     assert pooled["deviation"]["auc"] == rows[1]["deviation"]["auc"]   # the only break clip
 
 
@@ -125,7 +125,7 @@ def test_pool_keeps_misses_and_counts_them():
     from trajmem.experiment import pool
 
     def row(name, latency, lock):
-        return {"name": name, "error_px": {"median": 1.0, "iqr": 0.1}, "lock_on_s": lock,
+        return {"name": name, "fde_px": {"median": 1.0, "iqr": 0.1}, "lock_on_s": lock,
                 "path_px": {"median": 2.0, "last": 1.5}, "path_lock_on_s": lock, "period_ratio": 1.0, "blank_px": np.nan,
                 "deviation": {"auc": 0.9, "latency_s": latency, "fp_per_min": 0.0}, "unseen_fraction": 0.0}
     pooled = pool([row("a", 0.3, 1.0), row("b", np.inf, np.inf), row("c", 0.4, 2.0), row("d", np.inf, 3.0)])
@@ -158,7 +158,7 @@ def test_subtracting_the_label_offset_removes_a_constant_labelling_bias():
     trace = evaluate_clip(HarmonicFit(dt_s=0.005, warmup_s=3.0), shifted, window_us=5000, horizon_s=0.1)
     raw = score_trace(trace, shifted, tol_px=10.0, settle_s=4.0)
     fixed = score_trace(trace, shifted, tol_px=10.0, settle_s=4.0, subtract_offset=True)
-    assert raw["error_px"]["median"] > 20 and fixed["error_px"]["median"] < 6
+    assert raw["fde_px"]["median"] > 20 and fixed["fde_px"]["median"] < 6
     assert abs(fixed["offset_px"][1] - 24) < 2 and abs(fixed["offset_px"][0]) < 2
     assert np.allclose(label_offset(trace, shifted, 4.0) * (640, 480), fixed["offset_px"])
 

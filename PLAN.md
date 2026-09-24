@@ -58,8 +58,11 @@ freely moving real target, with a break signal.
 
 - `frontend.py`: ON/OFF count frames (optional downsample), time surfaces (main repo's
   `pipeline.time_surface`), and a dense-cell centroid track robust to noise and to a string.
-- `baseline.py`: `PeriodicKalman` (harmonic state, normalised-innovation surprise) and
-  `HarmonicFit` (sliding least-squares harmonics). Both estimate the period from a 5 s warm-up.
+- `baseline.py`: `Extrapolator` (the naive floor — a least-squares polynomial over the last
+  0.1 s; order 1 is constant velocity, 2 constant acceleration; no period, no remembered
+  path), `PeriodicKalman` (harmonic state, normalised-innovation surprise) and
+  `HarmonicFit` (sliding least-squares harmonics). The two periodic ones estimate the
+  period from a 5 s warm-up.
 - `metrics.py`, `experiment.py` (`evaluate_clip` is the one loop every method goes through),
   `scripts/run_experiment.py --set development`, `scripts/replay_gt.py --model kalman`.
 - **Numbers**, 5 ms windows, 100 ms horizon, px median (`runs/results/development_*.csv`):

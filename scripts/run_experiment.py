@@ -46,15 +46,15 @@ def open_clip(path, window=None):
     return slice_clip(clip, *window) if window else clip
 
 
-HEADER = (f"{'':26} {'err_med':>8} {'err_iqr':>8} {'lock_on_s':>9} {'path_med':>8} {'path_last':>9} "
+HEADER = (f"{'':26} {'fde_med':>8} {'fde_iqr':>8} {'lock_on_s':>9} {'path_med':>8} {'path_last':>9} "
           f"{'path_lock':>9} {'period':>7} {'blank':>7} {'auc':>7} {'latency_s':>9} {'fp/min':>8} {'unseen':>8} {'offset_px':>14}")
-CSV_FIELDS = ("set", "memory", "clip", "err_median_px", "err_iqr_px", "lock_on_s", "path_median_px",
+CSV_FIELDS = ("set", "memory", "clip", "fde_px", "fde_iqr_px", "lock_on_s", "path_median_px",
               "path_last_px", "path_lock_on_s", "period_ratio", "blank_px", "auc", "latency_s", "fp_per_min", "unseen_fraction",
               "offset_x_px", "offset_y_px")
 
 
 def row(name: str, r: dict) -> str:
-    e, d, p = r["error_px"], r["deviation"], r["path_px"]
+    e, d, p = r["fde_px"], r["deviation"], r["path_px"]
     ox, oy = r.get("offset_px", (0.0, 0.0))
     return (f"{name:26} {e['median']:8.1f} {e['iqr']:8.1f} {r['lock_on_s']:9.2f} "
             f"{p['median']:8.1f} {p['last']:9.1f} {r['path_lock_on_s']:9.2f} {r['period_ratio']:7.2f} "
@@ -63,10 +63,10 @@ def row(name: str, r: dict) -> str:
 
 
 def csv_row(set_name: str, memory: str, r: dict) -> dict:
-    e, d, p = r["error_px"], r["deviation"], r["path_px"]
+    e, d, p = r["fde_px"], r["deviation"], r["path_px"]
     ox, oy = r.get("offset_px", (0.0, 0.0))
-    return {"set": set_name, "memory": memory, "clip": r["name"], "err_median_px": e["median"],
-            "err_iqr_px": e["iqr"], "lock_on_s": r["lock_on_s"], "path_median_px": p["median"],
+    return {"set": set_name, "memory": memory, "clip": r["name"], "fde_px": e["median"],
+            "fde_iqr_px": e["iqr"], "lock_on_s": r["lock_on_s"], "path_median_px": p["median"],
             "path_last_px": p["last"], "path_lock_on_s": r["path_lock_on_s"],
             "period_ratio": r["period_ratio"], "blank_px": r["blank_px"], "auc": d["auc"],
             "latency_s": d["latency_s"], "fp_per_min": d["fp_per_min"],

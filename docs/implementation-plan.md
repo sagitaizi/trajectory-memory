@@ -131,6 +131,8 @@ the path is learned online. `snn.SpikingMemory` (learned two-timescale) and `snn
 (window recording) are the ablations, kept with their checkpoints.
 
 ### `baseline.py` ✅
+`Extrapolator` (least-squares polynomial over the last `fit_s`; `order` 1 = constant
+velocity, 2 = constant acceleration) — the naive floor, no period and no remembered path.
 `PeriodicKalman` (harmonic state per coordinate, normalised-innovation surprise) and
 `HarmonicFit` (sliding least-squares harmonics) — implement `TrajectoryMemory`; both take
 `dt_s` (one observation per window), estimate the period from a `warmup_s` (5 s) of
@@ -138,7 +140,8 @@ observations with `trajectories.search_period` and keep it; a NaN observation is
 `fit()` is a no-op: they learn each clip from its own warm-up.
 
 ### `metrics.py` ✅
-`prediction_error(pred, gt) -> {errors, median, iqr, mean, n}`.
+`displacement_error(pred, gt) -> {errors, median, iqr, mean, n}` — FDE at one horizon.
+`ade_fde({horizon: error}) -> {ade, fde}` — the trajectory-prediction pair.
 `lock_on_time(errors, tol, dt)` — first time after which the error stays under `tol`; inf if never.
 `deviation_roc(scores, times, deviation_times, threshold, hold_n) -> {threshold, auc,
 latency_s, fp_per_min}` — Mann–Whitney AUC; a flag is `hold_n` steps above threshold.
@@ -149,7 +152,8 @@ latency_s, fp_per_min}` — Mann–Whitney AUC; a flag is `hold_n` steps above t
 goes through. `score_trace(trace, clip, tol_px, settle_s) -> dict` — the three metrics.
 `load_set / open_set(name)` — `corpus/sets.yaml` entries, loaded and sliced.
 `run_set(make_memory, clips, ...) -> (rows, pooled)` — fresh memory per clip, medians pooled.
-`make_memory(name, dt_s, **params)` — `kalman` / `harmonic`; the SNN registers here.
+`make_memory(name, dt_s, **params)` — `constant_velocity` / `constant_acceleration` /
+`kalman` / `harmonic` / `phasemap` / `snn_phasemap`; the SNN registers here.
 
 ## Data flow
 

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from trajmem.baseline import HarmonicFit, PeriodicKalman
+from trajmem.baseline import Extrapolator, HarmonicFit, PeriodicKalman
 from trajmem.trajectories import Deviation, TrajectorySpec, sample
 
 DT = 0.005
@@ -34,7 +34,7 @@ def test_predicts_a_clean_repetitive_path_ahead(make):
 
 
 @pytest.mark.parametrize("make", [lambda: PeriodicKalman(dt_s=DT), lambda: HarmonicFit(dt_s=DT)])
-def test_prediction_error_grows_with_horizon_but_stays_small(make):
+def test_displacement_error_grows_with_horizon_but_stays_small(make):
     t, xy, spec = a_track()
     m = make()
     errs = {}
@@ -120,3 +120,24 @@ def test_path_points_trace_the_learned_path_once_the_period_is_known(make):
     truth = sample(spec, np.linspace(0, spec.period_s, 64, endpoint=False))
     d = np.hypot(*(cycle[:, None] - truth[None]).T)        # every point sits on the true path
     assert d.min(axis=0).max() < 0.005
+
+
+@pytest.mark.parametrize("order,worst", [(1, 0.05), (2, 0.015)])
+def test_extrapolator_predicts_ahead_but_holds_no_path(order, worst):
+    """The naive floor: good at a short horizon from the local motion alone, and with no
+    remembered cycle to report."""
+    t, xy, spec = a_track()
+    m = Extrapolator(dt_s=DT, order=order)
+    out = run(m, t, xy, horizon_s=0.1, start_s=5.0)
+    err = np.median(np.hypot(*(out[:, 1:3] - sample(spec, out[:, 0] + 0.1)).T))
+    assert err < worst
+    assert np.isnan(m.period()) and m.path_points([0.0, 0.5]) is None
+
+
+def test_extrapolator_error_grows_with_horizon_faster_than_a_periodic_memory():
+    t, xy, spec = a_track()
+    errs = {}
+    for name, m in (("flat", Extrapolator(dt_s=DT)), ("periodic", HarmonicFit(dt_s=DT))):
+        out = run(m, t, xy, horizon_s=0.5, start_s=6.0)
+        errs[name] = np.median(np.hypot(*(out[:, 1:3] - sample(spec, out[:, 0] + 0.5)).T))
+    assert errs["periodic"] < errs["flat"]

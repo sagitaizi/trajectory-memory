@@ -11,6 +11,8 @@ correct form: **prediction error against the learned model**, thresholded.
   distribution, or a CUSUM on `e`).
 - Report: ROC/AUC over a threshold sweep, median detection latency `t_flag − t_break`,
   false-positive rate on no-deviation clips, and whether the score relaxes after a transient.
+- How the field scores this, and why a point-adjusted F1 is not an option:
+  `repetitive-motion-and-metrics.md` §5.
 
 ## Biological grounding (for the discussion / future-work framing)
 - **Habituation via short-term synaptic depression** — repeated input depresses synapses,
