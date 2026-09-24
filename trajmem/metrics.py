@@ -75,12 +75,18 @@ def lock_on_time(errors, tol: float, dt: float) -> float:
 # centroid affords a k with neither; through the spiking localiser a deviation is less
 # separable from quiet running, and every k costs one or the other.
 RATCHET_K_BY_INPUT = {"centroid": 25.0, "frame_centroid": 25.0, "snn": 16.0}
+RATCHET_K_BY_CHECKPOINT = {"pend_ft": 30.0}    # spiking localisers calibrated on their own, by file stem
 RATCHET_K = 25.0                   # spreads above the settled score: the smallest of 3..30 that raised
                                    # no false alarm on the development clips (breaks still caught in 0.23 s)
 
 
-def k_for_input(name: str | None) -> float:
-    """The alarm constant calibrated for that position input (see RATCHET_K_BY_INPUT)."""
+def k_for_input(name: str | None, checkpoint=None) -> float:
+    """The alarm constant calibrated for that position input: its checkpoint's own if it has
+    one (RATCHET_K_BY_CHECKPOINT), else the input's (RATCHET_K_BY_INPUT)."""
+    from pathlib import Path
+
+    if checkpoint is not None and Path(checkpoint).stem in RATCHET_K_BY_CHECKPOINT:
+        return RATCHET_K_BY_CHECKPOINT[Path(checkpoint).stem]
     return RATCHET_K_BY_INPUT.get(name or "centroid", RATCHET_K)
 
 
@@ -145,7 +151,8 @@ def deviation_roc(scores, times, deviation_times, threshold=None,
 
     Positives are steps at or after the first break, negatives the steps before it
     (all steps, on a clip without a break). `auc` is threshold-free. At the operating
-    `threshold` -- a number, a per-step array, or "ratchet" for `ratchet_threshold`;
+    `threshold` -- a number, a per-step array, a rule (scores, times) -> per-step array,
+    or "ratchet" for `ratchet_threshold`;
     the default, the 99th percentile of the negatives, needs the labels and so is a
     reference rather than a detector -- a flag is `hold_n`
     consecutive steps above it: `latency_s` is the first flag after the break,
@@ -158,6 +165,8 @@ def deviation_roc(scores, times, deviation_times, threshold=None,
         if threshold != "ratchet":
             raise ValueError(f"unknown threshold rule {threshold!r}")
         threshold = ratchet_threshold(s, t)
+    elif callable(threshold):
+        threshold = threshold(s, t)
     elif threshold is None:
         threshold = float(np.nanpercentile(s[~positive], 99)) if (~positive).any() else np.inf
 

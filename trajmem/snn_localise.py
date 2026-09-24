@@ -180,6 +180,7 @@ class SpikingLocaliser:
         self.net = SpikingLocaliserNet(n_cells, ch, hidden, dt_s, in_hw=in_hw, seed=seed, learn_tau=learn_tau,
                                        polarity=polarity).to(self.device)
         self.val_clips: list[str] | None = None          # names of the clips held out while fitting
+        self.checkpoint: str | None = None               # the file it was loaded from
         self.reset()
 
     # -- persistence --
@@ -201,6 +202,7 @@ class SpikingLocaliser:
         m = cls(device=device, **{"learn_tau": True, **ck["config"]})       # older checkpoints learned them
         m.net.load_state_dict(ck["state"])
         m.val_clips = ck.get("val_clips")
+        m.checkpoint = str(path)
         m.reset()
         return m
 

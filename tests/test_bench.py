@@ -51,3 +51,13 @@ def test_the_bench_alarm_sees_every_memory_step_not_every_video_frame():
         panels.frame(t)
     for alarm in panels.alarms:
         assert len(alarm.window) > 150                       # ~190 steps of 5 ms, not ~10 frames
+
+
+def test_a_bench_panel_uses_the_alarm_constant_of_its_localiser_checkpoint(tmp_path):
+    loc = SpikingLocaliser(n_cells=4, ch=(2, 3), hidden=8)
+    loc.save(tmp_path / "pend_ft.pt")
+    loc = SpikingLocaliser.load(tmp_path / "pend_ft.pt")
+    clip = a_clip_of_events(a_spec(), duration_s=0.2)
+    overlays = bench.make_overlays(clip, loc, 5000, 0.1, 0.5)
+    panels = bench.Panels(clip, overlays, "x", 0.02, 40, 1.0, 1.0)
+    assert [a.k for a in panels.alarms] == [25.0, 25.0, 30.0]

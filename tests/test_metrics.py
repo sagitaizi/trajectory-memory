@@ -164,3 +164,22 @@ def test_k_is_calibrated_per_input():
     assert k_for_input("snn") == 16.0                      # the learned localiser needs a lower bar
     assert k_for_input(None) == k_for_input("centroid")    # the default input
     assert k_for_input("something else") == 25.0
+
+
+def test_k_follows_the_localiser_checkpoint_when_one_was_calibrated():
+    from trajmem.metrics import k_for_input
+
+    assert k_for_input("snn", "runs/localiser/pend_ft.pt") == 30.0    # the pendulum fine-tune
+    assert k_for_input("snn", "runs/localiser/snn.pt") == 16.0        # no entry: the input's constant
+    assert k_for_input("snn") == 16.0
+
+
+def test_deviation_roc_takes_a_threshold_rule():
+    from trajmem.metrics import deviation_roc, ratchet_threshold
+
+    rng = np.random.default_rng(0)
+    t = np.arange(4000) * 0.005
+    s = np.where(t < 15, 1.0 + 0.1 * rng.standard_normal(len(t)), 20.0)
+    by_rule = deviation_roc(s, t, [15.0], threshold=lambda s, t: ratchet_threshold(s, t, k=30))
+    by_array = deviation_roc(s, t, [15.0], threshold=ratchet_threshold(s, t, k=30))
+    assert by_rule == by_array

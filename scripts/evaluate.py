@@ -55,7 +55,7 @@ def rows_for(set_name, entries, memory: str, input_name: str, args, localiser) -
         for tr in traces:
             threshold = args.threshold_rule
             if threshold == "ratchet":                       # the bar this input was calibrated for
-                threshold = ratchet_threshold(tr.score, tr.t, k=k_for_input(input_name))
+                threshold = ratchet_threshold(tr.score, tr.t, k=k_for_input(input_name, args.localiser_checkpoint))
             r = score_trace(tr, clip, args.tol_px, args.settle, threshold=threshold,
                             subtract_offset=args.subtract_offset)
             d, e, p = r["deviation"], r["fde_px"], r["path_px"]
@@ -100,7 +100,7 @@ def _fmt(v, nd=1) -> str:
     return f"{v:.{nd}f}"
 
 
-def tables(pooled: list[dict], set_name: str, horizons) -> tuple[str, str]:
+def tables(pooled: list[dict], set_name: str, horizons, checkpoint=None) -> tuple[str, str]:
     """The paper's two tables: prediction + path per memory and input, and detection."""
     md, tex = [], []
     inputs = sorted({r["input"] for r in pooled})
@@ -130,7 +130,7 @@ def tables(pooled: list[dict], set_name: str, horizons) -> tuple[str, str]:
     tex.append("\\bottomrule\n\\end{tabular}")
 
     md.append(f"\n# {set_name}: deviation detection\n")
-    ks = ", ".join(f"{name} k={RATCHET_K_BY_INPUT[name]:g}" for name in sorted(set(inputs) & set(RATCHET_K_BY_INPUT)))
+    ks = ", ".join(f"{name} k={k_for_input(name, checkpoint):g}" for name in sorted(set(inputs) & set(RATCHET_K_BY_INPUT)))
     md.append(f"Ratcheting alarm, calibrated per input on the development clips ({ks}). "
               "AUC and latency over the break clips; false alarms over every clip's quiet part.\n")
     head2 = ["memory", "input", "break clips", "AUC", "latency s", "false alarms/min"]
@@ -201,7 +201,7 @@ def main(argv=None) -> None:
         w = csv.DictWriter(fh, fieldnames=list(FIELDS) + ["ade_px", "fde_at_max_px", "n_clips", "n_break_clips"])
         w.writeheader()
         w.writerows(pooled)
-    md, tex = tables(pooled, args.set_name, args.horizons)
+    md, tex = tables(pooled, args.set_name, args.horizons, args.localiser_checkpoint)
     (out_dir / "tables.md").write_text(md, encoding="utf-8")
     (out_dir / "tables.tex").write_text(tex, encoding="utf-8")
     print(md)

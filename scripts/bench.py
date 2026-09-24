@@ -74,6 +74,7 @@ def make_overlays(clip, localiser, window_us: int, horizon_s: float, warmup_s: f
         mem = make_memory(memory, dt_s=window_us / 1e6, warmup_s=warmup_s)
         overlay = LiveOverlay(mem, clip, window_us, horizon_s, label, localiser if loc == "snn" else None)
         overlay.input_name = loc                              # which alarm constant this panel is scored with
+        overlay.checkpoint = getattr(localiser, "checkpoint", None) if loc == "snn" else None
         out.append(overlay)
     return out
 
@@ -88,7 +89,8 @@ class Panels:
         self.max_width = max_width
         self.errors = [[] for _ in overlays]
         # the same rule and constant the scoring uses, per panel's input
-        self.alarms = [RatchetAlarm(k=k_for_input(getattr(ov, "input_name", "centroid"))) for ov in overlays]
+        self.alarms = [RatchetAlarm(k=k_for_input(getattr(ov, "input_name", "centroid"), getattr(ov, "checkpoint", None)))
+                       for ov in overlays]
         self.flagged = [False] * len(overlays)
         # The pipelines are independent and torch drops the GIL, so stepping them in
         # parallel costs about the slowest one instead of the sum.

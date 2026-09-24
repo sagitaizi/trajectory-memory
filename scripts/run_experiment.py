@@ -31,6 +31,7 @@ import _thesis_path  # noqa: F401,E402  (adds the thesis repo to sys.path)
 import numpy as np  # noqa: E402
 
 from trajmem.data import load_clip, load_recording, slice_clip  # noqa: E402
+from trajmem.metrics import RATCHET_K, k_for_input, ratchet_threshold  # noqa: E402
 from trajmem.experiment import (evaluate_clip, make_localiser, make_memory,  # noqa: E402
                                 open_set, run_set, score_trace)
 
@@ -73,19 +74,21 @@ def csv_row(set_name: str, memory: str, r: dict) -> dict:
             "unseen_fraction": r["unseen_fraction"], "offset_x_px": ox, "offset_y_px": oy}
 
 
-def threshold_rule(name: str):
-    """The deviation alarm bar: "ratchet" (the detector), "oracle" (the label-using
-    reference), or a fixed number of pixels."""
+def threshold_rule(name: str, k: float = RATCHET_K):
+    """The deviation alarm bar: "ratchet" (the detector, with the input's calibrated `k`),
+    "oracle" (the label-using reference), or a fixed number of pixels."""
     if name == "oracle":
         return None
-    return "ratchet" if name == "ratchet" else float(name)
+    if name == "ratchet":
+        return lambda s, t: ratchet_threshold(s, t, k=k)
+    return float(name)
 
 
 def run_on_set(set_name: str, names, args) -> None:
     import csv
 
     clips = open_set(set_name)
-    threshold = threshold_rule(args.threshold)
+    threshold = threshold_rule(args.threshold, k_for_input(args.localiser, args.localiser_checkpoint))
     localiser = make_localiser(args.localiser, args.localiser_checkpoint)
     print(f"set {set_name}: {len(clips)} clips with ground truth  window {args.window_us} us  "
           f"horizon {args.horizon} s  warm-up {args.warmup} s  localiser {args.localiser}")
@@ -138,7 +141,7 @@ def main(argv=None) -> None:
         return
     if not args.clip:
         p.error("give a clip or --set")
-    threshold = threshold_rule(args.threshold)
+    threshold = threshold_rule(args.threshold, k_for_input(args.localiser, args.localiser_checkpoint))
     clip = open_clip(args.clip, args.slice)
     print(f"{args.clip}  {clip.duration_us / 1e6:.1f} s  breaks at {clip.deviation_times or '-'}  "
           f"window {args.window_us} us  horizon {args.horizon} s")
