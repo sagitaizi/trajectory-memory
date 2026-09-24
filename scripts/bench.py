@@ -111,7 +111,8 @@ class Panels:
         for k, (ov, step) in enumerate(zip(self.overlays, steps)):
             if np.isfinite(step["err_px"]):
                 self.errors[k].append(step["err_px"])
-            self.flagged[k] = self.alarms[k].update(step.get("score", np.nan), mid)
+            for score, tw in ov.stepped:                        # every 5 ms step, as the scoring sees them
+                self.flagged[k] = self.alarms[k].update(score, tw)
             view = _draw(img, gt_px, trail_px, None, self.zoom, ov.name, t, self.view_window_s,
                          self.view_brightness, None, model={"step": step, "name": ov.memory.__class__.__name__},
                          footer="")

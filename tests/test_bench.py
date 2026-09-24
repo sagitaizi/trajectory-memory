@@ -41,3 +41,13 @@ def test_sim_status_falls_back_to_the_shared_split(tmp_path, monkeypatch):
     val = split_frame_sets(sorted(d.glob("sim_*.npz")))[1][0].stem
     assert bench.sim_status(val, object()) == "not trained on"
     assert bench.sim_status("sim_999", object()) == "trained on"
+
+
+def test_the_bench_alarm_sees_every_memory_step_not_every_video_frame():
+    clip = a_clip_of_events(a_spec(), duration_s=1.0)
+    overlays = bench.make_overlays(clip, None, 5000, 0.1, 0.5, pipelines=bench.PIPELINES[:2])
+    panels = bench.Panels(clip, overlays, "x", 0.02, 40, 1.0, 1.0)
+    for t in [i / 10 for i in range(10)]:
+        panels.frame(t)
+    for alarm in panels.alarms:
+        assert len(alarm.window) > 150                       # ~190 steps of 5 ms, not ~10 frames

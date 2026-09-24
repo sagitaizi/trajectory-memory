@@ -139,11 +139,13 @@ class LiveOverlay:
         self.scale = np.array(clip.meta["resolution"], dtype=float)
         self.windows = positions(clip, window_us, localiser)
         self.pending = None
+        self.stepped = []                                     # (score, t) of every step the last `at` ran
         self.step = {"obs_px": np.array([np.nan, np.nan]), "pred_px": np.array([np.nan, np.nan]),
                      "score": 0.0, "err_px": np.nan, "horizon_s": horizon_s}
         memory.reset()
 
     def at(self, t: float) -> dict:
+        self.stepped = []
         while True:
             if self.pending is None:
                 self.pending = next(self.windows, None)
@@ -162,6 +164,7 @@ class LiveOverlay:
                          "score": float(self.memory.deviation_score()), "err_px": err, "horizon_s": self.horizon_s,
                          "accepted": bool(getattr(self.memory, "accepted", True)),
                          "cycle_px": self._cycle(tw), "period_s": self._period()}
+            self.stepped.append((self.step["score"], tw))
 
     def _period(self) -> float:
         return float(self.memory.period()) if hasattr(self.memory, "period") else np.nan
