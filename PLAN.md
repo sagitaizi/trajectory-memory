@@ -15,8 +15,8 @@ freely moving real target, with a break signal.
 
 **Main proof of concept: the string pendulum** — one object, one motion, the cleanest
 repetitive trajectory in the corpus. The fan and wall target are the secondary result: the
-same pipeline is still a reasonable predictor on other motions. Pendulum scores subtract
-each clip's constant label offset (27–43 px; the offset is reported separately).
+same pipeline is still a reasonable predictor on other motions. Pendulum positions are scored against the labels as-is (the labelled brush centre is the
+target); offset-removed numbers are a secondary column.
 
 ## Status
 
@@ -24,7 +24,7 @@ each clip's constant label offset (27–43 px; the offset is reported separately
 |---|---|
 | A — Data | 🟨 Real corpus recorded and split; development set labelled; sim corpus generated. **Open: label the held-out clips.** |
 | B — Frontend + baselines | ✅ |
-| C — Trajectory memory, Stage 1 | 🟨 **In progress.** Now: a pendulum-specialised localiser, fine-tuned from `snn.pt` on `corpus/sim_pendulum/` (lr 1e-3, 10 epochs), judged against the centroid on the three pendulum development clips; from scratch if it misses. Network, training and evaluation built; 13.6 px at 100 ms on sim (Kalman 7.5), at the Kalman bar on the development set. Open: the cycle memory. |
+| C — Trajectory memory, Stage 1 | 🟨 **In progress.** Pendulum localiser: `runs/localiser/pend_ft.pt`, `snn.pt` fine-tuned on `corpus/sim_pendulum/` (lr 1e-3, 10 epochs; from scratch was worse). Pendulum development, against the labels, 100 ms prediction: 17.9 / 31.5 / 22.6 px vs centroid 27.2 / 49.2 / 42.8. Open: recalibrate the alarm k for this input. Network, training and evaluation built; 13.6 px at 100 ms on sim (Kalman 7.5), at the Kalman bar on the development set. Open: the cycle memory. |
 | D — Deviation detection | ✅ Label-free ratcheting alarm, k = 25 chosen on development: AUC 0.98, 0.23 s, no false alarms (Kalman 0.86, 39.9/min). Held-out pending labels. |
 | E — Raw events, Stage 2 | ⬜ Only if Stage 1 lands. |
 | F — Paper | 🟨 Written as sections unlock; draft due 2026-10-01. |
