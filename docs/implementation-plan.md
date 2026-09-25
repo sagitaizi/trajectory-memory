@@ -35,7 +35,10 @@ trajectory-memory/
     match_sim_real.py        sim-vs-real statistics on a labelled clip (v2e calibration)
     make_tracks.py           corpus/sim/tracks.npz: measured + true positions per window
     make_frames.py           corpus/sim/frames_<d>x_<w>us/: uint8 count images per window
-    train_memory.py          pretrain snn.SpikingMemory on tracks.npz -> runs/memory/snn.pt
+    train_memory.py          pretrain snn.SpikingMemory on tracks.npz -> runs/memory/snn.pt (ablation)
+    train_localiser.py       train the spiking localiser on a frame corpus -> runs/localiser/*.pt; --init fine-tunes
+    evaluate.py              every paper table from one command -> runs/eval/<set>/ (csv, md, booktabs)
+    mark_labels.py, mark_breaks.py, mark_anchors.py   hand-labelling tools for real clips
     corpus_summary.py        verify the corpus, print the §IV-A table
     replay_gt.py             player; --model draws a memory's output live
     bench.py                 visual test bench: corpus/bench.yaml clips through three pipelines side by side, rendered per iteration (runs/bench/<tag>/) or --live
@@ -71,7 +74,7 @@ location, so imports work with only `sys.path` set — no packaging needed.
 ## Modules
 
 ### `trajectories.py`
-`TrajectorySpec` — shape (`circle`, `ellipse`, `figure8`, `lissajous`), size, period, centre,
+`TrajectorySpec` — shape (`circle`, `ellipse`, `figure8`, `lissajous`, `pendulum`), size, period, centre,
 plus zero or more `Deviation(at_t, kind, params)` (`kind` ∈ shrink, speed-change, drift,
 switch-shape). `sample(spec, t) -> (x, y)`. Pure NumPy.
 
@@ -118,7 +121,7 @@ class Model:                                       # Localiser + TrajectoryMemor
 ```
 
 The Stage-1 memory behind this Protocol is `snn_phasemap.SpikingPhaseMap` (design decided
-2026-09-19/20; `phasemap.PhaseMap` is its non-spiking reference): five **clocks** — 4-D
+2026-09-19/20; `phasemap.PhaseMap` is its non-spiking reference): six **clocks** — 4-D
 LIF populations built by Nengo with the adaptive-frequency-oscillator dynamics as their
 recurrent wiring, run in torch as one batch — lock their phase to the motion's main-axis
 signal; each drives a **ring** of phase cells (a 2-D LIF population) whose connections to a
@@ -145,6 +148,9 @@ observations with `trajectories.search_period` and keep it; a NaN observation is
 `lock_on_time(errors, tol, dt)` — first time after which the error stays under `tol`; inf if never.
 `deviation_roc(scores, times, deviation_times, threshold, hold_n) -> {threshold, auc,
 latency_s, fp_per_min}` — Mann–Whitney AUC; a flag is `hold_n` steps above threshold.
+`path_shape_error` — the remembered cycle against the true one, px; period ratio apart.
+`ratchet_threshold` / `RatchetAlarm` — the label-free alarm bar (offline / live); `k_for_input`
+gives the k calibrated per position input (`RATCHET_K_BY_INPUT`, `RATCHET_K_BY_CHECKPOINT`).
 
 ### `experiment.py` ✅ (per-clip and per-set; the corpus-wide pretrain run comes with C)
 `Trace` — a memory's per-step output on one clip (`t, obs, pred, gt_ahead, score`).
@@ -153,7 +159,9 @@ goes through. `score_trace(trace, clip, tol_px, settle_s) -> dict` — the three
 `load_set / open_set(name)` — `corpus/sets.yaml` entries, loaded and sliced.
 `run_set(make_memory, clips, ...) -> (rows, pooled)` — fresh memory per clip, medians pooled.
 `make_memory(name, dt_s, **params)` — `constant_velocity` / `constant_acceleration` /
-`kalman` / `harmonic` / `phasemap` / `snn_phasemap`; the SNN registers here.
+`kalman` / `harmonic` / `phasemap` / `snn_phasemap`, and `snn` (a two-layer or LMU
+checkpoint, the ablations). `make_localiser(name, checkpoint)` — `centroid` /
+`frame_centroid` / `snn`.
 
 ## Data flow
 
@@ -166,20 +174,22 @@ recording .aedat4 ─► data ─► Clip ─┴─► frontend ─► obs strea
                                    metrics vs Clip.gt / deviation_times ─► Report
 ```
 
-Pretraining: `make_sim_dataset` writes N `Clip`s → `experiment` calls `model.fit` on their
-position tracks → weights frozen → evaluation runs on real clips only.
+Pretraining applies to the localiser only: `make_sim_dataset` writes N `Clip`s →
+`make_frames` → `train_localiser` → weights frozen → evaluation runs on real clips only.
+The memory learns each clip online; `fit()` is a no-op for it.
 
 ## Frameworks
 
 | Piece | Candidates | Notes |
 |---|---|---|
-| Memory core | two-timescale recurrent LIF (snnTorch) | G-F: snnTorch. LMU (Nengo) kept as an optional comparison. |
-| Localiser (Stage 1/2) | spiking conv / WTA (snnTorch or SpikingJelly) | Topographic → not NEF. |
+| Memory core | clock and map (`snn_phasemap.py`) | Nengo builds the NEF weights; LIF neurons stepped in PyTorch; PES by hand. |
+| Memory ablations | two-timescale LIF, LMU window (`snn.py`, `snn_lmu.py`) | snnTorch. |
+| Localiser (Stage 1) | spiking conv net (`snn_localise.py`) | snnTorch, surrogate gradients. Topographic → not NEF. |
 | Simulator | v2e | ESIM fallback if a 3-D scene is ever needed. |
 | Baseline | NumPy / SciPy | No SNN. |
 
-Everything SNN sits behind `model.py`'s Protocols. Swapping frameworks touches `model.py` and
-`requirements.txt` only.
+Everything SNN sits behind `model.py`'s Protocols, so either part can change framework
+without touching the rest.
 
 ## Testing
 

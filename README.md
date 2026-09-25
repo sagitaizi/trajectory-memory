@@ -26,6 +26,8 @@ All scripts run with the `thesis` env's interpreter (`conda run` swallows flags 
 python scripts/make_sim_dataset.py --n 100 --duration 15      # the simulated corpus -> corpus/sim/
 python scripts/make_sim_dataset.py --kind pendulum --n 100 --duration 15 --out corpus/sim_pendulum
 python scripts/match_sim_real.py corpus/real/fan/fan_brush_slow_02   # sim-vs-real check
+python scripts/evaluate.py --set development                   # every paper table -> runs/eval/development/
+python scripts/evaluate.py --set development --inputs centroid snn   # add the spiking-localiser rows
 python scripts/run_experiment.py --set development             # scorecard for every memory
 python scripts/run_experiment.py corpus/sim/sim_003.npz --memory kalman
 python scripts/check_localiser.py --set development            # centroid vs hand-labels
@@ -35,9 +37,9 @@ python scripts/make_frames.py --downsample 8                   # frame sets for 
 python scripts/train_localiser.py                              # train the spiking localiser -> runs/localiser/snn.pt
 python scripts/train_localiser.py --corpus corpus/sim_pendulum --init runs/localiser/snn.pt --lr 1e-3 --epochs 10 --out runs/localiser/pend_ft.pt
 python scripts/check_localiser.py --set development --localiser snn   # localiser vs hand-labels
-python scripts/run_experiment.py --set development --memory snn_phasemap --localiser snn --subtract-offset
-python scripts/train_memory.py                                 # pretrain the SNN memory -> runs/memory/snn.pt
-python scripts/run_experiment.py --set development --memory snn --subtract-offset
+python scripts/run_experiment.py --set development --memory snn_phasemap --localiser snn --localiser-checkpoint runs/localiser/pend_ft.pt
+python scripts/train_memory.py                                 # ablation: pretrain the two-layer SNN memory -> runs/memory/snn.pt
+python scripts/run_experiment.py --set development --memory snn --subtract-offset   # ablation
 python -m pytest                                               # ~2 min
 ```
 

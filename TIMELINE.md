@@ -18,7 +18,7 @@ order things must land to make the draft.
 | Window | Goal | |
 |---|---|---|
 | Sep 9–16 | Recording; simulator matched to real; sim corpus; frontend, baselines, metrics, evaluation loop | ✅ |
-| Sep 17–20 | Framework decision (G-F); SNN localiser + memory core; pretrain on sim; Stage 1 numbers on development clips | ⬜ |
+| Sep 17–20 | Framework decision (G-F); SNN localiser + memory core; pretrain on sim; Stage 1 numbers on development clips | ✅ |
 | Sep 21–27 | Deviation thresholds on development clips; label held-out clips; Stage 1 result frozen; Stage 2 if Stage 1 is solid | ⬜ |
 | Sep 28–Oct 1 | Held-out run, results table, draft to supervisor | ⬜ |
 | Oct 2–9 | Supervisor comments, Stage 2 push, final 8 pages | ⬜ |

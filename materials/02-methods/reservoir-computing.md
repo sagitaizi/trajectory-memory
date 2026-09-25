@@ -1,6 +1,7 @@
 # Reservoir computing (ESN / LSM / FORCE)
 
-The provisional memory core. A fixed recurrent network provides a rich temporal state; only a
+Background only: an early memory-core candidate, not used (the memory is the clock and map
+in `PLAN.md`). A fixed recurrent network provides a rich temporal state; only a
 readout is trained. Spiking variant = Liquid State Machine.
 
 ## Echo State Network — update equations

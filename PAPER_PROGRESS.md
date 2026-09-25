@@ -21,13 +21,13 @@ says which phase fills them.
 | §      | Section                    | Status      | Blocked on          | Revisit after   |
 |--------|----------------------------|-------------|---------------------|-----------------|
 | —      | Abstract                   | placeholder | everything          | write last      |
-| I      | Introduction               | in progress | —                   | results         |
+| I      | Introduction               | drafted     | —                   | results         |
 | II     | Related Work               | writable    | —                   | bib verify      |
 | III-A  | Problem Setup              | writable    | —                   | —               |
 | III-B  | Event Input                | writable*   | —                   | Phase B         |
-| III-C  | Localiser (incl. training) | writable*   | —                   | sheet retrain   |
+| III-C  | Localiser (incl. training) | writable    | —                   | —               |
 | III-D  | Memory network             | writable*   | —                   | half-period fix |
-| III-E  | Deviation Score            | writable*   | —                   | Phase D         |
+| III-E  | Deviation Score            | writable    | —                   | —               |
 | III-F  | Evaluation Protocol        | writable    | —                   | —               |
 | IV-A   | Simulator                  | writable*   | —                   | Phase A         |
 | IV-B   | Real Recordings            | writable    | —                   | labelling       |
@@ -35,8 +35,8 @@ says which phase fills them.
 | IV-D   | Metrics                    | writable    | —                   | —               |
 | V-A    | Results: Localiser         | blocked     | held-out scoring    | —               |
 | V-B    | Results: Prediction + path | blocked     | held-out scoring    | —               |
-| V-C    | Results: Deviation         | blocked     | Phase D, held-out   | —               |
-| V-D    | Results: Ablations         | writable*   | phasemap reference  | —               |
+| V-C    | Results: Deviation         | blocked     | held-out scoring    | —               |
+| V-D    | Results: Ablations         | writable    | —                   | —               |
 | VI     | Discussion                 | blocked     | results             | —               |
 | VII    | Conclusion                 | blocked     | results             | —               |
 | —      | Acknowledgment             | writable    | —                   | —               |
@@ -48,8 +48,11 @@ says which phase fills them.
 - **I, II** — `materials/01-literature/` (six notes); `PLAN.md`'s novelty framing.
 - **III-A** — `docs/implementation-plan.md`; `trajmem/trajectories.py`.
 - **III-B** — `materials/02-methods/event-representations.md`.
-- **III-C, III-D** — `docs/implementation-plan.md`;
-  `materials/02-methods/{reservoir-computing,legendre-memory-unit}.md`.
+- **III-C, III-D** — `docs/implementation-plan.md`; `PLAN.md` phase C and gate G-F;
+  `docs/snn-experiments-summary.md`; `materials/01-literature/multi-timescale-memory.md`;
+  specs in `docs/superpowers/specs/`.
+- **V-D** — `PLAN.md` phase C (ablations); `docs/snn-experiments-log.md`;
+  `materials/02-methods/legendre-memory-unit.md`.
 - **III-E** — `materials/01-literature/deviation-and-novelty.md`.
 - **III-F** — `PLAN.md`: pretrain on simulation, freeze, test on real.
 - **IV-A** — `materials/02-methods/simulation-with-v2e.md`; `trajmem/simulate.py`; `params.yaml`.
@@ -83,7 +86,7 @@ exists to position those claims — so §II is easier once §I is down.
    deviation ROC, median detection latency.
 6. **§III-F Protocol.** Pretrain on simulation, freeze, evaluate on held-out real clips.
 7. **Fig. 1.** Block diagram: events → frontend → localiser → memory → prediction + deviation.
-   Won't change unless G-F renames a block.
+   Won't change unless a block is renamed.
 
 Rough page budget (8 pages including references): the above is ~3.5–4 pages.
 
@@ -117,16 +120,18 @@ Nothing in the calibration was changed.
 
 ## Blocked, and on what
 
-- **§V-A–C** wait on the held-out set, scored once at the end; §V-C also on Phase D
-  thresholds. **§V-D** can be drafted from the development-set ablation numbers in `PLAN.md`
-  once the spiking-vs-arithmetic comparison is run.
+- **§V-A–C** wait on the held-out set, scored once at the end. **§V-D** can be drafted
+  now from the development-set numbers in `PLAN.md` (spiking vs arithmetic clock-and-map,
+  and the two learned memories).
 - **§VI–VII and the abstract** wait on results. Nothing to do but hold.
 
 ## Must revisit before submission
 
 Writing early buys speed and costs staleness. Nothing is *final* until these are cleared:
 
-- [ ] §I contribution claims match what the results actually support.
+- [ ] §I contribution claims match what the results actually support — in particular
+      "no false positives" (development clips only so far) and "within a fraction of a
+      motion cycle" (0.23 s median on development) must hold on the held-out clips.
 - [ ] §II citations verified — 9 of 18 `refs.bib` entries are marked `note = {verify}`,
       including both closest-prior-art papers. Needs internet; deferred to post-flight.
 - [ ] §III-B, §IV-A, §IV-C holes filled with real values.

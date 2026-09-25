@@ -1,7 +1,7 @@
 # snnTorch cheatsheet
 
-Surrogate-gradient SNNs on top of PyTorch. Candidate for the Stage-1/2 localiser and,
-possibly, the memory core. Verify names against the installed version (`import snntorch;
+Surrogate-gradient SNNs on top of PyTorch. The localiser's framework, and the ablation
+memories'. Verify names against the installed version (`import snntorch;
 snntorch.__version__`).
 
 Ref: Eshraghian et al., "Training Spiking Neural Networks Using Lessons from Deep Learning",

@@ -1,6 +1,7 @@
 # Nengo / LMU cheatsheet
 
-Candidate for the memory core if G-F picks the NEF family. Already in the `thesis` env.
+Nengo builds the memory's clock populations (NEF weights, then run in PyTorch); the LMU is
+an ablation. Already in the `thesis` env.
 Verify against installed version.
 
 ## Nengo core objects

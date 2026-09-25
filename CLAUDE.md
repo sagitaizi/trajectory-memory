@@ -56,14 +56,17 @@ Package `trajmem/`. One file, one job.
 | Module | Role |
 |---|---|
 | `data.py` | Load a clip (recorded `.aedat4` or simulated) → uniform `Clip` object: events + true trajectory + deviation times. |
-| `trajectories.py` | Analytic path specs (circle, ellipse, figure-8, Lissajous) + scripted deviations → exact position-vs-time. Pure math. |
+| `trajectories.py` | Analytic path specs (circle, ellipse, figure-8, Lissajous, pendulum) + scripted deviations → exact position-vs-time. Pure math. |
 | `simulate.py` | v2e wrapper: `TrajectorySpec` + camera config → synthetic event stream + exact ground truth. |
 | `frontend.py` | Events → model input: `to_frames` (Stage 1), `to_raw` (Stage 2, stub), `to_position` centroid (baseline/fallback). |
 | `model.py` | `Localiser` + `TrajectoryMemory` protocols. Two swappable jobs: localiser ("where now") and memory ("where next / is this normal"). The framework-agnostic boundary. |
-| `baseline.py` | Non-SNN comparators (`PeriodicKalman`, `HarmonicFit`). Same interface as `model.py`. |
-| `metrics.py` | Prediction error, lock-on time, deviation AUC / latency / false alarms. |
-| `experiment.py` | `evaluate_clip` (the one loop every method goes through), `score_trace`, clip sets, `run_set`, `make_memory`. |
-| `scripts/` | `make_sim_dataset`, `match_sim_real`, `run_experiment`, `check_localiser`, `replay_gt`, `bench`, `make_tracks`, `make_frames`, `corpus_summary`, the `mark_*` labelling tools. `README.md` lists the commands. |
+| `snn_localise.py` | Stage 1 localiser: spiking conv net over count frames (snnTorch), trained on sim. `localise.py` is its harness. |
+| `snn_phasemap.py` | Stage 1 memory: the clock and map (Nengo-built LIF populations run in PyTorch, PES map). `phasemap.py` is its arithmetic reference. |
+| `snn.py`, `snn_lmu.py`, `lmu.py` | Ablation memories (two-timescale LIF, LMU window); `lmu.py` also builds and steps the Nengo populations the memory uses. |
+| `baseline.py` | Non-SNN comparators (`PeriodicKalman`, `HarmonicFit`, `Extrapolator`). Same interface as `model.py`. |
+| `metrics.py` | Prediction error, path shape, lock-on time, deviation AUC / latency / false alarms, the ratcheting alarm. |
+| `experiment.py` | `evaluate_clip` (the one loop every method goes through), `score_trace`, clip sets, `run_set`, `make_memory`, `make_localiser`. |
+| `scripts/` | `make_sim_dataset`, `match_sim_real`, `evaluate`, `run_experiment`, `train_localiser`, `check_localiser`, `replay_gt`, `bench`, `make_tracks`, `make_frames`, `corpus_summary`, the `mark_*` labelling tools. `README.md` lists the commands. |
 
 ## Key conventions
 
@@ -71,8 +74,9 @@ Package `trajmem/`. One file, one job.
   No large comment blocks, no narrating past decisions or alternatives tried, no changelog prose
   in source. History belongs in git, not in `.py` files. Prefer clear names and small
   functions over explanatory comments.
-- **Framework choice is deferred** (decision gate G-F in `PLAN.md`). Everything SNN goes behind
-  `model.py`'s interface so the choice can change without touching the rest.
+- **Frameworks** (decision gate G-F in `PLAN.md`): snnTorch for the localiser; the memory's
+  weights are built by Nengo and its neurons run in PyTorch. Everything SNN goes behind
+  `model.py`'s interface so either can change without touching the rest.
 - **Ground truth**: exact from the spec on simulated clips (the apparent, lens-distorted
   position); hand-labels + interpolation on every real clip, motor-driven ones included.
 - **Pretrain on simulation, test on real.** Real clips are never trained on; development

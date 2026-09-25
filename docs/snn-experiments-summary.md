@@ -1,7 +1,8 @@
 # SNN memory — what was tried, in short
 
 The plain-language companion to `snn-experiments-log.md` (all the numbers). Written for
-picking the work up after a break.
+picking the work up after a break. The sections are dated snapshots; the current state is
+in `PLAN.md`.
 
 ## The job
 

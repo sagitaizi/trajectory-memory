@@ -22,8 +22,7 @@ See `requirements.txt` for pinned versions. `pip install -r requirements.txt` wh
   construct with `device="cpu"` (default is `cuda`, which the cpu torch rejects),
   `emu.generate_events(frame_f32, t_seconds)` → `(N, 4)` array of `[t, x, y, polarity]`.
   Smoke-tested 2026-09-10.
-- **CPU-only torch.** SNN training (Stage-1 localiser, Stage-2) runs on CPU — fine at small
-  scale, slow for anything large. A CUDA build would need re-installing while online.
+- **CUDA torch since.** Re-installed as `torch 2.14.0+cu126` (RTX 3060); see `requirements.txt`.
 
 ## Not available — do not plan around these
 | Package | Why |
@@ -37,9 +36,8 @@ Consequence: no trained conv-SNN inside Nengo, no Loihi/Lava deployment. Trained
 `snntorch` (co-installs fine, native 3.14 torch wheel). Energy/latency claims → **cited**.
 
 ## GPU
-The installed `torch` 2.14.0 is **CPU-only** (`torch.cuda.is_available()` → False; no cp314
-CUDA wheel at install time). snnTorch/torch training runs on CPU; the reservoir/LMU baselines
-are CPU-fine anyway.
+`torch 2.14.0+cu126` on the RTX 3060 (`torch.cuda.is_available()` → True), installed from
+the PyTorch cu126 index. Small recurrent memories still train faster on the CPU (4 threads).
 
 ## Sanity check
 ```

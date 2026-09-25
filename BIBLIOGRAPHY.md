@@ -60,6 +60,26 @@ each before citing in the manuscript. Entries whose author list could not be che
   computed by the clock population's neurons.
 - **Where:** `phasemap.py` (`_Clock.step`), `snn_phasemap.py` (`clock_dynamics`); `PLAN.md` §C.
 
+### Gams, Ijspeert, Schaal & Lenarčič, 2009 — "On-line learning and modulation of periodic movements with nonlinear dynamical systems"
+- *Autonomous Robots* 27(1):3–23. doi:10.1007/s10514-009-9118-y.
+- **Why:** adaptive-frequency oscillators find the rhythm of a demonstration, a second layer
+  learns its waveform online on top — the clock-and-map structure, non-spiking, on robot
+  joint signals, no deviation signal. Found after the design was settled (the design came
+  from the Kalman's phase-and-shape structure, `docs/snn-experiments-log.md` Run 11); cited
+  as the closest prior design, not as its source.
+- **Where:** paper §II rhythm-learning paragraph (candidate).
+
+### Eliasmith & Anderson, 2003 — "Neural Engineering: Computation, Representation, and Dynamics in Neurobiological Systems"
+- MIT Press.
+- **Why:** the Neural Engineering Framework — how the clock and ring populations' weights
+  are solved so the neurons compute the oscillator dynamics.
+- **Where:** `lmu.py` (`build_dynamics`), `snn_phasemap.py`; paper §I, §III-D.
+
+### MacNeil & Eliasmith, 2011 — "Fine-Tuning and the Stability of Recurrent Neural Networks"
+- *PLoS ONE* 6(9):e22885. doi:10.1371/journal.pone.0022885.
+- **Why:** introduces the PES rule, the error-driven decoder learning the map uses.
+- **Where:** `snn_phasemap.py` (map update); paper §III-D.
+
 ### Bekolay et al., 2014 — "Nengo: a Python tool for building large-scale functional brain models"
 - *Frontiers in Neuroinformatics* 7:48.
 - **Why:** the Neural Engineering Framework tooling that solves encoders, decoders and the
@@ -345,7 +365,31 @@ work can say why, and so the framing is not mistaken for ours.
   deviation problem on proprioceptive rather than visual data.
 - **Where:** paper related-work.
 
+## Training the localiser
+
+### Neftci, Mostafa & Zenke, 2019 — "Surrogate Gradient Learning in Spiking Neural Networks"
+- *IEEE Signal Processing Magazine* 36(6):51–63. doi:10.1109/MSP.2019.2931595.
+- **Why:** BPTT through spikes needs a smooth stand-in for the spike's derivative; the
+  method the localiser is trained with.
+- **Where:** `snn_localise.py`, `scripts/train_localiser.py`; paper §I, §III-C.
+
+### Eshraghian et al., 2023 — "Training Spiking Neural Networks Using Lessons From Deep Learning"
+- *Proceedings of the IEEE* 111(9):1016–1054. doi:10.1109/JPROC.2023.3308088. The snnTorch paper.
+- **Why:** the library the localiser (and the ablation memories) are built in.
+- **Where:** `snn_localise.py`, `snn.py`, `snn_lmu.py`; paper §I.
+
 ## Non-neuromorphic baselines and surveys
+
+### Kalman, 1960 — "A New Approach to Linear Filtering and Prediction Problems"
+- *Journal of Basic Engineering* 82(1):35–45. doi:10.1115/1.3662552.
+- **Why:** the Kalman filter; `PeriodicKalman` is one with a harmonic state.
+- **Where:** `baseline.py`; paper §I, §IV-C.
+
+### Harvey, 1989 — "Forecasting, Structural Time Series Models and the Kalman Filter"
+- Cambridge University Press.
+- **Why:** the trigonometric seasonal component — rotating harmonic pairs in a Kalman state,
+  the model `PeriodicKalman` uses. Candidate citation for §IV-C.
+- **Where:** `baseline.py` (`PeriodicKalman`).
 
 ### Ijspeert, Nakanishi & Schaal, 2002 — rhythmic dynamic movement primitives
 - "Learning rhythmic movements by demonstration using nonlinear oscillators." *IROS 2002*.

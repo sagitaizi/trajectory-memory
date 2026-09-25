@@ -36,18 +36,16 @@ The position-stream stage was dropped so the SNN always does target extraction.
 2. **Stage 2 (upside):** raw events end-to-end.
 - Fallback: classical centroid → SNN memory core (reported with an asterisk).
 
-## Framework — OPEN (decision gate G-F)
-Candidates for the memory core: reservoir/LSM + online readout, Legendre Memory Unit (Nengo),
-surrogate-gradient spiking RNN (snnTorch). Localiser (topographic frame → position) is not
-NEF's shape — likely a small spiking conv / WTA in snnTorch/SpikingJelly. Raw events narrow
-it: no CPU/GPU framework is truly asynchronous; frames and raw events push toward
-snnTorch/SpikingJelly or a custom reservoir, not Nengo. Provisional NumPy reservoir until
-decided. Resolve after a week-1 bake-off on simulated trajectories.
+## Framework — decided (decision gate G-F)
+Localiser: a spiking conv net in snnTorch. Memory: the clock-and-map network, its weights
+built by Nengo (NEF) and its LIF neurons run in PyTorch, the PES map rule by hand. The
+snnTorch learned memories and the Nengo LMU are ablations. Details in `PLAN.md`.
 
 ## Data
 - **Own corpus, recorded 2026-09-09:** fan-mounted brush, string pendulum, hand-moved printed
   square, and blank-wall clips (4a motor-swept camera = exact encoder ground truth; 4b
-  hand-moved square, clean background). Objects: brush, printed square, ball.
+  hand-moved square, clean background). Objects: brush, printed square, ball. The 4a encoder
+  ground truth was abandoned; every clip is hand-labelled (`PAPER_PROGRESS.md`).
 - **Simulation (v2e):** unlimited labelled trajectories through the DVXplorer camera model,
   for pretraining. Stand it up before the camera leaves; validate sim-vs-real day one.
 - **Ground truth:** analytic where the motion is driven; sparse hand-labels + interpolation
