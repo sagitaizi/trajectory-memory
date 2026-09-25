@@ -22,7 +22,7 @@ target); offset-removed numbers are a secondary column.
 
 | Phase | State |
 |---|---|
-| A — Data | 🟨 Real corpus recorded and split; development set labelled; sim corpus generated. **Open: label the held-out clips.** |
+| A — Data | 🟨 Real corpus recorded and split; development set labelled; sim corpus generated. Held-out pendulum clips labelled and **scored once** (2026-09-25, `scripts/paper_results.py --final`, `runs/paper/held_out/`); settings frozen for them from here. **Open: label the other held-out clips.** |
 | B — Frontend + baselines | ✅ |
 | C — Trajectory memory, Stage 1 | 🟨 **In progress.** Memory (clock and map, `snn_phasemap`) built: at the Kalman bar on prediction, better on path and deviation (development). Pendulum localiser `pend_ft.pt` beats the centroid on the pendulum. **Open: the half-period lock; the held-out set.** |
 | D — Deviation detection | ✅ Label-free ratcheting alarm, k calibrated per position input on development (centroid 25, `pend_ft` 30): AUC 0.98, 0.23 s, no false alarms (Kalman 0.86, 39.9/min). Held-out pending labels. |
@@ -188,7 +188,8 @@ target); offset-removed numbers are a secondary column.
 - Development set, same rule on each method's own score (pooled): spiking memory AUC 0.98,
   0.23 s, 0.00 false alarms/min; arithmetic prototype 1.00, 0.15 s, 0.00; Kalman 0.86,
   0.42 s, **39.9**; harmonic 0.72, 0.14 s, 0.00.
-- **Open:** the same numbers on the held-out break clips, once they are labelled.
+- Held-out pendulum break (`small_break`, full spiking pipeline): AUC 0.98, 0.07 s, no false
+  alarms (Kalman 1.00, 0.67 s). **Open:** the other held-out break clips, once labelled.
 
 ## E — Raw events, Stage 2 (upside)
 

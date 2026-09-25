@@ -26,3 +26,7 @@ runs/
 materials/pdfs/
 !corpus/sets.yaml
 !corpus/bench.yaml
+
+# LaTeX build by-products (figure sources are built in place)
+figures/**/*.aux
+figures/**/*.log

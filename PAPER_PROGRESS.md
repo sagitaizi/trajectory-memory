@@ -33,14 +33,14 @@ says which phase fills them.
 | IV-B   | Real Recordings            | writable    | —                   | labelling       |
 | IV-C   | Baselines                  | writable*   | —                   | Phase B         |
 | IV-D   | Metrics                    | writable    | —                   | —               |
-| V-A    | Results: Localiser         | blocked     | held-out scoring    | —               |
-| V-B    | Results: Prediction + path | blocked     | held-out scoring    | —               |
-| V-C    | Results: Deviation         | blocked     | held-out scoring    | —               |
-| V-D    | Results: Ablations         | writable    | —                   | —               |
+| V-A    | Results: Localiser         | drafted     | —                   | other held-out  |
+| V-B    | Results: Prediction + path | drafted     | —                   | other held-out  |
+| V-C    | Results: Deviation         | drafted     | —                   | other held-out  |
+| V-D    | Results: Ablations         | drafted     | —                   | —               |
 | VI     | Discussion                 | blocked     | results             | —               |
 | VII    | Conclusion                 | blocked     | results             | —               |
 | —      | Acknowledgment             | writable    | —                   | —               |
-| Fig. 1 | System overview            | writable    | —                   | —               |
+| Fig. 1 | System overview            | drafted     | —                   | —               |
 | Fig. 2 | Recording setups           | writable    | —                   | —               |
 
 ### Where each section's material lives
@@ -61,6 +61,15 @@ says which phase fills them.
   `materials/01-literature/classical-baselines.md`.
 - **IV-D** — `materials/02-methods/metrics.md`.
 - **Fig. 1** — `docs/implementation-plan.md`.
+- **§V (all)** — `scripts/paper_results.py run` (traces + scores, `runs/paper/`) and
+  `scripts/paper_figures.py` (figures to `paper/figures/results_*.pdf`, tables to
+  `runs/paper/tables.tex`). Scores and tables are kept in `docs/results/paper_*`.
+  Held-out: the three pendulum clips, each scored once (2026-09-25); the other held-out
+  clips are not labelled yet. Unused figure: `results_learning.pdf` (error vs time from
+  the clip's start), `results_break_dev.pdf` (the development break).
+- **Architecture figures** — `figures/architecture/`: `system_overview` (Fig. 1 candidate,
+  full width) and `clock_and_map` (§III-D candidate, one column), TikZ sources + PDFs,
+  not yet in `main.tex`.
 
 Every paper cited needs an entry in `BIBLIOGRAPHY.md` in the same change. `paper/refs.bib` is
 Sagi's, managed outside the repo; the state it was in when he took it over is

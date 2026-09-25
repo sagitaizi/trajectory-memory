@@ -28,6 +28,8 @@ python scripts/make_sim_dataset.py --kind pendulum --n 100 --duration 15 --out c
 python scripts/match_sim_real.py corpus/real/fan/fan_brush_slow_02   # sim-vs-real check
 python scripts/evaluate.py --set development                   # every paper table -> runs/eval/development/
 python scripts/evaluate.py --set development --inputs centroid snn   # add the spiking-localiser rows
+python scripts/paper_results.py run --ablations                 # the paper's runs + traces -> runs/paper/development/
+python scripts/paper_figures.py                                  # results figures -> paper/figures/, tables -> runs/paper/tables.tex
 python scripts/run_experiment.py --set development             # scorecard for every memory
 python scripts/run_experiment.py corpus/sim/sim_003.npz --memory kalman
 python scripts/check_localiser.py --set development            # centroid vs hand-labels

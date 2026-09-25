@@ -1,0 +1,38 @@
+% Table: pendulum, full spiking pipeline, labels as-is
+\begin{tabular}{lrrrrrrr}
+\toprule
+ & \multicolumn{3}{c}{Error at $h$ (px)} & Path & & Latency & False \\
+\cmidrule(lr){2-4}
+Memory & 50\,ms & 100\,ms & 200\,ms & (px) & AUC & (s) & alarms/min \\
+\midrule
+\multicolumn{8}{l}{\emph{Pendulum, held-out (3 clips, 1 break)}} \\
+\textbf{Spiking clock-and-map} & 14.2 & 18.0 & 24.4 & 18.0 & 0.98 & 0.07 & 0.0 \\
+Clock-and-map, arith. & 13.8 & 18.3 & 25.9 & 16.8 & 0.99 & 0.26 & 0.0 \\
+Periodic Kalman & 12.2 & 13.7 & 11.2 & 14.1 & 1.00 & 0.67 & 14.4 \\
+Harmonic fit & 10.5 & 10.9 & 11.3 & 11.5 & 0.63 & 0.00 & 1.4 \\
+Constant velocity & 19.5 & 30.5 & 60.4 & -- & 0.70 & -- & 0.0 \\
+\midrule
+\multicolumn{8}{l}{\emph{Pendulum, development (3 clips, 1 break)}} \\
+\textbf{Spiking clock-and-map} & 19.6 & 22.6 & 30.4 & 21.7 & 0.99 & 0.32 & 0.0 \\
+Clock-and-map, arith. & 18.1 & 19.6 & 22.8 & 17.5 & 1.00 & 0.29 & 0.0 \\
+Periodic Kalman & 21.7 & 21.3 & 20.7 & 20.1 & 0.99 & 0.16 & 1.0 \\
+Harmonic fit & 19.1 & 19.0 & 18.9 & 17.4 & 0.70 & 0.19 & 0.0 \\
+Constant velocity & 28.7 & 45.8 & 102.9 & -- & 0.67 & 0.53 & 0.0 \\
+\bottomrule
+\end{tabular}
+
+% Table: other setups, classical centroid input, label offset removed
+\begin{tabular}{lrrrrrrr}
+\toprule
+ & \multicolumn{3}{c}{Error at $h$ (px)} & Path & & Latency & False \\
+\cmidrule(lr){2-4}
+Memory & 50\,ms & 100\,ms & 200\,ms & (px) & AUC & (s) & alarms/min \\
+\midrule
+\multicolumn{8}{l}{\emph{Fan and wall target, development (3 clips + 2 segments, 1 break)}} \\
+\textbf{Spiking clock-and-map} & 11.1 & 14.9 & 22.1 & 16.6 & 0.97 & 0.33 & 0.0 \\
+Clock-and-map, arith. & 11.6 & 13.4 & 18.9 & 15.2 & 0.99 & 0.16 & 4.8 \\
+Periodic Kalman & 10.0 & 12.3 & 16.0 & 16.7 & 0.76 & 0.37 & 45.7 \\
+Harmonic fit & 23.5 & 24.7 & 26.8 & 8.8 & 0.74 & 0.15 & 0.0 \\
+Constant velocity & 12.0 & 17.9 & 47.2 & -- & 0.33 & -- & 0.0 \\
+\bottomrule
+\end{tabular}
