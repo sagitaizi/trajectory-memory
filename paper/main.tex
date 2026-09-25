@@ -61,71 +61,31 @@ Sight is by far the dominant sense humans use to perceive the world around them 
 
 The retina itself has a silicon counterpart \cite{Mahowald1991The}. Event cameras are low-power sensors that sample light based on the scene dynamics, and report per-pixel brightness changes as a stream of events with microsecond latency \cite{Gallego2022Event}. Spiking neural networks (SNNs) mimic the neurons behind it, computing via asynchronous discrete spikes which are sparse in time and allow for lower energy consumption and use with noisy inputs. Yet most pipelines built using them for tracking purposes react rather than anticipate---locating the target and extrapolating its position. A target that repeats its motion is exactly the case where prediction is possible, and event cameras and SNNs together are the parts from which such a biologically inspired prediction machine can be built. Such a system is useful in any application where a quick signal indicating that a target has deviated from its expected path is needed, for example in industrial inspection, robotics, and autonomous vehicles \cite{Sho2026A,Thoduka2021Using}. 
 
-A target oscillating in a repetitive manner generates events in a periodic pattern. The task is to learn this pattern from the event stream alone, predict the target's position a short horizon ahead, and signal when the motion stops matching. Real object movement, however, is never perfectly periodic--period and amplitude can drift and events can carry sensor noise, so the system must distinguish between these natural variations and actual deviation. For real-world scenarios, learning and detection must be performed online and without prior knowledge of the target's motion.
+A target oscillating in a repetitive manner generates events in a periodic pattern. The task at hand is to learn this pattern from the event stream alone, predict the target's position a short horizon ahead, and signal when the motion stops matching. Real object movement, however, is never perfect--period and amplitude can drift and events can carry sensor noise, so the system must distinguish between these natural variations and actual deviation. For real-world scenarios, learning and detection must be performed online and without prior knowledge of the target's motion.
 %
 % TODO teaser figure, once the model is final: one pendulum clip, one column wide, top of
 % page 1 or 2. Left: an event frame with the learned path, current position, and predicted
 % position overlaid. Right: true vs predicted position over a few swings, and the deviation
 % score below it with the alarm marked. Must show a real deviation (sim clip if no real one).
 %
-% P3 -- Why spiking. Events are spikes, so a spiking network can consume them without a
-% framing step; the network's own dynamics carry the learned pattern and produce the
-% prediction, rather than a separate regressor on top; and the result maps onto neuromorphic
-% hardware -- the claim is event-native operation and dynamics-as-predictor, not better
-% accuracy than a periodic Kalman filter on clean motion.
 
+Separate parts of this problem have been previously addressed. Classical periodic filters like the Kalman filter \cite{Kalman1960A} predict repetitive motion well, but they assume a clean stream of accurate positions and are not spiking by nature. SNNs on event cameras have been used to predict trajectories, but primarily for one-shot motions and without a deviation signal (Section~\ref{sec:related}).
 
-% P4 -- What we do. A pipeline of event front end, localiser, and trajectory memory produces a
-% short-horizon prediction and a deviation score from prediction error; it is pretrained on
-% trajectories rendered through a calibrated event-camera simulator \cite{hu2021v2e} and
-% evaluated with frozen weights on real recordings against classical periodic baselines.
-%
-% P5 -- Contributions (bulleted) and a one-sentence roadmap of the paper:
-%   - a spiking trajectory-memory network that learns a repetitive target path online and
-%     predicts it a short horizon ahead;
-%   - a deviation signal derived from prediction error that flags when motion leaves the
-%     learned pattern;
-%   - an evaluation protocol: simulator pretraining with a calibrated camera model,
-%     frozen-weight testing on real recordings, against periodic baselines.
+In this work, we propose a spiking system for online prediction built in two stages and tested on real-world cases using a real event camera. The first, a spiking localiser, estimates the target's position from short windows (5~ms) of accumulated events. Implemented with snnTorch \cite{Eshraghian2022Training}, it is trained with backpropagation through time (BPTT) using surrogate gradients \cite{Neftci2019Surrogate} on simulated clips and kept fixed. The second, a spiking memory built with the Neural Engineering Framework in Nengo \cite{Eliasmith2003Neural,Bekolay2014Nengo}, uses the localiser's output to learn the target's trajectory online. It relies on the fact that a repetitive motion with a defined cycle can be described by two things--where the target is at each point of the cycle--a map, and where in the cycle the target is now--a clock. The clock is an adaptive-frequency oscillator that locks on to the motion's rhythm \cite{Righetti2006Dynamic}, and the map is learned online on top of it. Once the map has settled, a copy of it is frozen for deviation detection, and deviation can then be flagged when the target moves too far from the frozen copy.
+
+The main contributions of this paper are as follows:
+\begin{itemize}
+\item A spiking trajectory memory built from a clock and a map that learns a repetitive path online without any pretraining, and predicts the target's position a short horizon ahead.
+\item A deviation signal read from the same memory, which compares the target's position against a frozen copy of the learned path and raises an alarm within a fraction of a motion cycle and with no false positives.
+\item An evaluation of the full pipeline on real event-camera motion of a swinging pendulum and other repetitive trajectories, with a localiser trained on simulated data only, against classical periodic baselines and manual annotations.
+\end{itemize}
+The rest of the paper is organised as follows. Section~\ref{sec:related} reviews related work, Section~\ref{sec:method} describes the method, and Section~\ref{sec:setup} the experimental setup. Section~\ref{sec:results} presents the results, which are discussed in Section~\ref{sec:discussion}, and Section~\ref{sec:conclusion} concludes the paper.
 
 \section{Related Work}
-% Budget ~1 column, at most 1.25. Write the gap sentence (P5) first; make every paragraph
-% lead to it. Not here: attention / Itti--Koch (Discussion), external datasets (Experimental
-% Setup), deep-learning trajectory surveys (one sentence at most, or cut).
-%
-% P1 -- Event-based trajectory prediction with SNNs. The closest systems predict where a ball
-% will land from an event stream \cite{debat2021event,pingpong2025egocentric} or learn driver
-% motion on neuromorphic hardware \cite{ndrivermotion2024}, but all of them share a static
-% camera, one-shot ballistic motion, offline batch training, and no signal when the motion
-% changes.
-%
-% P2 -- Oscillator-based rhythm learning: the method's lineage. Adaptive-frequency
-% oscillators lock their phase and rate to a periodic drive (Righetti et al. 2006); rhythmic
-% dynamic movement primitives \cite{ijspeert2002rhythmic,saveriano2023dmp} pair such a
-% canonical oscillator with a learned shape function -- a clock and a map. The NEF and the PES
-% rule give the spiking realisation. None has been driven by an event camera or asked for a
-% deviation signal.
-%
-% P3 -- Learned dynamics as the memory: the route we tried and report as ablations.
-% Reservoirs trained with FORCE \cite{sussillo2009generating,nicola2017supervised}, the
-% Legendre Memory Unit \cite{voelker2019lmu}, and local learning rules for recurrent SNNs
-% \cite{bellec2020eprop,gilra2017predicting,kim2018learning} let a spiking network hold and
-% reproduce a periodic low-dimensional signal, but are demonstrated on abstract signals, never
-% driven by a real sensor.
-%
-% P4 -- Novelty and deviation detection with spiking networks. Inhibitory plasticity
-% \cite{schulz2021novelty} and short-term synaptic depression make familiar input quiet and
-% leave novel input loud, and engineered SNN detectors handle generic time series
-% \cite{vacuumspiker2025}, but novelty there means stimulus identity, not departure from a
-% learned spatial motion pattern.
-%
-% Baselines (periodic Kalman, harmonic regression) are described in IV-C, not here.
-%
-% P5 -- The gap. No published system learns a repetitive path from a freely moving real target
-% through an event camera, predicts it a short horizon ahead, and signals when the motion
-% stops matching -- one or two sentences, or fold into the end of P1 if space is tight.
+\label{sec:related}
 
 \section{Method}
+\label{sec:method}
 % Fig. 1 (system overview) goes here: events -> frames -> localiser -> clock -> ring + map
 % -> prediction; snapshot -> deviation score.
 
@@ -183,6 +143,7 @@ A target oscillating in a repetitive manner generates events in a periodic patte
 % applied unchanged to held-out ones.
 
 \section{Experimental Setup}
+\label{sec:setup}
 
 \subsection{Event-Camera Simulator}
 % v2e configured with the DVXplorer intrinsics, lens distortion, contrast threshold, noise.
@@ -249,6 +210,7 @@ A target oscillating in a repetitive manner generates events in a periodic patte
 % against the frontend's own track and report localisation against labels separately.
 
 \section{Results}
+\label{sec:results}
 
 \subsection{Localiser}
 % Sim validation and real development clips vs the classical centroid; per-setup transfer.
@@ -268,11 +230,13 @@ A target oscillating in a repetitive manner generates events in a periodic patte
 % (phasemap.py) -- what spiking costs.
 
 \section{Discussion}
+\label{sec:discussion}
 % Where the spiking version wins / costs accuracy; event-native and latency arguments.
 % Neuromorphic-hardware energy/latency: cited, not measured (no Loihi/Lava access).
 % Limitations. Future work: online re-learning of a new pattern; attention across objects.
 
 \section{Conclusion}
+\label{sec:conclusion}
 % One paragraph.
 
 \section*{Acknowledgment}
