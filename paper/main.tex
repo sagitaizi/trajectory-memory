@@ -211,23 +211,117 @@ The rest of the paper is organised as follows. Section~\ref{sec:related} reviews
 
 \section{Results}
 \label{sec:results}
+% DRAFT (2026-09-25, overnight). Numbers from scripts/paper_results.py + paper_figures.py
+% (runs/paper/, tables in runs/paper/tables.tex). Held-out = the three pendulum clips, each
+% scored once; the fan, wall-target and 4a held-out clips are not labelled yet. Pendulum
+% positions are scored against the labels as they stand; fan and wall target with each
+% clip's constant label offset removed (Section~\ref{sec:setup}).
 
 \subsection{Localiser}
-% Sim validation and real development clips vs the classical centroid; per-setup transfer.
+\label{sec:res-localiser}
+On the pendulum, the spiking localiser places the target far closer to the labelled point than the classical centroid does (Fig.~\ref{fig:localiser}). Over the six pendulum clips, its median distance from the label is 14~px (90th percentile 28~px), against 65~px (125~px) for the centroid. The gap is widest on the held-out clips, 12 against 98~px, where the centroid settles on a different part of the target than the one marked. Most of the centroid's error is a constant offset: removing it per clip leaves 8--40~px, against 8--13~px for the spiking localiser. On the fan and the wall target, which the simulator resembles less closely, the spiking localiser brings no gain (fan 10~px against the centroid's 5~px; wall target 17--23~px for both), and the classical centroid remains their input in what follows.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{results_localiser}
+\caption{Localisation error on the six pendulum clips (development and held-out), against the hand labels as they stand. The spiking localiser was trained on simulated clips only.}
+\label{fig:localiser}
+\end{figure}
 
 \subsection{Prediction and Path Memory}
-% Real clips vs periodic Kalman and harmonic fit: prediction error at the horizons, path-shape
-% error, period, lock-on. Two input conditions: centroid input (the fallback row) and the
-% spiking localiser (full Stage 1).
+\label{sec:res-prediction}
+Table~\ref{tab:pendulum} and Fig.~\ref{fig:horizon} give the prediction error of the full spiking pipeline on the pendulum. At short horizons the spiking memory is close to the classical periodic baselines: on the held-out clips its median error is 14.2~px at 50~ms, against 12.2~px for the periodic Kalman filter and 10.5~px for the harmonic fit. As the horizon grows it falls behind them, reaching 18.0~px at 100~ms and 24.4~px at 200~ms, while both baselines stay near 11--14~px. On the development clips the three methods are within 4~px of each other up to 100~ms. All three periodic methods do far better than a constant-velocity extrapolator beyond 50~ms, whose error grows with the horizon to 60~px at 200~ms on the held-out clips.
+
+The remembered path matches the labelled one to a median of 18~px on the held-out clips (Kalman 14~px, harmonic fit 12~px), and the clock settles within 4\% of the true period on every pendulum clip, always slightly short. The baselines reach their steady error at the end of their five-second warm-up; the memory, which has no warm-up, reaches it about a second later, once its clock has locked and its map has filled, within five to six swings. On the fan and the wall target (Table~\ref{tab:other}), with the classical centroid as input, the ranking is the same at short horizons (14.9~px at 100~ms against 12.3~px for the Kalman filter); the harmonic fit is the least accurate predictor there but recalls the path best.
+% NOTE for Sagi: this is weaker than the introduction's "on par" -- behind at 200 ms on the
+% held-out pendulum. Revisit the claim in Section I or name the horizon it holds at.
+
+\begin{table}[t]
+\caption{Pendulum, full spiking pipeline, against the labels as they stand}
+\label{tab:pendulum}
+\centering
+\footnotesize
+\setlength{\tabcolsep}{2.3pt}
+\begin{tabular}{lrrrrrrr}
+\toprule
+ & \multicolumn{3}{c}{Error at $h$ (px)} & Path & & Lat. & False \\
+\cmidrule(lr){2-4}
+Memory & 50\,ms & 100\,ms & 200\,ms & (px) & AUC & (s) & al./min \\
+\midrule
+\multicolumn{8}{l}{\emph{Held-out (3 clips, 1 break)}} \\
+\textbf{Spiking clock-and-map} & 14.2 & 18.0 & 24.4 & 18.0 & 0.98 & 0.07 & 0.0 \\
+Clock-and-map, arith. & 13.8 & 18.3 & 25.9 & 16.8 & 0.99 & 0.26 & 0.0 \\
+Periodic Kalman & 12.2 & 13.7 & 11.2 & 14.1 & 1.00 & 0.67 & 14.4 \\
+Harmonic fit & 10.5 & 10.9 & 11.3 & 11.5 & 0.63 & -- & 1.4 \\
+Constant velocity & 19.5 & 30.5 & 60.4 & -- & 0.70 & -- & 0.0 \\
+\midrule
+\multicolumn{8}{l}{\emph{Development (3 clips, 1 break)}} \\
+\textbf{Spiking clock-and-map} & 19.6 & 22.6 & 30.4 & 21.7 & 0.99 & 0.32 & 0.0 \\
+Clock-and-map, arith. & 18.1 & 19.6 & 22.8 & 17.5 & 1.00 & 0.29 & 0.0 \\
+Periodic Kalman & 21.7 & 21.3 & 20.7 & 20.1 & 0.99 & 0.16 & 1.0 \\
+Harmonic fit & 19.1 & 19.0 & 18.9 & 17.4 & 0.70 & -- & 0.0 \\
+Constant velocity & 28.7 & 45.8 & 102.9 & -- & 0.67 & -- & 0.0 \\
+\bottomrule
+\end{tabular}
+\\[2pt]
+{\scriptsize Errors and path: medians over clips. AUC and latency: the break clip. False alarms: mean over clips. A latency is left out where the detector does not separate the break (AUC $<$ 0.75).}
+\end{table}
+
+\begin{table}[t]
+\caption{Fan and wall target (development), classical centroid input, constant label offset removed}
+\label{tab:other}
+\centering
+\footnotesize
+\setlength{\tabcolsep}{2.3pt}
+\begin{tabular}{lrrrrrrr}
+\toprule
+ & \multicolumn{3}{c}{Error at $h$ (px)} & Path & & Lat. & False \\
+\cmidrule(lr){2-4}
+Memory & 50\,ms & 100\,ms & 200\,ms & (px) & AUC & (s) & al./min \\
+\midrule
+\textbf{Spiking clock-and-map} & 11.1 & 14.9 & 22.1 & 16.6 & 0.97 & 0.33 & 0.0 \\
+Clock-and-map, arith. & 11.6 & 13.4 & 18.9 & 15.2 & 0.99 & 0.16 & 4.8 \\
+Periodic Kalman & 10.0 & 12.3 & 16.0 & 16.7 & 0.76 & 0.37 & 45.7 \\
+Harmonic fit & 23.5 & 24.7 & 26.8 & 8.8 & 0.74 & -- & 0.0 \\
+Constant velocity & 12.0 & 17.9 & 47.2 & -- & 0.33 & -- & 0.0 \\
+\bottomrule
+\end{tabular}
+\\[2pt]
+{\scriptsize Three clips and two segments of one of them; one break (wall target).}
+\end{table}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{results_horizon}
+\caption{Median prediction error against the horizon. (a,~b)~Pendulum through the full spiking pipeline, against the labels as they stand. (c)~Fan and wall target through the classical centroid, constant label offset removed. Values off the axis are printed at its top.}
+\label{fig:horizon}
+\end{figure*}
 
 \subsection{Deviation Detection}
-% AUC, median latency, false alarms per minute on the break clips; thresholds from
-% development clips applied unchanged to held-out ones.
+\label{sec:res-deviation}
+The deviation signal is where the spiking memory stands out (Table~\ref{tab:pendulum}, Fig.~\ref{fig:break}). On the held-out pendulum break it raises its alarm 0.07~s after the marked break, with an AUC of 0.98 and no false alarm on any of the three held-out clips. The periodic Kalman filter separates the break as well (AUC 1.00) but flags it only after 0.67~s, and raises 14 false alarms per minute on steady motion, 38 on one clip. The harmonic fit barely separates the break (AUC 0.63). The same holds on the development clips: the spiking memory detects both breaks (pendulum and wall target) without a single false alarm, while the Kalman filter raises 46 false alarms per minute on the fan and wall-target clips. The alarm's constant was chosen on the development clips for each input and applied unchanged to the held-out ones; with a single break clip per group, these latencies are indicative rather than statistical.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{results_break}
+\caption{Held-out pendulum break (\texttt{small\_break}), full spiking pipeline. Top: the target's horizontal position and the 100~ms prediction. Middle and bottom: each method's deviation score over its own alarm bar (dashed line at 1); red lines mark alarm onsets.}
+\label{fig:break}
+\end{figure}
 
 \subsection{Ablations}
-% The two learned memories that could not hold the cycle (two-timescale recurrent LIF, LMU
-% window), with their path error; the spiking clock-and-map against its arithmetic reference
-% (phasemap.py) -- what spiking costs.
+\label{sec:res-ablations}
+\emph{Learned memories.} The two memories that learn the cycle as network dynamics, a recurrent network of fast and slow LIF layers trained on simulated tracks and a spiking Legendre Memory Unit that records a window of the past, do not hold the cycle (Fig.~\ref{fig:paths}). On the development pendulum their remembered paths are 95 and 64~px from the labelled one, with periods 1.89 and 1.26 times the true one, and their 100~ms errors are 32 and 45~px against 23~px for the clock-and-map memory.
+
+\emph{Spiking against arithmetic.} The clock-and-map memory written as plain arithmetic predicts within 0.5~px of the spiking one on the held-out pendulum up to 100~ms and detects the break equally well (AUC 0.99 against 0.98). The spiking version costs accuracy only at the longest horizon on the development clips (30.4 against 22.8~px at 200~ms).
+
+\emph{Input.} With the classical centroid in place of the spiking localiser, the spiking memory's 100~ms error against the pendulum labels rises from 18--32~px to 27--49~px on the development clips and from 11--22~px to 76--130~px on the held-out ones, so on this setup the localiser sets the accuracy the whole pipeline can reach.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{results_paths}
+\caption{The remembered cycle of each memory at the last step before the break on the development pendulum clip \texttt{wide\_break}, over the labelled path of the preceding 6~s (grey), all through the spiking localiser. Only the clock-and-map memory and the Kalman filter hold the swing.}
+\label{fig:paths}
+\end{figure*}
 
 \section{Discussion}
 \label{sec:discussion}
