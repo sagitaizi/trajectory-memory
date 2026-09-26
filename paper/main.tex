@@ -13,7 +13,7 @@
 \usepackage{booktabs}
 \usepackage{textcomp}
 \usepackage{xcolor}
-\usepackage[hidelinks]{hyperref}          % load last
+\usepackage[hidelinks]{hyperref}
 
 \graphicspath{{figures/}}
 
@@ -56,22 +56,23 @@ event camera, spiking neural network, trajectory prediction, online learning,
 novelty detection, neuromorphic vision
 \end{IEEEkeywords}
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{pipeline}
+\caption{The proposed system. Stage~1: each 5~ms frame of accumulated ON and OFF events (left) passes through two convolutional LIF layers ($5\times5$ filters) and a dense layer of 256 LIF neurons, whose output gives the target's position $p(t)$ as place cells along $x$ and $y$ and a boolean indicating whether the target is visible. Stage~2: a clock implemented as an adaptive-frequency oscillator built from LIF neurons syncs with the motion, so its phase $\varphi$ tracks how far through each cycle the target is. A ring of phase cells then fires at the current detected phase, and a map, learned by the PES rule, holds the target's position at each phase. The prediction $\hat{p}(t{+}h)$ is the map read at the next phase $\varphi{+}\omega h$.}
+\label{fig:pipeline}
+\end{figure*}
+
 \section{Introduction}
 Sight is by far the dominant sense humans use to perceive the world around them \cite{Gallego2022Event}. The retina, a thin sheet of tissue in the eye, converts raw light into nerve signals that we then interpret as visual images. However, a flash of light can evoke a neural response in the brain with a delay of 30--100 ms \cite{Berry1999Anticipation}, during which a moving target can cover a significant distance and should therefore be seen behind its actual position. As this contradicts our daily experience, it has been suggested that the brain acts as a `prediction machine', modelling what comes next and attending to what deviates \cite{Clark2013Whatever}. This is most striking for repetitive motion, where the eyes can lock on to a moving target within a few cycles and follow it with almost no lag \cite{Barnes1991The}.
 
 The retina itself has a silicon counterpart \cite{Mahowald1991The}. Event cameras are low-power sensors that sample light based on the scene dynamics, and report per-pixel brightness changes as a stream of events with microsecond latency \cite{Gallego2022Event}. Spiking neural networks (SNNs) mimic the neurons behind it, computing via asynchronous discrete spikes which are sparse in time and allow for lower energy consumption and use with noisy inputs. Yet most pipelines built using them for tracking purposes react rather than anticipate---locating the target and extrapolating its position. A target that repeats its motion is exactly the case where prediction is possible, and event cameras and SNNs together are the parts from which such a biologically inspired prediction machine can be built. Such a system is useful in any application where a quick signal indicating that a target has deviated from its expected path is needed, for example in industrial inspection, robotics, and autonomous vehicles \cite{Sho2026A,Thoduka2021Using}. 
 
 A target oscillating in a repetitive manner generates events in a periodic pattern. The task at hand is to learn this pattern from the event stream alone, predict the target's position a short horizon ahead, and signal when the motion stops matching. Real object movement, however, is never perfect--period and amplitude can drift and events can carry sensor noise, so the system must distinguish between these natural variations and actual deviation. For real-world scenarios, learning and detection must be performed online and without prior knowledge of the target's motion.
-%
-% TODO teaser figure, once the model is final: one pendulum clip, one column wide, top of
-% page 1 or 2. Left: an event frame with the learned path, current position, and predicted
-% position overlaid. Right: true vs predicted position over a few swings, and the deviation
-% score below it with the alarm marked. Must show a real deviation (sim clip if no real one).
-%
 
 Separate parts of this problem have been previously addressed. Classical periodic filters like the Kalman filter \cite{Kalman1960A} predict repetitive motion well, but they assume a clean stream of accurate positions and are not spiking by nature. SNNs on event cameras have been used to predict trajectories, but primarily for one-shot motions and without a deviation signal (Section~\ref{sec:related}).
 
-In this work, we propose a spiking system for online prediction built in two stages and tested on real-world cases using a real event camera. The first, a spiking localiser, estimates the target's position from short windows (5~ms) of accumulated events. Implemented with snnTorch \cite{Eshraghian2022Training}, it is trained with backpropagation through time (BPTT) using surrogate gradients \cite{Neftci2019Surrogate} on simulated clips and kept fixed. The second, a spiking memory built with the Neural Engineering Framework in Nengo \cite{Eliasmith2003Neural,Bekolay2014Nengo}, uses the localiser's output to learn the target's trajectory online. It relies on the fact that a repetitive motion with a defined cycle can be described by two things--where the target is at each point of the cycle--a map, and where in the cycle the target is now--a clock. The clock is an adaptive-frequency oscillator that locks on to the motion's rhythm \cite{Righetti2006Dynamic}, and the map is learned online on top of it. Once the map has settled, a copy of it is frozen for deviation detection, and deviation can then be flagged when the target moves too far from the frozen copy.
+In this work, we propose a spiking system for online prediction built in two stages and tested on real-world cases using a real event camera. The first, a spiking localiser, estimates the target's position from short windows (5~ms) of accumulated events. Implemented with snnTorch \cite{Eshraghian2022Training}, it is trained with backpropagation through time (BPTT) using surrogate gradients \cite{Neftci2019Surrogate} on simulated clips and kept fixed. The second, a spiking memory built with the Neural Engineering Framework in Nengo \cite{Eliasmith2003Neural,Bekolay2014Nengo}, uses the localiser's output to learn the target's trajectory online. It relies on the fact that a repetitive motion with a defined cycle can be described by two things--where the target is at each point of the cycle--a map, and where in the cycle the target is now--a clock. The clock is an adaptive-frequency oscillator that locks on to the motion's rhythm \cite{Righetti2006Dynamic}, and the map is learned online on top of it. Once the map has settled, a copy of it is frozen and used for deviation detection when the target moves too far from it.
 
 The main contributions of this paper are as follows:
 \begin{itemize}
@@ -79,15 +80,13 @@ The main contributions of this paper are as follows:
 \item A deviation signal read from the same memory, which compares the target's position against a frozen copy of the learned path and raises an alarm within a fraction of a motion cycle and with no false positives.
 \item An evaluation of the full pipeline on real event-camera motion of a swinging pendulum and other repetitive trajectories, with a localiser trained on simulated data only, against classical periodic baselines and manual annotations.
 \end{itemize}
-The rest of the paper is organised as follows. Section~\ref{sec:related} reviews related work, Section~\ref{sec:method} describes the method, and Section~\ref{sec:setup} the experimental setup. Section~\ref{sec:results} presents the results, which are discussed in Section~\ref{sec:discussion}, and Section~\ref{sec:conclusion} concludes the paper.
+The rest of the paper is organised as follows--Section~\ref{sec:related} reviews related work, Section~\ref{sec:method} describes the method, and Section~\ref{sec:setup} the experimental setup. Section~\ref{sec:results} presents the results, which are discussed in Section~\ref{sec:discussion}, and Section~\ref{sec:conclusion} concludes the paper.
 
 \section{Related Work}
 \label{sec:related}
 
 \section{Method}
 \label{sec:method}
-% Fig. 1 (system overview) goes here: events -> frames -> localiser -> clock -> ring + map
-% -> prediction; snapshot -> deviation score.
 
 \subsection{Problem Setup}
 % Target position over time; repetition; prediction horizon; deviation definition.
@@ -219,20 +218,20 @@ The rest of the paper is organised as follows. Section~\ref{sec:related} reviews
 
 \subsection{Localiser}
 \label{sec:res-localiser}
-On the pendulum, the spiking localiser places the target far closer to the labelled point than the classical centroid does (Fig.~\ref{fig:localiser}). Over the six pendulum clips, its median distance from the label is 14~px (90th percentile 28~px), against 65~px (125~px) for the centroid. The gap is widest on the held-out clips, 12 against 98~px, where the centroid settles on a different part of the target than the one marked. Most of the centroid's error is a constant offset: removing it per clip leaves 8--40~px, against 8--13~px for the spiking localiser. On the fan and the wall target, which the simulator resembles less closely, the spiking localiser brings no gain (fan 10~px against the centroid's 5~px; wall target 17--23~px for both), and the classical centroid remains their input in what follows.
+On the pendulum, the spiking localiser places the target far closer to the labelled point than the classical centroid does (Fig.~\ref{fig:localiser}). Over the six pendulum recordings, its median distance from the label is 14~px (90th percentile 28~px), against 65~px (125~px) for the centroid. The gap is widest on the held-out recordings, 12 against 98~px, where the centroid settles on a different part of the target than the one marked. Most of the centroid's error is a constant offset: removing it per recording leaves 8--40~px, against 8--13~px for the spiking localiser. On the fan and the wall target, which the simulator resembles less closely, the spiking localiser brings no gain (fan 10~px against the centroid's 5~px; wall target 17--23~px for both), and the classical centroid remains their input in what follows.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{results_localiser}
-\caption{Localisation error on the six pendulum clips (development and held-out), against the hand labels as they stand. The spiking localiser was trained on simulated clips only.}
+\caption{Localisation error on the six pendulum recordings (development and held-out), against the hand labels as they stand. The spiking localiser was trained on simulated data only.}
 \label{fig:localiser}
 \end{figure}
 
 \subsection{Prediction and Path Memory}
 \label{sec:res-prediction}
-Table~\ref{tab:pendulum} and Fig.~\ref{fig:horizon} give the prediction error of the full spiking pipeline on the pendulum. At short horizons the spiking memory is close to the classical periodic baselines: on the held-out clips its median error is 14.2~px at 50~ms, against 12.2~px for the periodic Kalman filter and 10.5~px for the harmonic fit. As the horizon grows it falls behind them, reaching 18.0~px at 100~ms and 24.4~px at 200~ms, while both baselines stay near 11--14~px. On the development clips the three methods are within 4~px of each other up to 100~ms. All three periodic methods do far better than a constant-velocity extrapolator beyond 50~ms, whose error grows with the horizon to 60~px at 200~ms on the held-out clips.
+Table~\ref{tab:pendulum} and Fig.~\ref{fig:horizon} give the prediction error of the full spiking pipeline on the pendulum. At short horizons the spiking memory is close to the classical periodic baselines: on the held-out recordings its median error is 14.2~px at 50~ms, against 12.2~px for the periodic Kalman filter and 10.5~px for the harmonic fit. As the horizon grows it falls behind them, reaching 18.0~px at 100~ms and 24.4~px at 200~ms, while both baselines stay near 11--14~px. On the development recordings the three methods are within 4~px of each other up to 100~ms. All three periodic methods do far better than a constant-velocity extrapolator beyond 50~ms, whose error grows with the horizon to 60~px at 200~ms on the held-out recordings.
 
-The remembered path matches the labelled one to a median of 18~px on the held-out clips (Kalman 14~px, harmonic fit 12~px), and the clock settles within 4\% of the true period on every pendulum clip, always slightly short. The baselines reach their steady error at the end of their five-second warm-up; the memory, which has no warm-up, reaches it about a second later, once its clock has locked and its map has filled, within five to six swings. On the fan and the wall target (Table~\ref{tab:other}), with the classical centroid as input, the ranking is the same at short horizons (14.9~px at 100~ms against 12.3~px for the Kalman filter); the harmonic fit is the least accurate predictor there but recalls the path best.
+The remembered path matches the labelled one to a median of 18~px on the held-out recordings (Kalman 14~px, harmonic fit 12~px), and the clock settles within 4\% of the true period on every pendulum recording, always slightly short. The baselines reach their steady error at the end of their five-second warm-up; the memory, which has no warm-up, reaches it about a second later, once its clock has locked and its map has filled, within five to six swings. On the fan and the wall target (Table~\ref{tab:other}), with the classical centroid as input, the ranking is the same at short horizons (15.3~px at 100~ms against 12.3~px for the Kalman filter); the harmonic fit is the least accurate predictor there but recalls the path best.
 % NOTE for Sagi: this is weaker than the introduction's "on par" -- behind at 200 ms on the
 % held-out pendulum. Revisit the claim in Section I or name the horizon it holds at.
 
@@ -248,14 +247,14 @@ The remembered path matches the labelled one to a median of 18~px on the held-ou
 \cmidrule(lr){2-4}
 Memory & 50\,ms & 100\,ms & 200\,ms & (px) & AUC & (s) & al./min \\
 \midrule
-\multicolumn{8}{l}{\emph{Held-out (3 clips, 1 break)}} \\
+\multicolumn{8}{l}{\emph{Held-out (3 recordings, 1 with a deviation)}} \\
 \textbf{Spiking clock-and-map} & 14.2 & 18.0 & 24.4 & 18.0 & 0.98 & 0.07 & 0.0 \\
 Clock-and-map, arith. & 13.8 & 18.3 & 25.9 & 16.8 & 0.99 & 0.26 & 0.0 \\
 Periodic Kalman & 12.2 & 13.7 & 11.2 & 14.1 & 1.00 & 0.67 & 14.4 \\
 Harmonic fit & 10.5 & 10.9 & 11.3 & 11.5 & 0.63 & -- & 1.4 \\
 Constant velocity & 19.5 & 30.5 & 60.4 & -- & 0.70 & -- & 0.0 \\
 \midrule
-\multicolumn{8}{l}{\emph{Development (3 clips, 1 break)}} \\
+\multicolumn{8}{l}{\emph{Development (3 recordings, 1 with a deviation)}} \\
 \textbf{Spiking clock-and-map} & 19.6 & 22.6 & 30.4 & 21.7 & 0.99 & 0.32 & 0.0 \\
 Clock-and-map, arith. & 18.1 & 19.6 & 22.8 & 17.5 & 1.00 & 0.29 & 0.0 \\
 Periodic Kalman & 21.7 & 21.3 & 20.7 & 20.1 & 0.99 & 0.16 & 1.0 \\
@@ -264,7 +263,7 @@ Constant velocity & 28.7 & 45.8 & 102.9 & -- & 0.67 & -- & 0.0 \\
 \bottomrule
 \end{tabular}
 \\[2pt]
-{\scriptsize Errors and path: medians over clips. AUC and latency: the break clip. False alarms: mean over clips. A latency is left out where the detector does not separate the break (AUC $<$ 0.75).}
+{\scriptsize Errors and path: medians over recordings. AUC and latency: the recording with a deviation. False alarms: mean over recordings. A latency is left out where the detector does not separate the deviation (AUC $<$ 0.75).}
 \end{table}
 
 \begin{table}[t]
@@ -279,15 +278,15 @@ Constant velocity & 28.7 & 45.8 & 102.9 & -- & 0.67 & -- & 0.0 \\
 \cmidrule(lr){2-4}
 Memory & 50\,ms & 100\,ms & 200\,ms & (px) & AUC & (s) & al./min \\
 \midrule
-\textbf{Spiking clock-and-map} & 11.1 & 14.9 & 22.1 & 16.6 & 0.97 & 0.33 & 0.0 \\
-Clock-and-map, arith. & 11.6 & 13.4 & 18.9 & 15.2 & 0.99 & 0.16 & 4.8 \\
-Periodic Kalman & 10.0 & 12.3 & 16.0 & 16.7 & 0.76 & 0.37 & 45.7 \\
-Harmonic fit & 23.5 & 24.7 & 26.8 & 8.8 & 0.74 & -- & 0.0 \\
-Constant velocity & 12.0 & 17.9 & 47.2 & -- & 0.33 & -- & 0.0 \\
+\textbf{Spiking clock-and-map} & 11.1 & 15.3 & 22.1 & 16.6 & 0.97 & 0.33 & 0.0 \\
+Clock-and-map, arith. & 11.6 & 13.4 & 19.1 & 15.2 & 0.99 & 0.16 & 8.0 \\
+Periodic Kalman & 10.0 & 12.3 & 16.0 & 16.7 & 0.76 & 0.37 & 44.6 \\
+Harmonic fit & 23.5 & 24.7 & 26.1 & 8.7 & 0.74 & -- & 0.0 \\
+Constant velocity & 12.0 & 17.9 & 47.3 & -- & 0.33 & -- & 0.0 \\
 \bottomrule
 \end{tabular}
 \\[2pt]
-{\scriptsize Three clips and two segments of one of them; one break (wall target).}
+{\scriptsize Three recordings; one contains a deviation.}
 \end{table}
 
 \begin{figure*}[t]
@@ -299,27 +298,27 @@ Constant velocity & 12.0 & 17.9 & 47.2 & -- & 0.33 & -- & 0.0 \\
 
 \subsection{Deviation Detection}
 \label{sec:res-deviation}
-The deviation signal is where the spiking memory stands out (Table~\ref{tab:pendulum}, Fig.~\ref{fig:break}). On the held-out pendulum break it raises its alarm 0.07~s after the marked break, with an AUC of 0.98 and no false alarm on any of the three held-out clips. The periodic Kalman filter separates the break as well (AUC 1.00) but flags it only after 0.67~s, and raises 14 false alarms per minute on steady motion, 38 on one clip. The harmonic fit barely separates the break (AUC 0.63). The same holds on the development clips: the spiking memory detects both breaks (pendulum and wall target) without a single false alarm, while the Kalman filter raises 46 false alarms per minute on the fan and wall-target clips. The alarm's constant was chosen on the development clips for each input and applied unchanged to the held-out ones; with a single break clip per group, these latencies are indicative rather than statistical.
+The deviation signal is where the spiking memory stands out (Table~\ref{tab:pendulum}, Fig.~\ref{fig:break}). On the held-out pendulum deviation it raises its alarm 0.07~s after the deviation begins, with an AUC of 0.98 and no false alarm on any of the three held-out recordings. The periodic Kalman filter separates the deviation as well (AUC 1.00) but flags it only after 0.67~s, and raises 14 false alarms per minute on steady motion, 38 on one recording. The harmonic fit barely separates the deviation (AUC 0.63). The same holds on the development recordings: the spiking memory detects both deviations (pendulum and wall target) without a single false alarm, while the Kalman filter raises 45 false alarms per minute on the fan and wall-target recordings. The alarm threshold was chosen on the development recordings and applied unchanged to the held-out ones; with a single deviation per group, these latencies are indicative rather than statistical.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{results_break}
-\caption{Held-out pendulum break (\texttt{small\_break}), full spiking pipeline. Top: the target's horizontal position and the 100~ms prediction. Middle and bottom: each method's deviation score over its own alarm bar (dashed line at 1); red lines mark alarm onsets.}
+\caption{A held-out pendulum recording with a deviation, full spiking pipeline. Top: the target's horizontal position and the 100~ms prediction. Middle and bottom: each method's deviation score over its own alarm bar (dashed line at 1); red lines mark alarm onsets.}
 \label{fig:break}
 \end{figure}
 
 \subsection{Ablations}
 \label{sec:res-ablations}
-\emph{Learned memories.} The two memories that learn the cycle as network dynamics, a recurrent network of fast and slow LIF layers trained on simulated tracks and a spiking Legendre Memory Unit that records a window of the past, do not hold the cycle (Fig.~\ref{fig:paths}). On the development pendulum their remembered paths are 95 and 64~px from the labelled one, with periods 1.89 and 1.26 times the true one, and their 100~ms errors are 32 and 45~px against 23~px for the clock-and-map memory.
+\emph{Learned memories.} The two memories that learn the cycle as network dynamics, a recurrent network of fast and slow LIF layers trained on simulated tracks and a spiking Legendre Memory Unit that records a window of the past, do not hold the cycle (Fig.~\ref{fig:paths}). On the development pendulum recordings their remembered paths are 95 and 64~px from the labelled one, with periods 1.89 and 1.26 times the true one, and their 100~ms errors are 32 and 45~px against 23~px for the clock-and-map memory.
 
-\emph{Spiking against arithmetic.} The clock-and-map memory written as plain arithmetic predicts within 0.5~px of the spiking one on the held-out pendulum up to 100~ms and detects the break equally well (AUC 0.99 against 0.98). The spiking version costs accuracy only at the longest horizon on the development clips (30.4 against 22.8~px at 200~ms).
+\emph{Spiking against arithmetic.} The clock-and-map memory written as plain arithmetic predicts within 0.5~px of the spiking one on the held-out pendulum up to 100~ms and detects the deviation equally well (AUC 0.99 against 0.98). The spiking version costs accuracy only at the longest horizon on the development recordings (30.4 against 22.8~px at 200~ms).
 
-\emph{Input.} With the classical centroid in place of the spiking localiser, the spiking memory's 100~ms error against the pendulum labels rises from 18--32~px to 27--49~px on the development clips and from 11--22~px to 76--130~px on the held-out ones, so on this setup the localiser sets the accuracy the whole pipeline can reach.
+\emph{Input.} With the classical centroid in place of the spiking localiser, the spiking memory's 100~ms error against the pendulum labels rises from 18--32~px to 27--49~px on the development recordings and from 11--22~px to 76--130~px on the held-out ones, so on this setup the localiser sets the accuracy the whole pipeline can reach.
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{results_paths}
-\caption{The remembered cycle of each memory at the last step before the break on the development pendulum clip \texttt{wide\_break}, over the labelled path of the preceding 6~s (grey), all through the spiking localiser. Only the clock-and-map memory and the Kalman filter hold the swing.}
+\caption{The remembered cycle of each memory just before the deviation in a development pendulum recording, over the labelled path of the preceding 6~s (grey), all through the spiking localiser. Only the clock-and-map memory and the Kalman filter hold the swing.}
 \label{fig:paths}
 \end{figure*}
 
@@ -343,7 +342,6 @@ The deviation signal is where the spiking memory stands out (Table~\ref{tab:pend
 \label{sec:impl}
 % If space allows, a short implementation-notes paragraph or move framework details here.
 
-\nocite{*}   % TEMP: lists every refs.bib entry while drafting. Delete once citations are real.
 \bibliographystyle{IEEEtran}
 \bibliography{refs}
 

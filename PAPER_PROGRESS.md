@@ -67,9 +67,10 @@ says which phase fills them.
   Held-out: the three pendulum clips, each scored once (2026-09-25); the other held-out
   clips are not labelled yet. Unused figure: `results_learning.pdf` (error vs time from
   the clip's start), `results_break_dev.pdf` (the development break).
-- **Architecture figures** — `figures/architecture/`: `system_overview` (Fig. 1 candidate,
-  full width) and `clock_and_map` (§III-D candidate, one column), TikZ sources + PDFs,
-  not yet in `main.tex`.
+- **Architecture figures** — `figures/architecture/`, TikZ sources + PDFs. `pipeline` is
+  Fig. 1 (in `main.tex`, placed before §I so it floats to page 2; raster panels from
+  `make_assets.py`). Not yet in `main.tex`: `clock_and_map` (§III-D, one column) and
+  `rig` (the camera rig, labelled; §III-B or §IV-B). `system_overview` is superseded.
 
 Every paper cited needs an entry in `BIBLIOGRAPHY.md` in the same change. `paper/refs.bib` is
 Sagi's, managed outside the repo; the state it was in when he took it over is

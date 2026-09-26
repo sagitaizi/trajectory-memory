@@ -53,11 +53,14 @@ def setup_style() -> None:
 
 # --- data ------------------------------------------------------------------------------
 
+SEGMENTS = {"loop_break_01/diagonal", "loop_break_01/horizontal"}   # parts of a recording already scored whole
+
+
 def read_scores(set_name: str) -> list[dict]:
     path = RUNS / set_name / "scores.csv"
     if not path.exists():
         return []
-    rows = list(csv.DictReader(path.open(encoding="utf-8")))
+    rows = [r for r in csv.DictReader(path.open(encoding="utf-8")) if r["clip"] not in SEGMENTS]
     for r in rows:
         for k in ("horizon_s", "fde_px", "fde_iqr_px", "lock_on_s", "path_median_px", "path_last_px",
                   "period_ratio", "auc", "latency_s", "fp_per_min", "unseen_fraction"):
@@ -154,9 +157,9 @@ def fig_break_trace(set_name, clip, name="results_break", window=(-6.0, 4.0), in
         ax.text(0.01, 0.92, STYLE[m][0], transform=ax.transAxes, va="top", fontsize=7, color=INK)
     for ax in axes:
         ax.axvline(0.0, color=INK, lw=0.9)
-    axes[0].annotate("break", xy=(0, 1), xycoords=("data", "axes fraction"), xytext=(3, -2),
+    axes[0].annotate("deviation", xy=(0, 1), xycoords=("data", "axes fraction"), xytext=(3, -2),
                      textcoords="offset points", va="top", fontsize=7)
-    axes[-1].set_xlabel("Time from the marked break (s)")
+    axes[-1].set_xlabel("Time from the deviation (s)")
     fig.align_ylabels(axes)
     save(fig, name)
 
@@ -269,6 +272,102 @@ def fig_learning(set_names, name="results_learning", input_name="snn", horizon=0
     save(fig, name)
 
 
+def fig_teaser(set_name="held_out", clip="small_break", name="teaser", window=(-5.0, 3.0)) -> None:
+    """One column: an event frame just after the break with the remembered path, the current
+    position and the 100 ms prediction (left); the horizontal position with its prediction and
+    the deviation score against its alarm bar around the break (right)."""
+    import _thesis_path  # noqa: F401
+    from trajmem.data import load_recording
+
+    tr = trace(set_name, clip, "snn_phasemap", "snn")
+    if tr is None or not len(tr["deviation_times"]):
+        print("skip", name)
+        return
+    res, t, tb = tr["resolution"], tr["t"], float(tr["deviation_times"][0])
+    hi = list(tr["horizons"]).index(0.1)
+    i_b = int(np.searchsorted(t, tb) - 1)
+    path = tr["cycles"][i_b].astype(float) * res                  # the path remembered at the break
+    obs = tr["obs"] * res
+    rec = load_recording(ROOT / "corpus/real/pendulum" / clip)
+    ev = rec.events
+    ts = ev["timestamp"]
+
+    def visible(k):                                                # events within 40 px of the target in its 5 ms
+        a = ts[0] + int(t[k] * 1e6) - 2500
+        lo, hi_ = np.searchsorted(ts, [a, a + 5000])
+        e = ev[lo:hi_]
+        return int(np.sum(np.hypot(e["x"] - obs[k][0], e["y"] - obs[k][1]) < 40))
+
+    cand = [k for k in np.where((t > tb + 0.3) & (t < tb + 2.5) & np.isfinite(obs).all(1))[0] if visible(k) >= 500]
+    dist = [np.min(np.linalg.norm(path - obs[k], axis=1)) for k in cand]
+    i = int(cand[int(np.argmax(dist))])                           # furthest off the path while clearly in view
+    t0 = ev["timestamp"][0] + int(t[i] * 1e6) - 2500
+    sel = (ev["timestamp"] >= t0) & (ev["timestamp"] < t0 + 5000)
+    e = ev[sel]
+    img = np.zeros((res[1], res[0], 3)) + np.array(matplotlib.colors.to_rgb("#0d0d10"))
+    for pol, c in ((1, "#ff6b5b"), (0, "#4fb3ff")):
+        m = e["polarity"] == pol
+        img[e["y"][m], e["x"][m]] = matplotlib.colors.to_rgb(c)
+    pts = np.vstack([path, obs[i:i + 1] + [[-90, 60]], obs[i:i + 1] + [[60, -60]]])
+    cx, cy = np.nanmean(pts[:, 0]), np.nanmean(pts[:, 1])
+    half = max(np.ptp(pts[:, 0]), 1.6 * np.ptp(pts[:, 1])) / 2 + 45
+    x0, x1 = max(0, cx - half), min(res[0], cx + half)
+    y0, y1 = max(0, cy - half / 1.1), min(res[1], cy + half / 1.1)
+
+    fig = plt.figure(figsize=(COL, 1.85))
+    gs = fig.add_gridspec(2, 2, width_ratios=[1.0, 1.35], height_ratios=[1.3, 1], wspace=0.45, hspace=0.12)
+    ax = fig.add_subplot(gs[:, 0])
+    ax.imshow(img, interpolation="nearest")
+    closed = np.vstack([path, path[:1]])
+    ax.plot(closed[:, 0], closed[:, 1], color="white", lw=2.4, alpha=0.9)
+    ax.plot(closed[:, 0], closed[:, 1], color=STYLE["snn_phasemap"][1], lw=1.3, label="remembered path")
+    ax.plot(*obs[i], "o", ms=5, color="white", mec="black", mew=0.7, label="$p(t)$")
+    ax.plot(*(tr["pred"][hi][i] * res), "o", ms=5, color=STYLE["snn_phasemap"][1], mec="white", mew=0.9,
+            label=r"$\hat p(t{+}100\,\mathrm{ms})$")
+    ax.set_xlim(x0, x1)
+    ax.set_ylim(y1, y0)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.grid(False)
+    for s in ax.spines.values():
+        s.set_visible(True)
+        s.set_color(INK)
+    ax.set_title(f"{t[i] - tb:+.1f} s from the break", fontsize=7, loc="left", pad=2)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.01), ncol=1, fontsize=6.5, handlelength=1.4,
+              labelspacing=0.2, borderaxespad=0.2, markerscale=0.7)
+
+    tt = t - tb
+    s = (tt >= window[0]) & (tt <= window[1])
+    a1 = fig.add_subplot(gs[0, 1])
+    a1.plot(tt[s], tr["gt_now"][s, 0] * res[0], color=TRUTH, lw=2.2, alpha=0.5, label="label")
+    a1.plot(tt[s] + 0.1, tr["pred"][hi][s, 0] * res[0], color=STYLE["snn_phasemap"][1], lw=0.9, label="prediction")
+    a1.set_ylabel("$x$ (px)", labelpad=1)
+    a1.tick_params(labelbottom=False)
+    a1.legend(loc="lower left", bbox_to_anchor=(0.0, 1.0), fontsize=6.5, ncol=2, handlelength=1.2,
+              columnspacing=0.8, borderaxespad=0.1)
+    a2 = fig.add_subplot(gs[1, 1], sharex=a1)
+    ratio = tr["score"] / np.where(tr["bar"] > 0, tr["bar"], np.nan)
+    a2.plot(tt[s], ratio[s], color=STYLE["snn_phasemap"][1], lw=0.9)
+    a2.axhline(1.0, color=INK, lw=0.6, ls=(0, (3, 2)))
+    flags = alarm_times(tt, ratio)
+    flags = flags[(flags >= window[0]) & (flags <= window[1])]
+    if len(flags):
+        a2.axvline(flags[0], color="#d03b3b", lw=0.8)
+        a2.annotate("alarm", xy=(flags[0], 8), xytext=(3, 0), textcoords="offset points", fontsize=6.5,
+                    color="#d03b3b", va="center")
+    a2.set_yscale("log")
+    a2.set_ylim(0.05, 20)
+    a2.set_yticks([0.1, 1, 10], ["0.1", "1", "10"])
+    a2.minorticks_off()
+    a2.set_ylabel("score/bar", labelpad=1)
+    a2.set_xlabel("time from the break (s)", labelpad=1)
+    for a in (a1, a2):
+        a.axvline(0.0, color=INK, lw=0.8)
+        a.axvline(t[i] - tb, color=MUTED, lw=0.5, ls=":")
+    fig.align_ylabels([a1, a2])
+    save(fig, name)
+
+
 PENDULUM = ("small_01", "wide_02", "wide_break", "small_03", "wide_01", "small_break")
 
 
@@ -323,7 +422,7 @@ def tables(dev, held) -> str:
     main_table = (TABLE_HEAD + table_block(held, "Pendulum, held-out (3 clips, 1 break)", **pend) + [r"\midrule"]
                   + table_block(dev, "Pendulum, development (3 clips, 1 break)", setup="pendulum", **pend)
                   + TABLE_FOOT)
-    other = (TABLE_HEAD + table_block(dev, "Fan and wall target, development (3 clips + 2 segments, 1 break)",
+    other = (TABLE_HEAD + table_block(dev, "Fan and wall target, development (3 recordings, 1 with a deviation)",
                                       setup=lambda s: s in ("fan", "wall_target"), input="centroid",
                                       offset="removed") + TABLE_FOOT)
     return ("% Table: pendulum, full spiking pipeline, labels as-is\n" + "\n".join(main_table)
