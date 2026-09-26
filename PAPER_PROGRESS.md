@@ -28,11 +28,11 @@ says which phase fills them.
 | III-C  | Localiser (incl. training) | writable    | —                   | —               |
 | III-D  | Memory network             | writable*   | —                   | half-period fix |
 | III-E  | Deviation Score            | writable    | —                   | —               |
-| III-F  | Evaluation Protocol        | writable    | —                   | —               |
 | IV-A   | Simulator                  | writable*   | —                   | Phase A         |
 | IV-B   | Real Recordings            | writable    | —                   | labelling       |
 | IV-C   | Baselines                  | writable*   | —                   | Phase B         |
-| IV-D   | Metrics                    | writable    | —                   | —               |
+| IV-D   | Evaluation Protocol        | drafted     | —                   | —               |
+| IV-E   | Metrics                    | writable    | —                   | —               |
 | V-A    | Results: Localiser         | drafted     | —                   | other held-out  |
 | V-B    | Results: Prediction + path | drafted     | —                   | other held-out  |
 | V-C    | Results: Deviation         | drafted     | —                   | other held-out  |
@@ -54,12 +54,12 @@ says which phase fills them.
 - **V-D** — `PLAN.md` phase C (ablations); `docs/snn-experiments-log.md`;
   `materials/02-methods/legendre-memory-unit.md`.
 - **III-E** — `materials/01-literature/deviation-and-novelty.md`.
-- **III-F** — `PLAN.md`: pretrain on simulation, freeze, test on real.
 - **IV-A** — `materials/02-methods/simulation-with-v2e.md`; `trajmem/simulate.py`; `params.yaml`.
 - **IV-B, Fig. 2** — `RECORDING_LOG.md`; `corpus/sets.yaml`; `corpus/real/`.
 - **IV-C** — `materials/02-methods/{kalman-periodic,rhythmic-dmp}.md`;
   `materials/01-literature/classical-baselines.md`.
-- **IV-D** — `materials/02-methods/metrics.md`.
+- **IV-D** — `PLAN.md`: pretrain on simulation, freeze, test on real; `corpus/sets.yaml`.
+- **IV-E** — `materials/02-methods/metrics.md`.
 - **Fig. 1** — `docs/implementation-plan.md`.
 - **§V (all)** — `scripts/paper_results.py run` (traces + scores, `runs/paper/`) and
   `scripts/paper_figures.py` (figures to `paper/figures/results_*.pdf`, tables to
@@ -69,8 +69,8 @@ says which phase fills them.
   the clip's start), `results_break_dev.pdf` (the development break).
 - **Architecture figures** — `figures/architecture/`, TikZ sources + PDFs. `pipeline` is
   Fig. 1 (in `main.tex`, placed before §I so it floats to page 2; raster panels from
-  `make_assets.py`). Not yet in `main.tex`: `clock_and_map` (§III-D, one column) and
-  `rig` (the camera rig, labelled; §III-B or §IV-B). `system_overview` is superseded.
+  `make_assets.py`). Not in `main.tex`: `clock_and_map` (§III-D, one column); `rig` (left
+  out: the motors are never used). `system_overview` is superseded.
 
 Every paper cited needs an entry in `BIBLIOGRAPHY.md` in the same change. `paper/refs.bib` is
 Sagi's, managed outside the repo; the state it was in when he took it over is
@@ -92,9 +92,9 @@ exists to position those claims — so §II is easier once §I is down.
    for them. See "The 4a encoder ground truth was abandoned" below.
 4. **§III-A Problem Setup.** Definitions only: position over time, what counts as repetition,
    the prediction horizon, what "deviation" means formally.
-5. **§IV-D Metrics.** Definitions, not values: prediction error at the horizon, lock-on time,
+5. **§IV-E Metrics.** Definitions, not values: prediction error at the horizon, lock-on time,
    deviation ROC, median detection latency.
-6. **§III-F Protocol.** Pretrain on simulation, freeze, evaluate on held-out real clips.
+6. **§IV-D Protocol.** Pretrain on simulation, freeze, evaluate on held-out real clips.
 7. **Fig. 1.** Block diagram: events → frontend → localiser → memory → prediction + deviation.
    Won't change unless a block is renamed.
 

@@ -17,6 +17,8 @@
 \definecolor{muted}{HTML}{52514E}
 \definecolor{faint}{HTML}{BDBCB6}
 \definecolor{mapfill}{HTML}{DCE9FA}
+\definecolor{mem}{HTML}{C98500}
+\definecolor{memfill}{HTML}{FBF0D9}
 
 \tikzset{
   font=\footnotesize,
@@ -73,26 +75,25 @@
 % ---------------------------------------------------------------- stage 2: clock, phase cells, map
 \begin{scope}[shift={(104,11)}]
   \draw[faint, line width=0.6pt] (0,0) circle (5.2);
-  \draw[->, ours, line width=0.9pt] (30:5.2) arc[start angle=30, end angle=95, radius=5.2];
+  \draw[->, mem, line width=0.9pt] (30:5.2) arc[start angle=30, end angle=95, radius=5.2];
   \draw[muted, line width=0.4pt] (0,0) -- (30:5.2);
   \fill[ink] (30:5.2) circle (0.75);
-  \draw[ours, fill=white, line width=0.7pt] (95:5.2) circle (0.75);
+  \draw[mem, fill=white, line width=0.7pt] (95:5.2) circle (0.75);
   \node[sub] at (0,-1.2) {$\varphi$};
   \node[lab] at (0,-9.3) {clock\\[-1pt]{\scriptsize\itshape adaptive osc.}};
   \begin{scope}[shift={(14,0)}]
     \foreach \a in {0,20,...,340} {
       \pgfmathsetmacro{\d}{min(abs(\a-30), 360-abs(\a-30))}
       \pgfmathsetmacro{\act}{100*exp(-(\d/32)^2)}
-      \filldraw[fill=ours!\act!white, draw=ours!60!faint, line width=0.3pt] (\a:5.2) circle (0.8);
+      \filldraw[fill=mem!\act!white, draw=mem!60!faint, line width=0.3pt] (\a:5.2) circle (0.8);
     }
     \node[lab] at (0,-9.3) {phase\\[-1pt]cells};
   \end{scope}
   \draw[flow] (5.8,0) -- (7.9,0);
   \begin{scope}[shift={(32,0)}]
-    \filldraw[fill=mapfill, draw=ours, line width=0.6pt, rounded corners=1.5pt] (-5,-5) rectangle (5,5);
-    \draw[ours, line width=0.9pt] (-3.8,1.8) .. controls (-1.5,-2.2) and (1.5,-2.2) .. (3.8,1.8);
+    \filldraw[fill=memfill, draw=mem, line width=0.6pt, rounded corners=1.5pt] (-5,-5) rectangle (5,5);
+    \draw[mem, line width=0.9pt] (-3.8,1.8) .. controls (-1.5,-2.2) and (1.5,-2.2) .. (3.8,1.8);
     \node[lab] at (0,-9.3) {map\\[-1pt]{\scriptsize\itshape PES-learned}};
-    \node[sub, anchor=south] at (0,5.3) {read at $\varphi{+}\omega h$};
   \end{scope}
   \draw[flow] (20,0) -- (26.6,0);
 \end{scope}
@@ -101,8 +102,8 @@
 \node[imgframe, anchor=south west] (out) at (148.5,0)
   {\includegraphics[height=21mm]{assets/prediction_frame.png}};
 \node[sub, anchor=north, align=left] at (out.south) {%
-  {\color{ours}\textbf{---}} remembered path\\
-  $\circ$ $p(t)$\quad {\color{ours}$\bullet$} $\hat{p}(t{+}100\,\mathrm{ms})$};
+  {\color{mem}\textbf{---}} remembered path\\
+  $\circ$ $p(t)$\quad {\color{mem}$\bullet$} $\hat{p}(t{+}h)$};
 
 % ---------------------------------------------------------------- stage boxes and the flow between them
 \begin{scope}[on background layer]

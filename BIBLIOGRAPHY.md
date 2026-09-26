@@ -67,7 +67,7 @@ each before citing in the manuscript. Entries whose author list could not be che
   joint signals, no deviation signal. Found after the design was settled (the design came
   from the Kalman's phase-and-shape structure, `docs/snn-experiments-log.md` Run 11); cited
   as the closest prior design, not as its source.
-- **Where:** paper §II rhythm-learning paragraph (candidate).
+- **Where:** paper §II periodic-motion paragraph (candidate).
 
 ### Eliasmith & Anderson, 2003 — "Neural Engineering: Computation, Representation, and Dynamics in Neurobiological Systems"
 - MIT Press.
@@ -388,8 +388,9 @@ work can say why, and so the framing is not mistaken for ours.
 ### Harvey, 1989 — "Forecasting, Structural Time Series Models and the Kalman Filter"
 - Cambridge University Press.
 - **Why:** the trigonometric seasonal component — rotating harmonic pairs in a Kalman state,
-  the model `PeriodicKalman` uses. Candidate citation for §IV-C.
-- **Where:** `baseline.py` (`PeriodicKalman`).
+  the model `PeriodicKalman` uses. Assumes the period is known.
+- **Where:** `baseline.py` (`PeriodicKalman`); paper §II periodic-motion paragraph
+  (candidate), §IV-C.
 
 ### Ijspeert, Nakanishi & Schaal, 2002 — rhythmic dynamic movement primitives
 - "Learning rhythmic movements by demonstration using nonlinear oscillators." *IROS 2002*.

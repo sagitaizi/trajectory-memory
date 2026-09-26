@@ -28,7 +28,7 @@ BEFORE_BREAK_S = 2.66         # the moment shown, this long before the marked br
 WINDOW_US = 5000
 CROP = (60, 600, 40, 400)     # x0, x1, y0, y1 in pixels
 ON, OFF, BG = "#ff6b5b", "#4fb3ff", "#0d0d10"
-OURS = "#2a78d6"
+OURS = "#c98500"
 
 
 def frame_image(events, t0_us, t1_us, res):

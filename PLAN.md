@@ -91,11 +91,11 @@ target); offset-removed numbers are a secondary column.
   (the string) and the predictors follow it (~49 px); with clean positions the Kalman is
   7.5 px, 5.6 on exact paths. Break detection on sim: AUC 0.91 / 0.87, latency 0.33 /
   0.15 s. Lock-on pools to "never" on both sets at a 15 px tolerance — the tolerance
-  must be set per regime (§IV-D).
+  must be set per regime (§IV-E).
   Hand-labels mark a fixed point of the object that is not the event centroid (pendulum:
   brush centre, 25–42 px below the centroid; wall target: 12–21 px), a floor under any error
   scored against them. `--subtract-offset` removes each clip's median label−centroid
-  vector before scoring and reports it (§IV-D); it is `evaluate.py`'s default. For the
+  vector before scoring and reports it (§IV-E); it is `evaluate.py`'s default. For the
   pendulum the as-is numbers are primary and offset-removed ones secondary (see top).
 
 ## C — Trajectory memory, Stage 1 (the goal)
