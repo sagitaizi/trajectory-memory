@@ -59,7 +59,7 @@ novelty detection, neuromorphic vision
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{pipeline}
-\caption{The proposed system. Stage~1: each 5~ms frame of accumulated ON and OFF events (left) passes through two convolutional LIF layers ($5\times5$ filters) and a dense layer of 256 LIF neurons, whose output gives the target's position $p(t)$ as place cells along $x$ and $y$ and a boolean indicating whether the target is visible. Stage~2: a clock implemented as an adaptive-frequency oscillator built from LIF neurons syncs with the motion, so its phase $\varphi$ tracks how far through each cycle the target is. A ring of phase cells then fires at the current detected phase, and a map, learned by a PES rule, holds the target's position at each phase. The prediction (right) $\hat{p}(t{+}h)$ is the map read at the next phase $\varphi{+}\omega h$, where $\omega$ is the clock's rate, and the remembered path is the map read at every phase over one full cycle.}
+\caption{The proposed system. Stage~1: each 5~ms frame of accumulated ON and OFF events (left) passes through two convolutional LIF layers ($5\times5$ filters) and a fully connected layer of 256 LIF neurons, whose output gives the target's estimated position $\tilde{p}(t)$ as place cells along $x$ and $y$ and a boolean indicating whether the target is visible. Stage~2: a clock implemented as an adaptive-frequency oscillator built from LIF neurons syncs with the motion, so its phase $\varphi$ tracks how far through each cycle the target is. A ring of phase cells then fires at the current detected phase, and a map, learned by a PES rule, holds the target's position at each phase. The prediction (right) $\hat{p}(t{+}h)$ is the map read at the next phase $\varphi{+}\omega h$, where $\omega$ is the clock's rate, and the remembered path is the map read at every phase over one full cycle.}
 \label{fig:pipeline}
 \end{figure*}
 
@@ -93,7 +93,7 @@ Detecting deviations as errors of prediction is also common in other settings. V
 \section{Method}
 \label{sec:method}
 
-Our proposed system is a spiking pipeline built from two stages of SNNs as seen in Fig.~\ref{fig:pipeline}. Events from the camera are accumulated into short 5ms frames from which a spiking localiser estimates the target's position in the scene. Given this constant stream of positions, the trajectory memory SNN learns the target's path, predicts where the target will be a short time ahead, and flags when motion departs from the estimated path. The localiser is trained once on simulated data only and kept fixed, while the memory is not trained in advance and learns online. Section~\ref{sec:problem} defines the task while the event input, localiser, memory and the deviation score are described in Sections~\ref{sec:input}--\ref{sec:deviation}.
+Our proposed system is a spiking pipeline built from two stages of SNNs as seen in Fig.~\ref{fig:pipeline}. Events from the camera are accumulated into short 5ms frames from which a spiking localiser estimates the target's position in the scene. Given this constant stream of positions, the trajectory memory SNN learns the target's path, predicts where the target will be a short time ahead, and flags when motion departs from the estimated path. The localiser is trained once on simulated data only and kept fixed, while the memory is not trained in advance and learns online. Section~\ref{sec:problem} defines the task while the event input, localiser and memory, including its deviation score, are described in Sections~\ref{sec:input}--\ref{sec:memory}.
 
 \subsection{Problem Definition}
 \label{sec:problem}
@@ -103,76 +103,58 @@ At every time step $t$ the system must produce two outputs from this event strea
 
 \subsection{Event Input}
 \label{sec:input}
-All (non-simulated) events are recorded with a DVXplorer event camera with a resolution of $640\times480$ pixels. Each event $e=(x, y, t, q)$ is a single brightness change at pixel $(x, y)$ at time $t$, with polarity $q$ marking an increase (ON) or a decrease (OFF). The stream is divided into consecutive windows of 5~ms each accumulated into a frame of two channels, one for ON and one for OFF events at every pixel. The frames are then reduced by $8\times$ by summing $8\times8$ pixels blocks, giving a $2\times60\times80$ (channels $\times$ height $\times$ width) input size for every 5~ms step. The window length sets how often the system produces an output and how long it waits for its input, and is the main latency parameter of the pipeline.
+All real events are captured with a DVXplorer event camera with a resolution of $640\times480$ pixels. Each event $e=(x, y, t, q)$ is a single brightness change at pixel $(x, y)$ at time $t$, with polarity $q$ marking an increase (ON) or a decrease (OFF). The stream is divided into consecutive windows of 5~ms each accumulated into a frame of two channels, one for ON and one for OFF events at every pixel. The frames are then reduced by $8\times$ by summing $8\times8$ pixels blocks, giving a $2\times60\times80$ (channels $\times$ height $\times$ width) input size for every 5~ms step. The window length sets how often the system produces an output and how long it waits for its input, and is the main latency parameter of the pipeline.
 
 \subsection{Spiking Localiser}
 \label{sec:localiser}
-% numbered offline review notes:
-% 1. "runs once per frame" - what does 'runs' mean in this context?
-% 2. what does convulutional mean in the spiking sense?
-% 3. first paragraph needs more explanations on what "feature maps" and "place cells" mean, perhaps with a cite to the biological reference or to another paper using a similar concept if we have used any in our bibliography.
-% 4. "Two convolutional layers of $5\times5$ filters with a stride of 2 map the input to 16 feature maps of $30\times40$ and then to 32 feature maps of $15\times20$, and a fully connected layer of 256 neurons follows." - this is a big part of the implemention and it is mentioned briefly and not in enough detail. We need to detail more about each layer's significance to the pipeline.
-Given the raw event frames, the localiser is responsible for locating the target in each one of them (Fig.~\ref{fig:pipeline}, Stage~1). It is a convolutional spiking network where each layer is composed of feature maps, grids of leaky integrate-and-fire (LIF) neurons, each neuron receiving a weighted sum of the spikes in a small patch of the layer below. All neurons of a map use the same set of weights, called a filter, so the map detects one pattern and shows where in the input it appears. A LIF neuron $i$ sums its input current $I_i$ into a membrane potential $U_i$ that leaks, and spikes when $U_i$ crosses a threshold $\theta$, after which $\theta$ is subtracted:
+Given the event frames, the localiser is responsible for locating the target in each one of them (Fig.~\ref{fig:pipeline}, Stage~1). It is a convolutional spiking network where each layer is composed of feature maps--grids of leaky integrate-and-fire (LIF) neurons. A LIF neuron (as used in our localiser implementation) $i$ sums its input current $I_i$ into a membrane potential $U_i$ that leaks, and spikes when $U_i$ crosses a threshold $\theta$, after which $\theta$ is subtracted~\cite{Eshraghian2022Training}:
 \begin{equation}
-U_i[t] = \beta_i U_i[t-1] + I_i[t] - \theta S_i[t-1], \quad S_i[t] = H\big(U_i[t]-\theta\big),
+\begin{aligned}
+U_i[t] &= \beta_i U_i[t-1] + I_i[t] - \theta S_i[t-1],\\
+S_i[t] &= \begin{cases} 1, & \text{if } U_i[t] > \theta\\ 0, & \text{otherwise} \end{cases}
+\end{aligned}
 \end{equation}
-where $H$ is the step function and $\beta_i = e^{-\Delta t/\tau_i}$, with $\Delta t = 5$~ms and $\tau_i$ spread over 10--20~ms. The leak gives the network a memory of the last few frames, so a frame with few events is still read in the light of the frames before it.
+where $\beta_i = e^{-\Delta t/\tau_i}$ marks the leak, with $\Delta t = 5$~ms and $\tau_i$ spread over 10--20~ms. This leak gives the network a natural memory of the last few frames, so neurons can remain active and keep responding to the target through frames in which it produces few events.
 
-The first layer has 16 feature maps of $30\times40$ neurons, each seeing $5\times5$ input cells ($40\times40$ pixels), and can respond to local patterns of ON and OFF events such as the edges of a moving object. The second has 32 maps of $15\times20$, each neuron seeing $13\times13$ cells ($104\times104$ pixels), enough to hold the whole target and so to tell it apart from a thin string or a single noisy pixel. Both use filters of $5\times5$ with a stride of 2. A fully connected layer of 256 LIF neurons then sees the whole image at once, where evidence from all positions can be compared to decide where the target is.
+Each neuron receives its input current as a weighted sum of the activity in a small patch of the layer below. All neurons of one map use the same set of weights, called a filter, so that each map detects exactly one pattern and shows where in the input it appears. The first layer has 16 feature maps of $30\times40$ neurons, each seeing $5\times5$ input blocks ($40\times40$ pixels) with a stride of 2, which halves the grid. A single map from this layer mainly responds to local patterns of ON and OFF events, such as the edges of a moving object. The second has 32 maps of $15\times20$, each neuron seeing $13\times13$ blocks ($104\times104$ pixels) with a stride of 2 as well, which is usually enough to hold the entire target or a large part of it. A fully connected layer of 256 LIF neurons then sees the whole image at once, where evidence from all positions can be compared to decide where the target is.
 
-% 5. what does "read out linearly" mean here?
-% 6. place cells explanation comes now, too late, after the conecpt was already mentioned in the prev paragraph.
-% CITE: OKeefe1971Hippocampus missing from refs.bib -- O'Keefe & Dostrovsky, Brain Research 34(1):171--175, 1971.
-The position is read from place cells: 32 cells tile the image width, each tuned to one position $c_k$, and 32 tile its height, so a position is represented by a bump of activity over the few cells tuned nearest to it, a population code \cite{Eliasmith2003Neural} named after the hippocampal cells that fire at one location of an animal \cite{OKeefe1971Hippocampus}. The spikes of the fully connected layer are smoothed with a 15~ms low-pass filter, and the cells' activities $z_k$ are weighted sums of the smoothed spikes, without neurons. The position is their centre of mass,
+The position readout is inspired by place cells \cite{OKeefe1971The}, neurons in the hippocampus of various animals (including humans) that fire mainly when the animal is physically present at one specific location. In our implementation, each axis is covered by 32 cells, each tuned to one position $c_k$, so a position is represented by a bump of activity over the few cells tuned nearest to it (Fig.~\ref{fig:pipeline} Stage 1). To compute the cells' activities $z_k$, the spikes of the fully connected layer are smoothed with a 15~ms low-pass filter and summed with learned weights. The position is then defined as the centre of mass of the bump, with each cell weighted by the softmax of its activity,
 \begin{equation}
 \hat{x} = \sum_k c_k \frac{e^{z_k}}{\sum_j e^{z_j}},
 \end{equation}
-and likewise for $\hat{y}$. A 65th output tells whether the target is visible; when it is not, the step reaches the memory as unseen.
+and likewise for $\hat{y}$, giving the estimate $\tilde{p}(t) = (\hat{x}, \hat{y})$ that the memory receives.
+One more output tells whether the target is visible; when it is not, the step reaches the memory as unseen.
 
-% 7. what does "Guassian bump" mean?
-% 8. what does "keeps the dense firing 10%" mean?
-% 9. what does "stuck pixels" mean?
-% 10. need to make sure we don't repeat info here which is really more relevant in exprimental setup section.
-% 11. ~15s does not render correctly - space instead of the charachter ~.
-% 12. is there an equation that this sucsection might benefit from having?
-The network is implemented in snnTorch \cite{Eshraghian2022Training} and trained with backpropagation through time using surrogate gradients \cite{Neftci2019Surrogate}, over chunks of 0.25~s with the state carried between them. The loss has three terms: a cross-entropy between each axis's cells and a Gaussian bump centred on the true position, of a width of one cell; a binary cross-entropy on visibility; and a penalty that keeps the fully connected neurons spiking on about 10\% of steps, so the layer neither falls silent nor saturates. Training uses simulated recordings only (Section~\ref{sec:setup}). The imperfections of the real camera that the simulator does not produce are added to the frames during training: stuck pixels that fire whatever the scene, a background of noise events, mirror flips and a quarter turn, a random brightness scale, swapped ON and OFF channels, and short gaps in which the target's events are removed. The network is trained for 20 epochs on all simulated recordings and fine-tuned for 10 more on simulated pendulum recordings only. Its weights are fixed before any real recording is used.
+The network is trained on simulated recordings only (Section~\ref{sec:setup}) with a loss function aiming to match a bell-shaped bump one cell wide centred on the true position and a penalty that keeps the fully connected layer spiking on about 10\% of steps. Camera effects the simulator does not produce, such as background noise, brightness changes and short gaps in the target's events, are added to the frames during training. The network is then fine-tuned on simulated pendulum motion and kept fixed.
 
 \subsection{Trajectory-Memory Network}
 \label{sec:memory}
 The memory receives the target's position every 5~ms and learns, online, where the target is at each point of its cycle (Fig.~\ref{fig:pipeline}, Stage~2). It consists of a clock that follows the phase of the motion, a ring of phase cells that represents that phase, and a map from the phase cells to position.
 
-\emph{Clock.} The motion is first reduced to a single signal $F(t)$: the position projected on the main axis of the motion, found online from a running estimate of the positions' covariance, and scaled to a unit amplitude. The clock is an adaptive-frequency oscillator \cite{Righetti2006Dynamic}, whose state $(x_c, y_c)$ turns around a limit cycle at a rate $\omega$ while $F$ pulls on its phase $\varphi$ and, more slowly, on its rate:
+\emph{Clock.} The motion is first reduced to a single signal $F(t)$: the position projected on the main axis of the motion, found online from a running estimate of the positions' covariance, and scaled to a unit amplitude. The clock is a variant of the adaptive-frequency oscillator \cite{Righetti2006Dynamic}, whose state $(x_c, y_c)$ turns around a limit cycle at a rate $\omega$ while $F$ pulls on its phase $\varphi$ and, more slowly, on its rate:
 \begin{align}
 \dot{x}_c &= \gamma(1-r^2)\,x_c - \omega\,(1-\kappa F y_c)\,y_c, \nonumber\\
 \dot{y}_c &= \gamma(1-r^2)\,y_c + \omega\,(1-\kappa F y_c)\,x_c, \label{eq:clock}\\
 \dot{\omega} &= -\eta_\omega\,\omega F y_c, \nonumber
 \end{align}
-with $r^2 = x_c^2 + y_c^2$, $\varphi = \mathrm{atan2}(y_c, x_c)$, $\gamma = 2$, $\kappa = 0.3$ and $\eta_\omega = 0.6$. After a few cycles the rate matches the period of the motion and the phase keeps a fixed relation to it, so $\varphi$ tells how far through its cycle the target is. The clock's state, together with $\omega$ and $F$, is represented by a population of 1,500 LIF neurons, and the recurrent connections that make the population follow \eqref{eq:clock} are found with the Neural Engineering Framework \cite{Eliasmith2003Neural} in Nengo \cite{Bekolay2014Nengo}. The rate itself is updated outside the population and fed back into it, since holding it as a neural integrator made it drift. Six clocks, started at periods between 0.8 and 7~s, run side by side, and the one whose period agrees with the period measured from the crossings of $F$ through zero is used.
+with $r^2 = x_c^2 + y_c^2$, $\varphi = \mathrm{atan2}(y_c, x_c)$, $\gamma = 2$, $\kappa = 0.3$ and $\eta_\omega = 0.6$. After a few cycles the rate matches the frequency of the motion and the phase keeps a fixed relation to it, so $\varphi$ tells how far through its cycle the target is. The clock's state, together with $\omega$ and $F$, is represented by a population of 1,500 LIF neurons, and the recurrent connections that make the population follow \eqref{eq:clock} are found with the Neural Engineering Framework \cite{Eliasmith2003Neural} in Nengo \cite{Bekolay2014Nengo}. The rate itself is updated outside the population and fed back into it, since holding it as a neural integrator made it drift. Six clocks, started at periods between 0.8 and 7~s, run side by side, and after the first 3~s the one whose period is closest to that measured from the crossings of $F$ through zero is used.
 
-\emph{Phase cells.} The phase is passed to a ring of 400 LIF neurons, each tuned to one direction on the unit circle, as the unit vector $(\cos\varphi, \sin\varphi)$. At any moment the neurons tuned near $\varphi$ fire, forming a bump of activity $a(t)$ that travels around the ring as the clock turns.
+\emph{Phase cells.} The phase is passed, as the unit vector $(\cos\varphi, \sin\varphi)$, to a ring of 400 LIF neurons, each tuned to one direction on the unit circle. At any moment the neurons tuned near $\varphi$ fire, forming a bump of activity $a(t)$ that travels around the ring as the clock turns.
 
 % CITE: MacNeil2011Fine missing from refs.bib -- MacNeil & Eliasmith, "Fine-Tuning and the Stability of Recurrent Neural Networks", PLoS ONE, 2011.
-\emph{Map.} The map is a set of connections $W$ from the phase cells to the target's position, which starts empty in every recording and is learned by an error-driven rule of the PES family \cite{MacNeil2011Fine}:
+\emph{Map.} The map is a set of connections $W$ from the phase cells to the target's position, which starts at zero in every run and is learned by an error-driven rule of the PES family \cite{MacNeil2011Fine}:
 \begin{equation}
-\Delta W = \eta\,\frac{\big(p(t) - W a(t)\big)\,a(t)^{\top}}{\lVert a(t)\rVert^{2}},
+\Delta W = \eta\,\frac{\big(\tilde{p}(t) - W a(t)\big)\,a(t)^{\top}}{\lVert a(t)\rVert^{2}},
 \end{equation}
 where the learning rate $\eta$ decays from 0.3 to 0.02 over the first seconds of motion. Each update moves the position stored at the active phase towards the observed one, so after a few cycles $W$ holds the target's path, one position per phase. A slow correction of the output's centre and scale follows gradual changes of the path, such as the decaying amplitude of a pendulum, and once a clock is chosen, a position far from where the map expects the target is treated as unseen, which protects the map from a momentary error of the localiser.
 
-\emph{Prediction.} To predict $h$ ahead, the phase is advanced by $\omega h$ and the map is read through the ring's tuning at the advanced phase, $\bar{a}(\varphi + \omega h)$:
+\emph{Prediction.} To predict $h$ ahead, the phase is advanced by $\omega h$ and the map is read through $\bar{a}(\varphi + \omega h)$, the activity the ring would have at the advanced phase:
 \begin{equation}
 \hat{p}(t+h) = W\,\bar{a}(\varphi + \omega h) + e^{-h/\tau_r}\,\rho(t),
 \end{equation}
-where $\rho(t)$ is the recent error of the map, smoothed over 20~ms, which lets the prediction follow a target that is momentarily off its path, and $\tau_r = 2$~s. The neurons of the clock and the ring use Nengo's LIF model (membrane time constant 20~ms, refractory period 2~ms) and are simulated in PyTorch in steps of 1~ms, five per frame.
+where $\rho(t)$ is the recent error of the map, smoothed over 20~ms, which lets the prediction follow a target that is momentarily off its path, and $\tau_r = 2$~s; the map's output is taken after the centre and scale correction above. The neurons of the clock and the ring use Nengo's LIF model (membrane time constant 20~ms, refractory period 2~ms) and are simulated in PyTorch in steps of 1~ms, five per frame.
 
-\subsection{Deviation Score}
-\label{sec:deviation}
-If the deviation were measured against the map itself, the map would learn the new motion within a few cycles and the deviation would disappear from the score. The score is therefore measured against a second copy of the map, $W_s$, taken once the memory has settled: when the chosen clock has run for at least three cycles, its period agrees with the one measured from $F$, and the map's error has stopped decreasing. From then on $W_s$ follows the working map only slowly, with a time constant that grows to 30~s, so it keeps the path as it was learned. The deviation score is the distance between the observed position and the position that $W_s$ holds for the current phase,
-\begin{equation}
-s(t) = \big\lVert p(t) - W_s\,a(t) \big\rVert,
-\end{equation}
-smoothed over 0.2~s.
-
-An alarm is raised when $s(t)$ stays above a threshold for three consecutive steps (15~ms). The threshold is set from the score itself and needs no labels: over a sliding window of 2~s it is the median of the score plus $k$ times its spread (the scaled median absolute deviation), and it only ever decreases, taking the lowest value reached so far. It therefore tightens while the memory settles and cannot be raised by the deviation it is meant to catch. The constant $k$ is chosen once on the development recordings for each input (Section~\ref{sec:protocol}).
+\emph{Deviation.} Measured against the working map, a deviation would fade within a few cycles as the map learns the new motion. The score is therefore measured against a slow copy $W_s$ of the map, taken once the memory has settled and updated from then on with a time constant that grows to 30~s, so it keeps the path as first learned: $s(t) = \lVert \tilde{p}(t) - W_s\,a(t) \rVert$, smoothed over 0.2~s.
 
 \section{Experimental Setup}
 \label{sec:setup}
@@ -195,7 +177,7 @@ An alarm is raised when $s(t)$ stays above a threshold for three consecutive ste
 % 30% exact and the rest with small smooth imperfections. Corpus summary table: see
 % materials/02-methods/simulation-with-v2e.md (added once the 100 clips are generated).
 
-\subsection{Real Recordings}
+\subsection{Live Runs}
 % Four regimes: ceiling-fan (circular), string pendulum, hand-moved, motor-driven on a blank
 % wall (exact encoder ground truth via calibration). Single high-contrast target; daylight.
 % NOTE the line above is stale: the encoder ground truth was abandoned (PAPER_PROGRESS.md);
@@ -219,7 +201,7 @@ An alarm is raised when $s(t)$ stays above a threshold for three consecutive ste
 % $16\times16$ pixels, the cells holding at least 30\% of the fullest one are kept, and the
 % position is the mean of their events. This keeps the estimate on the dense target rather
 % than on noise or on the string of a hanging target. We refer to it as the classical
-% centroid; it is the input of every method on the fan and wall-target recordings, and
+% centroid; it is the input of every method on the fan and wall-target runs, and
 % replaces the spiking localiser in the input ablation.
 % Periodic Kalman filter; harmonic / Fourier fit; rhythmic dynamic movement primitive.
 % Start (two are implemented, trajmem/baseline.py; the DMP only if it gets built):
@@ -237,9 +219,9 @@ An alarm is raised when $s(t)$ stays above a threshold for three consecutive ste
 
 \subsection{Evaluation Protocol}
 \label{sec:protocol}
-The real recordings are never used for training or fine-tuning and are divided in advance into development recordings, which were used freely while building the system and to choose the alarm constant, and held-out recordings, which were labelled last and scored once, after every setting had been fixed. The alarm constant is the smallest value that detects every deviation in the development recordings without a false alarm, and it is applied unchanged to the held-out ones.
+The live runs are never used for training or fine-tuning and are divided in advance into development runs, which were used freely while building the system and to choose the alarm constant, and held-out runs, which were labelled last and scored once, after every setting had been fixed. Every method's deviation score raises an alarm when it stays for 15~ms above a threshold set from the score itself: its median over the last 2~s plus $k$ times its spread, never raised once lowered. The alarm constant $k$ is set for each input as the smallest value that detects every deviation in the development runs without a false alarm, and it is applied unchanged to the held-out ones.
 
-Every method, spiking or classical, receives the same stream of positions, one every 5~ms, from the same localiser, and none is given the period of the motion. The classical baselines estimate the period from the first 5~s of each recording and keep it, while the memory finds it through its clock. Prediction errors are measured from the sixth second of a recording, once every method has had time to learn the motion, and up to the start of any deviation.
+Every method, spiking or classical, receives the same stream of positions, one every 5~ms, from the same localiser, and none is given the period of the motion. The classical baselines estimate the period from the first 5~s of each run and keep it, while the memory finds it through its clock. Prediction errors are measured from the sixth second of a run, once every method has had time to learn the motion, and up to the start of any deviation.
 
 \subsection{Metrics}
 % Prediction error at the horizon; lock-on time; deviation-detection ROC and median latency.
@@ -249,7 +231,7 @@ Every method, spiking or classical, receives the same stream of positions, one e
 % as the median of per-clip medians; lock-on = first time after which the error stays under
 % a tolerance for the rest of the clip, in seconds and in cycles, tolerance stated per
 % regime; deviation: positives are steps at or after the break, AUC is Mann--Whitney over
-% the score, a flag is the alarm of the Deviation Score section (refer, don't redefine),
+% the score, a flag is the alarm of the Evaluation Protocol (refer, don't redefine),
 % latency is the first flag after the break, false alarms are flags per minute on
 % negatives. Decide and state here how the pendulum's
 % constant label offset is handled: subtract the per-clip median offset, or score prediction
@@ -257,30 +239,24 @@ Every method, spiking or classical, receives the same stream of positions, one e
 
 \section{Results}
 \label{sec:results}
-% DRAFT (2026-09-25, overnight). Numbers from scripts/paper_results.py + paper_figures.py
-% (runs/paper/, tables in runs/paper/tables.tex). Held-out = the three pendulum clips, each
-% scored once; the fan, wall-target and 4a held-out clips are not labelled yet. Pendulum
-% positions are scored against the labels as they stand; fan and wall target with each
-% clip's constant label offset removed (Section~\ref{sec:setup}).
+Every result below comes from a live run of the pipeline: events are processed in the order they arrive, one 5~ms step at a time, and each output uses only the events seen so far, as with the camera connected. With the localiser and the memory running side by side on a laptop CPU (Intel Core i7-12650H), a 5~ms step takes 4.0--4.4~ms on average, so the pipeline keeps up with the camera in real time. The runs were recorded so that every method could be given exactly the same input and scored afterwards against the hand labels.
 
 \subsection{Localiser}
 \label{sec:res-localiser}
-On the pendulum, the spiking localiser places the target far closer to the labelled point than the classical centroid does (Fig.~\ref{fig:localiser}). Over the six pendulum recordings, its median distance from the label is 14~px (90th percentile 28~px), against 65~px (125~px) for the centroid. The gap is widest on the held-out recordings, 12 against 98~px, where the centroid settles on a different part of the target than the one marked. Most of the centroid's error is a constant offset: removing it per recording leaves 8--40~px, against 8--13~px for the spiking localiser. On the fan and the wall target, which the simulator resembles less closely, the spiking localiser brings no gain (fan 10~px against the centroid's 5~px; wall target 17--23~px for both), and the classical centroid remains their input in what follows.
+On the pendulum, the spiking localiser places the target far closer to the labelled point than the classical centroid does (Fig.~\ref{fig:localiser}). Over the six pendulum runs, its median distance from the label is 14~px (90th percentile 28~px), against 65~px (125~px) for the centroid. The gap is widest on the held-out runs, 12 against 98~px, where the centroid settles on a different part of the target than the one marked. Most of the centroid's error is a constant offset: removing it per run leaves 8--40~px, against 8--13~px for the spiking localiser. On the fan and the wall target, the spiking localiser, fine-tuned on simulated pendulum motion only, brings no gain (fan 10~px against the centroid's 5~px; wall target 17--23~px for both), and the classical centroid remains their input in what follows.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{results_localiser}
-\caption{Localisation error on the six pendulum recordings (development and held-out), against the hand labels as they stand. The spiking localiser was trained on simulated data only.}
+\caption{Localisation error on the six pendulum runs (development and held-out), against the hand labels as they stand. The spiking localiser was trained on simulated data only.}
 \label{fig:localiser}
 \end{figure}
 
 \subsection{Prediction and Path Memory}
 \label{sec:res-prediction}
-Table~\ref{tab:pendulum} and Fig.~\ref{fig:horizon} give the prediction error of the full spiking pipeline on the pendulum. At short horizons the spiking memory is close to the classical periodic baselines: on the held-out recordings its median error is 14.2~px at 50~ms, against 12.2~px for the periodic Kalman filter and 10.5~px for the harmonic fit. As the horizon grows it falls behind them, reaching 18.0~px at 100~ms and 24.4~px at 200~ms, while both baselines stay near 11--14~px. On the development recordings the three methods are within 4~px of each other up to 100~ms. All three periodic methods do far better than a constant-velocity extrapolator beyond 50~ms, whose error grows with the horizon to 60~px at 200~ms on the held-out recordings.
+Table~\ref{tab:pendulum} and Fig.~\ref{fig:horizon} give the prediction error of the full spiking pipeline on the pendulum. At short horizons the spiking memory is close to the classical periodic baselines: on the held-out runs its median error is 14.2~px at 50~ms, against 12.2~px for the periodic Kalman filter and 10.5~px for the harmonic fit. As the horizon grows it falls behind them, reaching 18.0~px at 100~ms and 24.4~px at 200~ms, while both baselines stay near 11--14~px. On the development runs the three methods are within 4~px of each other up to 100~ms. All three periodic methods do far better than a constant-velocity extrapolator beyond 50~ms, whose error grows with the horizon to 60~px at 200~ms on the held-out runs.
 
-The remembered path matches the labelled one to a median of 18~px on the held-out recordings (Kalman 14~px, harmonic fit 12~px), and the clock settles within 4\% of the true period on every pendulum recording, always slightly short. The baselines reach their steady error at the end of their five-second warm-up; the memory, which has no warm-up, reaches it about a second later, once its clock has locked and its map has filled, within five to six swings. On the fan and the wall target (Table~\ref{tab:other}), with the classical centroid as input, the ranking is the same at short horizons (15.3~px at 100~ms against 12.3~px for the Kalman filter); the harmonic fit is the least accurate predictor there but recalls the path best.
-% NOTE for Sagi: this is weaker than the introduction's "on par" -- behind at 200 ms on the
-% held-out pendulum. Revisit the claim in Section I or name the horizon it holds at.
+The remembered path matches the labelled one to a median of 18~px on the held-out runs (Kalman 14~px, harmonic fit 12~px), and the clock settles within 4\% of the true period on every pendulum run, always slightly short. The baselines reach their steady error at the end of their five-second warm-up; the memory, which has no warm-up, reaches it about a second later, once its clock has locked and its map has filled, within five to six swings. On the fan and the wall target (Table~\ref{tab:other}), with the classical centroid as input, the spiking memory again trails the Kalman filter (15.3 against 12.3~px at 100~ms); the harmonic fit is the least accurate of the periodic methods there but recalls the path best. On the wall-target run with a deviation, the clock locked on to half the period of the motion, and it is there that the spiking memory's remembered path is furthest from the labelled one (26~px).
 
 \begin{table}[t]
 \caption{Pendulum, full spiking pipeline, against the labels as they stand}
@@ -294,14 +270,14 @@ The remembered path matches the labelled one to a median of 18~px on the held-ou
 \cmidrule(lr){2-4}
 Memory & 50\,ms & 100\,ms & 200\,ms & (px) & AUC & (s) & al./min \\
 \midrule
-\multicolumn{8}{l}{\emph{Held-out (3 recordings, 1 with a deviation)}} \\
+\multicolumn{8}{l}{\emph{Held-out (3 runs, 1 with a deviation)}} \\
 \textbf{Spiking clock-and-map} & 14.2 & 18.0 & 24.4 & 18.0 & 0.98 & 0.07 & 0.0 \\
 Clock-and-map, arith. & 13.8 & 18.3 & 25.9 & 16.8 & 0.99 & 0.26 & 0.0 \\
 Periodic Kalman & 12.2 & 13.7 & 11.2 & 14.1 & 1.00 & 0.67 & 14.4 \\
 Harmonic fit & 10.5 & 10.9 & 11.3 & 11.5 & 0.63 & -- & 1.4 \\
 Constant velocity & 19.5 & 30.5 & 60.4 & -- & 0.70 & -- & 0.0 \\
 \midrule
-\multicolumn{8}{l}{\emph{Development (3 recordings, 1 with a deviation)}} \\
+\multicolumn{8}{l}{\emph{Development (3 runs, 1 with a deviation)}} \\
 \textbf{Spiking clock-and-map} & 19.6 & 22.6 & 30.4 & 21.7 & 0.99 & 0.32 & 0.0 \\
 Clock-and-map, arith. & 18.1 & 19.6 & 22.8 & 17.5 & 1.00 & 0.29 & 0.0 \\
 Periodic Kalman & 21.7 & 21.3 & 20.7 & 20.1 & 0.99 & 0.16 & 1.0 \\
@@ -310,7 +286,7 @@ Constant velocity & 28.7 & 45.8 & 102.9 & -- & 0.67 & -- & 0.0 \\
 \bottomrule
 \end{tabular}
 \\[2pt]
-{\scriptsize Errors and path: medians over recordings. AUC and latency: the recording with a deviation. False alarms: mean over recordings. A latency is left out where the detector does not separate the deviation (AUC $<$ 0.75).}
+{\scriptsize Errors and path: medians over runs. AUC and latency: the run with a deviation. False alarms: mean over runs. A latency is left out where the detector does not separate the deviation (AUC $<$ 0.75).}
 \end{table}
 
 \begin{table}[t]
@@ -333,7 +309,7 @@ Constant velocity & 12.0 & 17.9 & 47.3 & -- & 0.33 & -- & 0.0 \\
 \bottomrule
 \end{tabular}
 \\[2pt]
-{\scriptsize Three recordings; one contains a deviation.}
+{\scriptsize Three runs; one contains a deviation.}
 \end{table}
 
 \begin{figure*}[t]
@@ -345,28 +321,28 @@ Constant velocity & 12.0 & 17.9 & 47.3 & -- & 0.33 & -- & 0.0 \\
 
 \subsection{Deviation Detection}
 \label{sec:res-deviation}
-The deviation signal is where the spiking memory stands out (Table~\ref{tab:pendulum}, Fig.~\ref{fig:break}). On the held-out pendulum deviation it raises its alarm 0.07~s after the deviation begins, with an AUC of 0.98 and no false alarm on any of the three held-out recordings. The periodic Kalman filter separates the deviation as well (AUC 1.00) but flags it only after 0.67~s, and raises 14 false alarms per minute on steady motion, 38 on one recording. The harmonic fit barely separates the deviation (AUC 0.63). The same holds on the development recordings: the spiking memory detects both deviations (pendulum and wall target) without a single false alarm, while the Kalman filter raises 45 false alarms per minute on the fan and wall-target recordings. The alarm threshold was chosen on the development recordings and applied unchanged to the held-out ones; with a single deviation per group, these latencies are indicative rather than statistical.
+The deviation signal is where the spiking memory stands out (Table~\ref{tab:pendulum}, Fig.~\ref{fig:break}). On the held-out pendulum deviation it raises its alarm 0.07~s after the deviation begins, with an AUC of 0.98 and no false alarm in any of the three held-out runs. The periodic Kalman filter separates the deviation as well (AUC 1.00) but flags it only after 0.67~s, and raises 14 false alarms per minute on steady motion, 38 in one run. The harmonic fit barely separates the deviation (AUC 0.63). On the development runs the spiking memory again detects both deviations, on the pendulum and on the wall target, without a single false alarm, though not always first: it flags them after 0.32 and 0.33~s, against 0.16~s for the Kalman filter on the pendulum and for the arithmetic clock-and-map on the wall target, the latter at the cost of 8 false alarms per minute. The Kalman filter raises 45 false alarms per minute on the fan and wall-target runs. The alarm threshold was chosen on the development runs and applied unchanged to the held-out ones; with a single deviation per group, these latencies are indicative rather than statistical.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{results_break}
-\caption{A held-out pendulum recording with a deviation, full spiking pipeline. Top: the target's horizontal position and the 100~ms prediction. Middle and bottom: each method's deviation score over its own alarm bar (dashed line at 1); red lines mark alarm onsets.}
+\caption{A held-out pendulum run with a deviation, full spiking pipeline. Top: the target's horizontal position and the 100~ms prediction. Middle and bottom: each method's deviation score over its own alarm bar (dashed line at 1); red lines mark alarm onsets.}
 \label{fig:break}
 \end{figure}
 
 \subsection{Ablations}
 \label{sec:res-ablations}
 % CITE: Voelker2019Legendre missing from refs.bib -- Voelker, Kajic & Eliasmith, "Legendre Memory Units", NeurIPS 2019.
-\emph{Learned memories.} The two memories that learn the cycle as network dynamics, a recurrent network of fast and slow LIF layers trained on simulated tracks and a spiking Legendre Memory Unit \cite{Voelker2019Legendre} that records a window of the past, do not hold the cycle (Fig.~\ref{fig:paths}). On the development pendulum recordings their remembered paths are 95 and 64~px from the labelled one, with periods 1.89 and 1.26 times the true one, and their 100~ms errors are 32 and 45~px against 23~px for the clock-and-map memory.
+\emph{Learned memories.} The two memories that learn the cycle as network dynamics, a recurrent network of fast and slow LIF layers trained on simulated motion and a spiking Legendre Memory Unit \cite{Voelker2019Legendre} that records a window of the past, do not hold the cycle (Fig.~\ref{fig:paths}). On the development pendulum runs their remembered paths are 95 and 64~px from the labelled one, with periods 1.89 and 1.26 times the true one, and their 100~ms errors are 32 and 45~px against 23~px for the clock-and-map memory.
 
-\emph{Spiking against arithmetic.} The clock-and-map memory written as plain arithmetic predicts within 0.5~px of the spiking one on the held-out pendulum up to 100~ms and detects the deviation equally well (AUC 0.99 against 0.98). The spiking version costs accuracy only at the longest horizon on the development recordings (30.4 against 22.8~px at 200~ms).
+\emph{Spiking against arithmetic.} The clock-and-map memory written as plain arithmetic predicts within 0.5~px of the spiking one on the held-out pendulum at 50 and 100~ms and separates the deviation as well (AUC 0.99 against 0.98), though it flags it later (0.26 against 0.07~s). On the development runs the spiking version costs some accuracy, mostly at the longest horizon (30.4 against 22.8~px at 200~ms, 22.6 against 19.6~px at 100~ms).
 
-\emph{Input.} With the classical centroid in place of the spiking localiser, the spiking memory's 100~ms error against the pendulum labels rises from 18--32~px to 27--49~px on the development recordings and from 11--22~px to 76--130~px on the held-out ones, so on this setup the localiser sets the accuracy the whole pipeline can reach.
+\emph{Input.} With the classical centroid in place of the spiking localiser, the spiking memory's 100~ms error against the pendulum labels rises from 18--32~px to 27--49~px on the development runs and from 11--22~px to 76--130~px on the held-out ones, mostly through the centroid's constant offset from the marked point (Section~\ref{sec:res-localiser}); on this setup the localiser sets the accuracy the whole pipeline can reach.
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{results_paths}
-\caption{The remembered cycle of each memory just before the deviation in a development pendulum recording, over the labelled path of the preceding 6~s (grey), all through the spiking localiser. Only the clock-and-map memory and the Kalman filter hold the swing.}
+\caption{The remembered cycle of each memory just before the deviation in a development pendulum run, over the labelled path of the preceding 6~s (grey), all through the spiking localiser. Only the clock-and-map memory and the Kalman filter hold the swing.}
 \label{fig:paths}
 \end{figure*}
 

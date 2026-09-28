@@ -25,9 +25,8 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 | III    | Method (opening paragraph) | reviewed    | —                   | —                        |
 | III-A  | Problem Definition         | reviewed    | —                   | —                        |
 | III-B  | Event Input                | reviewed    | —                   | —                        |
-| III-C  | Spiking Localiser          | in review   | —                   | Sagi's notes             |
-| III-D  | Trajectory-Memory Network  | drafted     | —                   | half-period fix          |
-| III-E  | Deviation Score            | drafted     | —                   | —                        |
+| III-C  | Spiking Localiser          | reviewed    | —                   | —                        |
+| III-D  | Trajectory-Memory Network  | reviewed    | —                   | half-period fix          |
 | IV-A   | Event-Camera Simulator     | writable    | —                   | —                        |
 | IV-B   | Real Recordings            | writable    | —                   | —                        |
 | IV-C   | Baselines                  | writable    | —                   | —                        |
@@ -63,7 +62,7 @@ Notes on the rows:
   specs in `docs/superpowers/specs/`.
 - **V-D** — `PLAN.md` phase C (ablations); `docs/snn-experiments-log.md`;
   `materials/02-methods/legendre-memory-unit.md`.
-- **III-E** — `materials/01-literature/deviation-and-novelty.md`.
+- **III-D deviation, IV-D alarm** — `materials/01-literature/deviation-and-novelty.md`.
 - **IV-A** — `materials/02-methods/simulation-with-v2e.md`; `trajmem/simulate.py`; `params.yaml`.
 - **IV-B, Fig. 2** — `RECORDING_LOG.md`; `corpus/sets.yaml`; `corpus/real/`.
 - **IV-C** — `materials/02-methods/{kalman-periodic,rhythmic-dmp}.md`;
@@ -88,8 +87,7 @@ Sagi's, managed outside the repo; the state it was in when he took it over is
 
 ## Pending
 
-**Review** (drafted, not yet reviewed), in paper order: §III-C (in review), §III-D, §III-E,
-§IV-D, §V-A–D.
+**Review** (drafted, not yet reviewed), in paper order: §IV-D, §V-A–D.
 
 **Write**, in suggested order:
 
@@ -142,9 +140,13 @@ Writing early buys speed and costs staleness. Nothing is *final* until these are
       missing `OKeefe1971Hippocampus`, `MacNeil2011Fine`, `Voelker2019Legendre` (each has a
       `% CITE:` comment in `main.tex`); `Alberico2025Egocentric` has the last author
       reversed and is the arXiv version, not CVPR Workshops 2025; `Harvey2002Forecasting` is
-      a 2-page *Wilmott* piece, not Harvey's 1989 book (doi:10.1017/CBO9781107049994).
-- [ ] If the paper claims the system runs live, any per-frame time it reports is measured on
-      mains power (a battery-save run gave 0.65× real time).
+      a 2-page *Wilmott* piece, not Harvey's 1989 book (doi:10.1017/CBO9781107049994);
+      `Eshraghian2022Training` and `Neftci2019Surrogate` are the arXiv versions, not
+      *Proc. IEEE* 2023 and *IEEE Signal Processing Magazine* 2019 (BIBLIOGRAPHY.md has both).
+- [x] Real-time claim: `scripts/time_live.py`, mains power, held-out pendulum runs. With
+      localiser and memory overlapped (separate processes, identical outputs) a 5 ms frame
+      costs 4.0–4.4 ms (1.15–1.26×); one after the other it is 5.2–5.5 ms (0.91–0.96×).
+      §V opening quotes the overlapped number. Re-run it if either network changes.
 - [ ] §III-B, §IV-A, §IV-C holes filled with real values.
 - [ ] §IV-B describes ground truth as hand-labelled and interpolated, for every setup.
 - [ ] Abstract written last, matching the results.

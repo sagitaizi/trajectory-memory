@@ -14,12 +14,13 @@ targeted at **IEEE MCSoC 2026** (8 pages, submission 2026-10-10).
 
 ## The funnel
 
-The SNN's input gets harder in two stages. Stage 1 is the goal; Stage 2 is upside.
+The SNN's input gets harder in two stages. Stage 1 is the goal; Stage 2 is dropped for the
+submission (future work).
 
 | Stage | SNN input | SNN does | Role |
 |---|---|---|---|
 | 1 | accumulated event frames | localise target + memorise path + predict + flag deviation | **goal** |
-| 2 | raw events, end-to-end | same, no framing step | upside, only if Stage 1 lands |
+| 2 | raw events, end-to-end | same, no framing step | future work, not in the submission |
 | fallback | classical centroid → memory core | memory/predict/deviation only, reported with an asterisk | ablation + safety net |
 
 Re-learning a *new* path after a break, and the attention-span mechanism, are **out of scope**
@@ -66,7 +67,7 @@ Package `trajmem/`. One file, one job.
 | `baseline.py` | Non-SNN comparators (`PeriodicKalman`, `HarmonicFit`, `Extrapolator`). Same interface as `model.py`. |
 | `metrics.py` | Prediction error, path shape, lock-on time, deviation AUC / latency / false alarms, the ratcheting alarm. |
 | `experiment.py` | `evaluate_clip` (the one loop every method goes through), `score_trace`, clip sets, `run_set`, `make_memory`, `make_localiser`. |
-| `scripts/` | `make_sim_dataset`, `match_sim_real`, `evaluate`, `run_experiment`, `train_localiser`, `check_localiser`, `replay_gt`, `bench`, `make_tracks`, `make_frames`, `corpus_summary`, the `mark_*` labelling tools. `README.md` lists the commands. |
+| `scripts/` | `make_sim_dataset`, `match_sim_real`, `evaluate`, `run_experiment`, `train_localiser`, `check_localiser`, `replay_gt`, `bench`, `time_live`, `make_tracks`, `make_frames`, `corpus_summary`, the `mark_*` labelling tools. `README.md` lists the commands. |
 
 ## Key conventions
 

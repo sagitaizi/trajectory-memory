@@ -22,11 +22,11 @@ target); offset-removed numbers are a secondary column.
 
 | Phase | State |
 |---|---|
-| A — Data | 🟨 Real corpus recorded and split; development set labelled; sim corpus generated. Held-out pendulum clips labelled and **scored once** (2026-09-25, `scripts/paper_results.py --final`, `runs/paper/held_out/`); settings frozen for them from here. **Open: label the other held-out clips.** |
+| A — Data | 🟨 Real corpus recorded and split; development set labelled; sim corpus generated. Held-out pendulum clips labelled and **scored once** (2026-09-25, `scripts/paper_results.py --final`, `runs/paper/held_out/`); settings frozen for them from here. The other held-out clips stay unlabelled: dropped for the submission. |
 | B — Frontend + baselines | ✅ |
-| C — Trajectory memory, Stage 1 | 🟨 **In progress.** Memory (clock and map, `snn_phasemap`) built: at the Kalman bar on prediction, better on path and deviation (development). Pendulum localiser `pend_ft.pt` beats the centroid on the pendulum. **Open: the half-period lock; the held-out set.** |
-| D — Deviation detection | ✅ Label-free ratcheting alarm, k calibrated per position input on development (centroid 25, `pend_ft` 30): AUC 0.98, 0.23 s, no false alarms (Kalman 0.86, 39.9/min). Held-out pending labels. |
-| E — Raw events, Stage 2 | ⬜ Only if Stage 1 lands. |
+| C — Trajectory memory, Stage 1 | 🟨 **In progress.** Memory (clock and map, `snn_phasemap`) built: at the Kalman bar on prediction, better on path and deviation (development). Pendulum localiser `pend_ft.pt` beats the centroid on the pendulum. **Open: the half-period lock.** |
+| D — Deviation detection | ✅ Label-free ratcheting alarm, k calibrated per position input on development (centroid 25, `pend_ft` 30): AUC 0.98, 0.23 s, no false alarms (Kalman 0.86, 39.9/min). Held-out: the pendulum break (below). |
+| E — Raw events, Stage 2 | Dropped for the submission; future work. |
 | F — Paper | 🟨 Written as sections unlock; draft due 2026-10-01. |
 
 ## A — Data
@@ -143,7 +143,7 @@ target); offset-removed numbers are a secondary column.
   Prediction ties the Kalman; path and deviation are better. Known weak cases: the
   diagonal sweep locks at half the period; a 3:2 Lissajous has nothing at the fundamental
   to lock to. **Open: the half-period lock (Sagi checks it in the replay first); a fast
-  layer for the 25–50 ms horizons; the held-out set (scored once, at the end).**
+  layer for the 25–50 ms horizons.**
 - **Ablations** (the learned memories that could not hold the cycle; full record in
   `docs/snn-experiments-log.md`, short version `docs/snn-experiments-summary.md`):
   the two-timescale network (`snn.py`, `runs/memory/snn_anchor20.pt`) predicts 10.2 px at
@@ -189,16 +189,16 @@ target); offset-removed numbers are a secondary column.
   0.23 s, 0.00 false alarms/min; arithmetic prototype 1.00, 0.15 s, 0.00; Kalman 0.86,
   0.42 s, **39.9**; harmonic 0.72, 0.14 s, 0.00.
 - Held-out pendulum break (`small_break`, full spiking pipeline): AUC 0.98, 0.07 s, no false
-  alarms (Kalman 1.00, 0.67 s). **Open:** the other held-out break clips, once labelled.
+  alarms (Kalman 1.00, 0.67 s).
 
-## E — Raw events, Stage 2 (upside)
+## E — Raw events, Stage 2 (dropped for the submission)
 
 - `frontend.to_raw` (1 ms bins) and an end-to-end variant behind the same interface.
 - **Done when:** it runs on real clips with a prediction-error number, even if worse.
 
 ## F — Paper
 
-Per-section status in `PAPER_PROGRESS.md`. Results table: baseline vs Stage 1 (vs Stage 2),
+Per-section status in `PAPER_PROGRESS.md`. Results table: baseline vs Stage 1,
 prediction + deviation; one external-dataset generalisation check; 8 pages IEEE.
 
 ## Decision gate G-F — framework for the SNN core ✅
@@ -222,4 +222,4 @@ on the RTX 3060; SpikingJelly and CuPy are installed but unpinned.
 ## Out of scope (future work)
 
 Re-learning a new pattern after a break; attention across multiple objects; closing the loop
-to the pan-tilt rig.
+to the pan-tilt rig; Stage 2 (raw events, end-to-end).

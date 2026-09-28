@@ -30,8 +30,8 @@ STYLE = {  # memory -> (label, colour, line style, marker)
     "kalman": ("Periodic Kalman", "#eb6834", "-", "s"),
     "harmonic": ("Harmonic fit", "#1baf7a", "-", "^"),
     "constant_velocity": ("Constant velocity", "#8a8985", (0, (1, 1.2)), "D"),
-    "snn_two_layer": ("Learned two-timescale SNN", "#4a3aa7", "-", "v"),
-    "snn_lmu": ("LMU window SNN", "#e87ba4", "-", "P"),
+    "snn_two_layer": ("Fast and slow LIF network", "#4a3aa7", "-", "v"),
+    "snn_lmu": ("Spiking LMU", "#e87ba4", "-", "P"),
 }
 TRUTH = "#8a8985"
 
@@ -192,7 +192,7 @@ def fig_paths(set_name, clip, name="results_paths", input_name="snn") -> None:
         closed = np.vstack([cyc, cyc[:1]])
         label, colour, _, _ = STYLE[m]
         ax.plot(closed[:, 0], closed[:, 1], color=colour, lw=1.3)
-        ax.set_title(label.replace(" (ours)", "\n(ours)").replace(" SNN", "\nSNN").replace("Periodic ", "Periodic\n"),
+        ax.set_title(label.replace(" (ours)", "\n(ours)").replace(" LIF network", "\nLIF network").replace("Spiking LMU", "Spiking\nLMU").replace("Periodic ", "Periodic\n"),
                      fontsize=7, loc="left")
         ax.set_aspect("equal")
         ax.tick_params(labelsize=6)
