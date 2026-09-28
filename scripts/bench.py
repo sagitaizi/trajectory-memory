@@ -9,7 +9,8 @@ the all-spiking chain -- so one iteration of the SNN can be eyeballed against th
 
 Rendering writes runs/bench/<tag>/<clip>.mp4 at true speed (the pipelines are stepped
 offline at their real 5 ms window) plus an index.md. Live mode plays the same three
-panels in a window at whatever speed the CPU allows, with the speed shown.
+panels in a window at whatever speed the CPU allows, with the speed shown; there the
+spiking localiser runs in its own process, overlapping the memory as it would live.
 """
 from __future__ import annotations
 
@@ -65,14 +66,55 @@ def sim_status(clip_name: str, localiser) -> str:
     return "not trained on" if clip_name in val else "trained on"
 
 
+def _feed_positions(clip_path: str, checkpoint, window_us: int, q) -> None:
+    """Child process: the spiking localiser over the clip, one (t, x, y) per window."""
+    from trajmem.experiment import make_localiser, positions
+
+    clip, _ = open_clip(clip_path)
+    localiser = make_localiser("snn", checkpoint)
+    q.put("ready")
+    for w in positions(clip, window_us, localiser):
+        q.put(w)
+    q.put(None)
+
+
+class LocaliserProcess:
+    """The spiking localiser in its own process, a few windows ahead of the memory, so the
+    two stages overlap instead of adding up (scripts/time_live.py measures the gain)."""
+
+    def __init__(self, clip_path, checkpoint, window_us: int, ahead: int = 8):
+        import multiprocessing as mp
+
+        self.q = mp.Queue(maxsize=ahead)
+        self.proc = mp.Process(target=_feed_positions, args=(str(clip_path), checkpoint, window_us, self.q),
+                               daemon=True)
+        self.proc.start()
+
+    def wait_ready(self) -> None:
+        """Block until the child has loaded its localiser, so play starts at full speed."""
+        if self.q.get() != "ready":
+            raise RuntimeError("localiser process failed to start")
+
+    def __iter__(self):
+        while (w := self.q.get()) is not None:
+            yield w
+
+    def close(self) -> None:
+        if self.proc.is_alive():
+            self.proc.terminate()
+        self.proc.join()
+
+
 def make_overlays(clip, localiser, window_us: int, horizon_s: float, warmup_s: float,
-                  pipelines=PIPELINES) -> list[LiveOverlay]:
+                  pipelines=PIPELINES, snn_windows=None) -> list[LiveOverlay]:
+    """`snn_windows`, when given, replaces running the spiking localiser in this process."""
     from trajmem.experiment import make_memory
 
     out = []
     for label, memory, loc in pipelines:
         mem = make_memory(memory, dt_s=window_us / 1e6, warmup_s=warmup_s)
-        overlay = LiveOverlay(mem, clip, window_us, horizon_s, label, localiser if loc == "snn" else None)
+        overlay = LiveOverlay(mem, clip, window_us, horizon_s, label, localiser if loc == "snn" else None,
+                              windows=snn_windows if loc == "snn" else None)
         overlay.input_name = loc                              # which alarm constant this panel is scored with
         overlay.checkpoint = getattr(localiser, "checkpoint", None) if loc == "snn" else None
         out.append(overlay)
@@ -101,6 +143,7 @@ class Panels:
 
         clip, res = self.clip, self.clip.meta["resolution"]
         mid = t + self.view_window_s / 2
+        stepping = [self.pool.submit(ov.at, mid) for ov in self.overlays]   # the picture is built meanwhile
         img = accumulate(_window_events(clip, t, self.view_window_s), 0.0, self.view_window_s, res,
                          gain=self.view_brightness)
         if clip.gt is None:
@@ -109,7 +152,7 @@ class Panels:
             gt_px = to_pixels(clip.gt(mid), res)[0]
             trail_px = to_pixels(trail_points(clip.gt, mid, self.trail_s), res)
         panels = []
-        steps = list(self.pool.map(lambda ov: ov.at(mid), self.overlays))
+        steps = [f.result() for f in stepping]
         for k, (ov, step) in enumerate(zip(self.overlays, steps)):
             if np.isfinite(step["err_px"]):
                 self.errors[k].append(step["err_px"])
@@ -239,15 +282,27 @@ def main(argv=None) -> None:
         pool = e.get("pool", "")
         if pool.startswith("sim"):
             pool = f"{pool}, {sim_status(name, localiser)}"
-        overlays = make_overlays(clip, localiser, args.window_us, args.horizon, args.warmup, pipelines)
         header = f"{name}   [{pool}]   localiser {ckpt}"
+        if args.live:
+            feed = (LocaliserProcess(e["clip"], args.localiser_checkpoint, args.window_us)
+                    if any(loc == "snn" for _, _, loc in pipelines) else None)
+            try:
+                overlays = make_overlays(clip, localiser, args.window_us, args.horizon, args.warmup, pipelines,
+                                         snn_windows=feed)
+                panels = Panels(clip, overlays, header, args.view_window, args.view_brightness, args.trail,
+                                args.view_zoom, max_width)
+                if feed is not None:
+                    feed.wait_ready()
+                print(f"playing {name}", flush=True)
+                if play_clip(panels, args.fps) == "quit":
+                    break
+            finally:
+                if feed is not None:
+                    feed.close()
+            continue
+        overlays = make_overlays(clip, localiser, args.window_us, args.horizon, args.warmup, pipelines)
         panels = Panels(clip, overlays, header, args.view_window, args.view_brightness, args.trail, args.view_zoom,
                         max_width)
-        if args.live:
-            print(f"playing {name}", flush=True)
-            if play_clip(panels, args.fps) == "quit":
-                break
-            continue
         t0 = time.time()
         path = render_clip(panels, out_dir / f"{name.replace('/', '_')}.mp4", args.fps)
         med = ["n/a" if not errs else f"{np.median(errs):.1f}" for errs in panels.errors]

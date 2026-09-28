@@ -132,12 +132,12 @@ class LiveOverlay:
     """The memory stepped as the frames come: `at(t)` feeds it every window up to `t`
     and reports its latest output. Causal, so the picture is what the memory knew then."""
 
-    def __init__(self, memory, clip, window_us: int, horizon_s: float, name: str, localiser=None):
+    def __init__(self, memory, clip, window_us: int, horizon_s: float, name: str, localiser=None, windows=None):
         from trajmem.experiment import positions
 
         self.memory, self.clip, self.name, self.horizon_s = memory, clip, name, horizon_s
         self.scale = np.array(clip.meta["resolution"], dtype=float)
-        self.windows = positions(clip, window_us, localiser)
+        self.windows = iter(windows) if windows is not None else positions(clip, window_us, localiser)
         self.pending = None
         self.stepped = []                                     # (score, t) of every step the last `at` ran
         self.step = {"obs_px": np.array([np.nan, np.nan]), "pred_px": np.array([np.nan, np.nan]),

@@ -42,6 +42,7 @@ trajectory-memory/
     corpus_summary.py        verify the corpus, print the §IV-A table
     replay_gt.py             player; --model draws a memory's output live
     bench.py                 visual test bench: corpus/bench.yaml clips through three pipelines side by side, rendered per iteration (runs/bench/<tag>/) or --live
+    time_live.py             per-frame cost of the full pipeline, sequential and with localiser and memory overlapped
   tests/
   corpus/                # recorded .aedat4 + generated sim clips + GT (gitignored)
   docs/
