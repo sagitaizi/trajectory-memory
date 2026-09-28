@@ -64,7 +64,7 @@ novelty detection, neuromorphic vision
 \end{figure*}
 
 \section{Introduction}
-Sight is by far the dominant sense humans use to perceive the world around them \cite{Gallego2022Event}. The retina, a thin sheet of tissue in the eye, converts raw light into nerve signals that we then interpret as visual images. However, a flash of light can evoke a neural response in the brain with a delay of 30--100 ms \cite{Berry1999Anticipation}, during which a moving target can cover a significant distance and should therefore be seen behind its actual position. As this contradicts our daily experience, it has been suggested that the brain acts as a `prediction machine', modelling what comes next and attending to what deviates \cite{Clark2013Whatever}. This is most striking for repetitive motion, where the eyes can lock on to a moving target within a few cycles and follow it with almost no lag \cite{Barnes1991The}.
+Sight is by far the dominant sense humans use to perceive the world around them. The retina, a thin sheet of tissue in the eye, converts raw light into nerve signals that we then interpret as visual images. However, a flash of light can evoke a neural response in the brain with a delay of 30--100 ms \cite{Berry1999Anticipation}, during which a moving target can cover a significant distance and should therefore be seen behind its actual position. As this contradicts our daily experience, it has been suggested that the brain acts as a `prediction machine', modelling what comes next and attending to what deviates \cite{Clark2013Whatever}. This is most striking for repetitive motion, where the eyes can lock on to a moving target within a few cycles and follow it with almost no lag \cite{Barnes1991The}.
 
 The retina itself has a silicon counterpart \cite{Mahowald1991The}. Event cameras are low-power sensors that sample light based on the scene dynamics, and report per-pixel brightness changes as a stream of events with microsecond latency \cite{Gallego2022Event}. Spiking neural networks (SNNs) mimic the neurons behind it, computing via asynchronous discrete spikes which are sparse in time and allow for lower energy consumption and use with noisy inputs. Yet most pipelines built using them for tracking purposes react rather than anticipate---locating the target and extrapolating its position. A target that repeats its motion is exactly the case where prediction is possible, and event cameras and SNNs together are the parts from which such a biologically inspired prediction machine can be built. Such a system is useful in any application where a quick signal indicating that a target has deviated from its expected path is needed, for example in industrial inspection, robotics, and autonomous vehicles \cite{Sho2026A,Thoduka2021Using}. 
 
@@ -84,36 +84,58 @@ The rest of the paper is organised as follows--Section~\ref{sec:related} reviews
 
 \section{Related Work}
 \label{sec:related}
-% Periodic-motion models: Harvey 1989 (structural time series, trigonometric seasonal
-% component) -- phase and shape of a cycle held separately, the model behind the Kalman
-% baseline, but with the period known in advance; our clock finds it. Pair with Gams et al.
-% 2009 (adaptive oscillator + online-learned waveform, non-spiking, no deviation signal).
-% Neither is in refs.bib yet; entries in BIBLIOGRAPHY.md.
+Related work on trajectory prediction from event cameras is mostly focused on single, one-shot motions. Debat et al.~\cite{Debat2021Event} trained an SNN with unsupervised spike-timing-dependent plasticity (STDP) to predict where a thrown ball will land. More recent work predicts the flight of a ping-pong ball in real time from an event camera worn on-head \cite{Alberico2025Egocentric}, with a fitted trajectory prediction model and no spiking network. Neither works involve building a memory of a repeating path nor reporting when motion changes.
+
+Repetitive motion has been mostly modelled outside of vision. Structural time-series models track a repeating pattern as a set of rotating harmonics within a Kalman filter \cite{Harvey2002Forecasting}, but take the period as a known. Since the period is not known in our task, and as we have used this model as a baseline in our work, our implementation estimates it from the first few seconds of motion and otherwise runs it unchanged (whereas our memory finds and follows the period online). Gams et al.~\cite{Gams2009On} learn a periodic movement with no knowledge of its period by pairing an adaptive-frequency oscillator with a waveform learned online. This is the design closest to ours, but it is not spiking and learns from a robot's joints signals rather than vision.
+
+Detecting deviations as errors of prediction is also common in other settings. Video anomaly detection predicts the next frame and flags frames it predicts poorly \cite{Xu2022Motion}, and a robot's task can be monitored by memorizing the optical flow of a successful execution and comparing it to the observed one \cite{Thoduka2021Using}. In our system, the normal motion is learned online, and the deviation is read from the same memory that predicts.
 
 \section{Method}
 \label{sec:method}
 
 Our proposed system is a spiking pipeline built from two stages of SNNs as seen in Fig.~\ref{fig:pipeline}. Events from the camera are accumulated into short 5ms frames from which a spiking localiser estimates the target's position in the scene. Given this constant stream of positions, the trajectory memory SNN learns the target's path, predicts where the target will be a short time ahead, and flags when motion departs from the estimated path. The localiser is trained once on simulated data only and kept fixed, while the memory is not trained in advance and learns online. Section~\ref{sec:problem} defines the task while the event input, localiser, memory and the deviation score are described in Sections~\ref{sec:input}--\ref{sec:deviation}.
 
-\subsection{Problem Setup}
+\subsection{Problem Definition}
 \label{sec:problem}
-A static event camera observes a single target moving along a repetitive path. Let $p(t)$ denote the target's position in the image at time $t$, in pixels. The motion is repetitive in the sense that $p(t+T) \approx p(t)$ for a period $T$ of about one to a few seconds, which is not known in advance. The approximation is deliberate: real motion drifts, its amplitude decays or grows, and its period varies slightly from cycle to cycle, and these natural variations are part of the normal motion.
+A static event camera is placed in front of an object moving along a certain path. Let $p(t)$ be the target's actual position in the image at time $t$ in the camera frame ($640\times480$ pixels). Motion is repetitive--$p(t+nT) \approx p(t)$ for a period $T$ which is not known in advance. Events are generated by the target's motion and arrive as a stream of asynchronous brightness changes.
 
-From the event stream alone, and processing it once in the order it arrives, the system must produce two outputs at every time step: a prediction $\hat{p}(t+h)$ of the target's position a fixed horizon $h$ ahead, and a scalar deviation score $s(t)$. We report horizons of 25 to 200~ms, with $h = 100$~ms as the main one. A deviation is a change after which the motion no longer follows the learned path, such as a push that changes the amplitude or the direction of the swing, or a change in speed; the score should stay low under natural variations and rise quickly after a deviation. Neither the path, nor its period, nor the time of a deviation is given to the system. Re-learning a new path after a deviation is left for future work.
+At every time step $t$ the system must produce two outputs from this event stream: a prediction $\hat{p}(t+h)$ of the target's position a fixed horizon $h$ ahead ranging from 25 to 200~ms, with $h = 100$~ms as the main one, and a scalar deviation score $s(t)$. A deviation is defined as a change in the target's motion after which the learned path is considered no longer followed, such as a push that changes the amplitude or direction of the swing or a change in speed. A high deviation score suggests such a change has occured and the system must alert it as fast as possible.
 
 \subsection{Event Input}
 \label{sec:input}
-The events are recorded with a DVXplorer event camera ($640\times480$ pixels) held still. Each event $e=(x, y, t, q)$ reports a brightness change at pixel $(x, y)$ at time $t$, with polarity $q$ marking an increase (ON) or a decrease (OFF). The stream is cut into consecutive windows of 5~ms, and each window is accumulated into a frame of two channels, counting the ON and the OFF events at every pixel. The frames are then reduced $8\times$ by summing $8\times8$ blocks, giving a $2\times60\times80$ input for every 5~ms step. The window length sets how often the system produces an output and how long it waits for its input, and is the main latency parameter of the pipeline.
+All (non-simulated) events are recorded with a DVXplorer event camera with a resolution of $640\times480$ pixels. Each event $e=(x, y, t, q)$ is a single brightness change at pixel $(x, y)$ at time $t$, with polarity $q$ marking an increase (ON) or a decrease (OFF). The stream is divided into consecutive windows of 5~ms each accumulated into a frame of two channels, one for ON and one for OFF events at every pixel. The frames are then reduced by $8\times$ by summing $8\times8$ pixels blocks, giving a $2\times60\times80$ (channels $\times$ height $\times$ width) input size for every 5~ms step. The window length sets how often the system produces an output and how long it waits for its input, and is the main latency parameter of the pipeline.
 
-As a classical alternative to the spiking localiser, used as input by the baselines and in the ablations, the target's position is also estimated directly from the events: the events of a window are counted in cells of $16\times16$ pixels, the cells holding at least 30\% of the fullest one are kept, and the position is the mean of their events. This keeps the estimate on the dense target rather than on noise spread over the sensor or on a thin string above a hanging target, and we refer to it as the classical centroid.
-
-\subsection{Localiser}
+\subsection{Spiking Localiser}
 \label{sec:localiser}
-The localiser is a convolutional spiking network that runs once per frame and carries the state of its neurons from one frame to the next (Fig.~\ref{fig:pipeline}, Stage~1). Two convolutional layers of $5\times5$ filters with a stride of 2 map the input to 16 feature maps of $30\times40$ and then to 32 feature maps of $15\times20$, and a fully connected layer of 256 neurons follows. All three layers are made of leaky integrate-and-fire (LIF) neurons, whose membrane potential integrates the input, leaks with a time constant of 10--20~ms, and emits a spike when it crosses a threshold. The leak gives the network a short memory of the last few frames, so a frame with few events is still read in the light of the frames before it.
+% numbered offline review notes:
+% 1. "runs once per frame" - what does 'runs' mean in this context?
+% 2. what does convulutional mean in the spiking sense?
+% 3. first paragraph needs more explanations on what "feature maps" and "place cells" mean, perhaps with a cite to the biological reference or to another paper using a similar concept if we have used any in our bibliography.
+% 4. "Two convolutional layers of $5\times5$ filters with a stride of 2 map the input to 16 feature maps of $30\times40$ and then to 32 feature maps of $15\times20$, and a fully connected layer of 256 neurons follows." - this is a big part of the implemention and it is mentioned briefly and not in enough detail. We need to detail more about each layer's significance to the pipeline.
+Given the raw event frames, the localiser is responsible for locating the target in each one of them (Fig.~\ref{fig:pipeline}, Stage~1). It is a convolutional spiking network where each layer is composed of feature maps, grids of leaky integrate-and-fire (LIF) neurons, each neuron receiving a weighted sum of the spikes in a small patch of the layer below. All neurons of a map use the same set of weights, called a filter, so the map detects one pattern and shows where in the input it appears. A LIF neuron $i$ sums its input current $I_i$ into a membrane potential $U_i$ that leaks, and spikes when $U_i$ crosses a threshold $\theta$, after which $\theta$ is subtracted:
+\begin{equation}
+U_i[t] = \beta_i U_i[t-1] + I_i[t] - \theta S_i[t-1], \quad S_i[t] = H\big(U_i[t]-\theta\big),
+\end{equation}
+where $H$ is the step function and $\beta_i = e^{-\Delta t/\tau_i}$, with $\Delta t = 5$~ms and $\tau_i$ spread over 10--20~ms. The leak gives the network a memory of the last few frames, so a frame with few events is still read in the light of the frames before it.
 
-The spikes of the last layer are smoothed with a 15~ms filter and read out linearly into 65 values: 32 place cells for $x$, 32 for $y$, and a single unit that indicates whether the target is visible at all. Each place cell stands for one position along its axis, and the position is read as the centre of mass of the cells' activity along each axis. When the target is reported as not visible, the step is passed on to the memory as unseen and is skipped.
+The first layer has 16 feature maps of $30\times40$ neurons, each seeing $5\times5$ input cells ($40\times40$ pixels), and can respond to local patterns of ON and OFF events such as the edges of a moving object. The second has 32 maps of $15\times20$, each neuron seeing $13\times13$ cells ($104\times104$ pixels), enough to hold the whole target and so to tell it apart from a thin string or a single noisy pixel. Both use filters of $5\times5$ with a stride of 2. A fully connected layer of 256 LIF neurons then sees the whole image at once, where evidence from all positions can be compared to decide where the target is.
 
-The network is implemented in snnTorch \cite{Eshraghian2022Training} and trained with backpropagation through time using surrogate gradients \cite{Neftci2019Surrogate}, over chunks of 0.25~s with the state carried between them. The loss compares the place cells of each axis with a Gaussian bump centred on the true position, adds a binary term for visibility, and keeps the dense layer firing at about 10\% of steps. Training uses simulated recordings only (Section~\ref{sec:setup}), 300 clips of a target moving along varied paths, and adds to them the imperfections of the real camera that the simulator does not produce: stuck pixels, a background of noise events, mirror flips and a quarter turn, a random brightness scale, an exchange of the ON and OFF channels, and short stretches in which the target is removed. The network is trained for 20 epochs, and for the pendulum it is then fine-tuned for 10 more on simulated pendulum recordings. The weights are fixed before any real recording is used.
+% 5. what does "read out linearly" mean here?
+% 6. place cells explanation comes now, too late, after the conecpt was already mentioned in the prev paragraph.
+% CITE: OKeefe1971Hippocampus missing from refs.bib -- O'Keefe & Dostrovsky, Brain Research 34(1):171--175, 1971.
+The position is read from place cells: 32 cells tile the image width, each tuned to one position $c_k$, and 32 tile its height, so a position is represented by a bump of activity over the few cells tuned nearest to it, a population code \cite{Eliasmith2003Neural} named after the hippocampal cells that fire at one location of an animal \cite{OKeefe1971Hippocampus}. The spikes of the fully connected layer are smoothed with a 15~ms low-pass filter, and the cells' activities $z_k$ are weighted sums of the smoothed spikes, without neurons. The position is their centre of mass,
+\begin{equation}
+\hat{x} = \sum_k c_k \frac{e^{z_k}}{\sum_j e^{z_j}},
+\end{equation}
+and likewise for $\hat{y}$. A 65th output tells whether the target is visible; when it is not, the step reaches the memory as unseen.
+
+% 7. what does "Guassian bump" mean?
+% 8. what does "keeps the dense firing 10%" mean?
+% 9. what does "stuck pixels" mean?
+% 10. need to make sure we don't repeat info here which is really more relevant in exprimental setup section.
+% 11. ~15s does not render correctly - space instead of the charachter ~.
+% 12. is there an equation that this sucsection might benefit from having?
+The network is implemented in snnTorch \cite{Eshraghian2022Training} and trained with backpropagation through time using surrogate gradients \cite{Neftci2019Surrogate}, over chunks of 0.25~s with the state carried between them. The loss has three terms: a cross-entropy between each axis's cells and a Gaussian bump centred on the true position, of a width of one cell; a binary cross-entropy on visibility; and a penalty that keeps the fully connected neurons spiking on about 10\% of steps, so the layer neither falls silent nor saturates. Training uses simulated recordings only (Section~\ref{sec:setup}). The imperfections of the real camera that the simulator does not produce are added to the frames during training: stuck pixels that fire whatever the scene, a background of noise events, mirror flips and a quarter turn, a random brightness scale, swapped ON and OFF channels, and short gaps in which the target's events are removed. The network is trained for 20 epochs on all simulated recordings and fine-tuned for 10 more on simulated pendulum recordings only. Its weights are fixed before any real recording is used.
 
 \subsection{Trajectory-Memory Network}
 \label{sec:memory}
@@ -129,6 +151,7 @@ with $r^2 = x_c^2 + y_c^2$, $\varphi = \mathrm{atan2}(y_c, x_c)$, $\gamma = 2$, 
 
 \emph{Phase cells.} The phase is passed to a ring of 400 LIF neurons, each tuned to one direction on the unit circle, as the unit vector $(\cos\varphi, \sin\varphi)$. At any moment the neurons tuned near $\varphi$ fire, forming a bump of activity $a(t)$ that travels around the ring as the clock turns.
 
+% CITE: MacNeil2011Fine missing from refs.bib -- MacNeil & Eliasmith, "Fine-Tuning and the Stability of Recurrent Neural Networks", PLoS ONE, 2011.
 \emph{Map.} The map is a set of connections $W$ from the phase cells to the target's position, which starts empty in every recording and is learned by an error-driven rule of the PES family \cite{MacNeil2011Fine}:
 \begin{equation}
 \Delta W = \eta\,\frac{\big(p(t) - W a(t)\big)\,a(t)^{\top}}{\lVert a(t)\rVert^{2}},
@@ -190,6 +213,14 @@ An alarm is raised when $s(t)$ stays above a threshold for three consecutive ste
 % setup, from scripts/replay_gt.py --save.
 
 \subsection{Baselines}
+% Classical centroid (moved from Event Input; must be defined before V-A uses it):
+% As a classical alternative to the spiking localiser, the target's position is also
+% estimated directly from the events: the events of a window are counted in cells of
+% $16\times16$ pixels, the cells holding at least 30\% of the fullest one are kept, and the
+% position is the mean of their events. This keeps the estimate on the dense target rather
+% than on noise or on the string of a hanging target. We refer to it as the classical
+% centroid; it is the input of every method on the fan and wall-target recordings, and
+% replaces the spiking localiser in the input ablation.
 % Periodic Kalman filter; harmonic / Fourier fit; rhythmic dynamic movement primitive.
 % Start (two are implemented, trajmem/baseline.py; the DMP only if it gets built):
 % (1) Kalman filter with a harmonic state per coordinate, [mean, (c_k, d_k) k = 1, 2],
@@ -325,7 +356,8 @@ The deviation signal is where the spiking memory stands out (Table~\ref{tab:pend
 
 \subsection{Ablations}
 \label{sec:res-ablations}
-\emph{Learned memories.} The two memories that learn the cycle as network dynamics, a recurrent network of fast and slow LIF layers trained on simulated tracks and a spiking Legendre Memory Unit that records a window of the past, do not hold the cycle (Fig.~\ref{fig:paths}). On the development pendulum recordings their remembered paths are 95 and 64~px from the labelled one, with periods 1.89 and 1.26 times the true one, and their 100~ms errors are 32 and 45~px against 23~px for the clock-and-map memory.
+% CITE: Voelker2019Legendre missing from refs.bib -- Voelker, Kajic & Eliasmith, "Legendre Memory Units", NeurIPS 2019.
+\emph{Learned memories.} The two memories that learn the cycle as network dynamics, a recurrent network of fast and slow LIF layers trained on simulated tracks and a spiking Legendre Memory Unit \cite{Voelker2019Legendre} that records a window of the past, do not hold the cycle (Fig.~\ref{fig:paths}). On the development pendulum recordings their remembered paths are 95 and 64~px from the labelled one, with periods 1.89 and 1.26 times the true one, and their 100~ms errors are 32 and 45~px against 23~px for the clock-and-map memory.
 
 \emph{Spiking against arithmetic.} The clock-and-map memory written as plain arithmetic predicts within 0.5~px of the spiking one on the held-out pendulum up to 100~ms and detects the deviation equally well (AUC 0.99 against 0.98). The spiking version costs accuracy only at the longest horizon on the development recordings (30.4 against 22.8~px at 200~ms).
 

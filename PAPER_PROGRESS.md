@@ -7,41 +7,51 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 
 - `paper/` is **read-only to Claude**. Claude writes a section only when Sagi names it
   ("write §IV-B"), and touches nothing else in the file.
-- Statuses: **blocked** → **writable** → **drafted** → **final**.
-- *Drafted* means the prose is there. *Final* means its "revisit" column is cleared.
+- Statuses: **blocked** → **writable** → **drafted** → **in review** → **reviewed** → **final**.
+- *Drafted* means the prose is there. *In review* means Sagi is reviewing it (notes may sit
+  in `%` comments). *Reviewed* means he has signed it off. *Final* means its "revisit"
+  column is cleared.
 - The trigger: when a phase's **Done when** in `PLAN.md` is met, this file is updated and
   the newly writable sections are named. Writing then keeps pace with the code instead of
   landing all at once in the last week.
 
 ## Section status
 
-`writable*` means write it now, but some values are still missing; the "revisit after" column
-says which phase fills them.
+| §      | Section                    | Status      | Blocked on          | Revisit after            |
+|--------|----------------------------|-------------|---------------------|--------------------------|
+| —      | Abstract                   | placeholder | everything          | write last               |
+| I      | Introduction               | reviewed    | —                   | results (claims)         |
+| II     | Related Work               | reviewed    | —                   | —                        |
+| III    | Method (opening paragraph) | reviewed    | —                   | —                        |
+| III-A  | Problem Definition         | reviewed    | —                   | —                        |
+| III-B  | Event Input                | reviewed    | —                   | —                        |
+| III-C  | Spiking Localiser          | in review   | —                   | Sagi's notes             |
+| III-D  | Trajectory-Memory Network  | drafted     | —                   | half-period fix          |
+| III-E  | Deviation Score            | drafted     | —                   | —                        |
+| IV-A   | Event-Camera Simulator     | writable    | —                   | —                        |
+| IV-B   | Real Recordings            | writable    | —                   | —                        |
+| IV-C   | Baselines                  | writable    | —                   | —                        |
+| IV-D   | Evaluation Protocol        | drafted     | —                   | —                        |
+| IV-E   | Metrics                    | writable    | —                   | —                        |
+| V-A    | Results: Localiser         | drafted     | —                   | other held-out           |
+| V-B    | Results: Prediction + path | drafted     | —                   | other held-out           |
+| V-C    | Results: Deviation         | drafted     | —                   | other held-out           |
+| V-D    | Results: Ablations         | drafted     | —                   | —                        |
+| VI     | Discussion                 | writable    | —                   | —                        |
+| VII    | Conclusion                 | writable    | —                   | —                        |
+| —      | Acknowledgment             | writable    | —                   | —                        |
+| Fig. 1 | System overview            | reviewed    | —                   | —                        |
+| Fig. 2 | Recording setups           | writable    | —                   | —                        |
 
-| §      | Section                    | Status      | Blocked on          | Revisit after   |
-|--------|----------------------------|-------------|---------------------|-----------------|
-| —      | Abstract                   | placeholder | everything          | write last      |
-| I      | Introduction               | drafted     | —                   | results         |
-| II     | Related Work               | writable    | —                   | bib verify      |
-| III-A  | Problem Setup              | writable    | —                   | —               |
-| III-B  | Event Input                | writable*   | —                   | Phase B         |
-| III-C  | Localiser (incl. training) | writable    | —                   | —               |
-| III-D  | Memory network             | writable*   | —                   | half-period fix |
-| III-E  | Deviation Score            | writable    | —                   | —               |
-| IV-A   | Simulator                  | writable*   | —                   | Phase A         |
-| IV-B   | Real Recordings            | writable    | —                   | labelling       |
-| IV-C   | Baselines                  | writable*   | —                   | Phase B         |
-| IV-D   | Evaluation Protocol        | drafted     | —                   | —               |
-| IV-E   | Metrics                    | writable    | —                   | —               |
-| V-A    | Results: Localiser         | drafted     | —                   | other held-out  |
-| V-B    | Results: Prediction + path | drafted     | —                   | other held-out  |
-| V-C    | Results: Deviation         | drafted     | —                   | other held-out  |
-| V-D    | Results: Ablations         | drafted     | —                   | —               |
-| VI     | Discussion                 | blocked     | results             | —               |
-| VII    | Conclusion                 | blocked     | results             | —               |
-| —      | Acknowledgment             | writable    | —                   | —               |
-| Fig. 1 | System overview            | drafted     | —                   | —               |
-| Fig. 2 | Recording setups           | writable    | —                   | —               |
+Notes on the rows:
+
+- **III-C** — Sagi's twelve review notes sit as `%` comments in the subsection above the
+  paragraphs they refer to; he deletes them himself.
+- **IV-A** — comments only. Also takes what left III-C: the v2e citation and the 300 simulated
+  recordings of about 15 s.
+- **IV-C** — comments only, including the classical-centroid definition that left III-B
+  (it must be defined before V-A uses it).
+- **IV-B, IV-E, VI, VII** — heading only, or comments only.
 
 ### Where each section's material lives
 
@@ -76,29 +86,22 @@ Every paper cited needs an entry in `BIBLIOGRAPHY.md` in the same change. `paper
 Sagi's, managed outside the repo; the state it was in when he took it over is
 `materials/01-literature/refs-snapshot-2026-09-14.bib` (18 entries, 9 marked `verify`).
 
-## Writable right now
+## Pending
 
-In suggested order. Introduction goes first: it fixes what the paper claims, and Related Work
-exists to position those claims — so §II is easier once §I is down.
+**Review** (drafted, not yet reviewed), in paper order: §III-C (in review), §III-D, §III-E,
+§IV-D, §V-A–D.
 
-1. **§I Introduction.** Motivation, problem, why spiking, contributions. Expand the abstract
-   placeholder and `PLAN.md`'s "What this is"; write the contributions as the claims you
-   intend to support and revisit once results exist.
-2. **§II Related Work.** The largest chunk that results can never change. The six notes in
-   `materials/01-literature/` carry the pipelines, the numbers, and the gap statement.
-3. **§IV-B Real Recordings.** The session already happened; `RECORDING_LOG.md` has the setups,
-   clip counts and durations. **Caveat:** every clip's ground truth is hand-labels plus
+**Write**, in suggested order:
+
+1. **§IV-C Baselines** — the classical centroid first; §V-A already uses it.
+2. **§IV-E Metrics.** Definitions, not values: prediction error at the horizon, lock-on time,
+   deviation ROC, median detection latency.
+3. **§IV-A Simulator** — including the v2e citation and the simulated corpus moved out of §III-C.
+4. **§IV-B Real Recordings** and **Fig. 2.** `RECORDING_LOG.md` has the setups, clip
+   counts and durations. **Caveat:** every clip's ground truth is hand-labels plus
    interpolation, including the `wall/` (4a) clips — do not claim exact encoder ground truth
    for them. See "The 4a encoder ground truth was abandoned" below.
-4. **§III-A Problem Setup.** Definitions only: position over time, what counts as repetition,
-   the prediction horizon, what "deviation" means formally.
-5. **§IV-E Metrics.** Definitions, not values: prediction error at the horizon, lock-on time,
-   deviation ROC, median detection latency.
-6. **§IV-D Protocol.** Pretrain on simulation, freeze, evaluate on held-out real clips.
-7. **Fig. 1.** Block diagram: events → frontend → localiser → memory → prediction + deviation.
-   Won't change unless a block is renamed.
-
-Rough page budget (8 pages including references): the above is ~3.5–4 pages.
+5. **§VI Discussion**, **§VII Conclusion**, then the **Abstract** last.
 
 ## The 4a encoder ground truth was abandoned (2026-09-12)
 
@@ -128,13 +131,6 @@ The encoder path still exists in `trajmem/data.py` (`ego_gt`, reached by passing
 and `scan_pan_slow_01` still carries an anchor side-car, but hand-labels take precedence.
 Nothing in the calibration was changed.
 
-## Blocked, and on what
-
-- **§V-A–C** wait on the held-out set, scored once at the end. **§V-D** can be drafted
-  now from the development-set numbers in `PLAN.md` (spiking vs arithmetic clock-and-map,
-  and the two learned memories).
-- **§VI–VII and the abstract** wait on results. Nothing to do but hold.
-
 ## Must revisit before submission
 
 Writing early buys speed and costs staleness. Nothing is *final* until these are cleared:
@@ -142,8 +138,13 @@ Writing early buys speed and costs staleness. Nothing is *final* until these are
 - [ ] §I contribution claims match what the results actually support — in particular
       "no false positives" (development clips only so far) and "within a fraction of a
       motion cycle" (0.23 s median on development) must hold on the held-out clips.
-- [ ] §II citations verified — 9 of 18 `refs.bib` entries are marked `note = {verify}`,
-      including both closest-prior-art papers. Needs internet; deferred to post-flight.
+- [ ] Final sweep validating every reference, once all writing is done. Known so far:
+      missing `OKeefe1971Hippocampus`, `MacNeil2011Fine`, `Voelker2019Legendre` (each has a
+      `% CITE:` comment in `main.tex`); `Alberico2025Egocentric` has the last author
+      reversed and is the arXiv version, not CVPR Workshops 2025; `Harvey2002Forecasting` is
+      a 2-page *Wilmott* piece, not Harvey's 1989 book (doi:10.1017/CBO9781107049994).
+- [ ] If the paper claims the system runs live, any per-frame time it reports is measured on
+      mains power (a battery-save run gave 0.65× real time).
 - [ ] §III-B, §IV-A, §IV-C holes filled with real values.
 - [ ] §IV-B describes ground truth as hand-labelled and interpolated, for every setup.
 - [ ] Abstract written last, matching the results.
@@ -157,7 +158,6 @@ Things that need a connection, so they can't be done on the plane:
       *Deferred by choice: no point registering a template.* The CFP sets no separate abstract
       deadline, so the only real date is Oct 10; do it once there is a real abstract, and
       leave margin in case EDAS or the connection misbehaves.
-- [ ] Verify the 9 `refs.bib` entries marked `verify` — *deferred to post-flight by choice*.
 - [x] One clean LaTeX build (`latexmk -C && latexmk -pdf`) so MiKTeX fetches nothing lazily.
 - [x] Paper PDFs pulled into `materials/pdfs/` (gitignored) — 14 of 18. Missing: Sussillo
       2009, Ijspeert 2002 and Itti 2001 (paywalled), Vacuum Spiker 2025 (no identifier on

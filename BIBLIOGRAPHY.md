@@ -18,20 +18,22 @@ each before citing in the manuscript. Entries whose author list could not be che
   motion-selective neurons → polynomial readout predicts where a thrown ball lands. Static
   camera, constrained ballistic motion, offline batch training, no deviation detection, no
   attention.
-- **Where:** `PLAN.md` novelty framing; the baseline every result is positioned against.
+- **Where:** `PLAN.md` novelty framing; paper §II.
 
-### "Egocentric Event-Based Vision for Ping Pong Ball Trajectory Prediction", 2025
-- arXiv:2506.07860. Authors unverified (RPG, University of Zurich). Public code.
+### Alberico, Cannici, Cioffi & Scaramuzza, 2025 — "Egocentric Event-Based Vision for Ping Pong Ball Trajectory Prediction"
+- *CVPR Workshops 2025*, arXiv:2506.07860. No spiking network. Public code.
 - **Why:** current-generation restatement of Debat — event camera → ball trajectory prediction
   with 3-D ground truth, real-time. Sharpens the required delta: repetitive learned path +
   deviation, not one-shot ballistic prediction.
-- **Where:** `PLAN.md` novelty framing.
+- **Where:** `PLAN.md` novelty framing; paper §II (`Alberico2025Egocentric`).
 
 ### N-DriverMotion, 2024
 - "Driver motion learning and prediction using an event-based camera and directly trained
   spiking neural networks on Loihi 2." arXiv:2408.13379.
-- **Why:** evidence the full stack (event camera → directly-trained SNN → motion prediction →
-  neuromorphic hardware) is a current, publishable combination.
+- Chung, Kang & Yang. *IEEE Open Journal of Vehicular Technology*.
+- **Why:** evidence the stack (event camera → directly-trained SNN → neuromorphic hardware) is
+  current. The task is classifying 13 driver gestures, not predicting a trajectory, so it is
+  not prior art for prediction; left out of §II.
 - **Where:** paper related-work; motivation for the event-native goal (Stage 2).
 
 ## Sequence memory and dynamical prediction in spiking networks
@@ -41,7 +43,7 @@ each before citing in the manuscript. Entries whose author list could not be che
 - **Why:** NEF-derived, provably optimal rolling memory of a time signal; beats LSTM on chaotic
   time-series prediction; runs on Loihi. The memory core of `snn_lmu.LmuMemory`: the Legendre
   matrices, the delay readout, and the window-holds-the-cycle argument.
-- **Where:** `lmu.py`; `PLAN.md` §C; the paper's method section.
+- **Where:** `lmu.py`; `PLAN.md` §C; paper §V-D ablations (`Voelker2019Legendre`).
 
 ### Voelker & Eliasmith, 2018 — "Improving spiking dynamical networks: accurate delays, higher-order synapses, and time cells"
 - *Neural Computation* 30(3):569–609.
@@ -67,7 +69,7 @@ each before citing in the manuscript. Entries whose author list could not be che
   joint signals, no deviation signal. Found after the design was settled (the design came
   from the Kalman's phase-and-shape structure, `docs/snn-experiments-log.md` Run 11); cited
   as the closest prior design, not as its source.
-- **Where:** paper §II periodic-motion paragraph (candidate).
+- **Where:** paper §II (`Gams2009On`).
 
 ### Eliasmith & Anderson, 2003 — "Neural Engineering: Computation, Representation, and Dynamics in Neurobiological Systems"
 - MIT Press.
@@ -316,7 +318,7 @@ work can say why, and so the framing is not mistaken for ours.
   positives penalised by distance from a window. Our AUC + latency + false-alarms-per-minute
   triple is a hand-rolled version; NAB is what to cite for it. Its detector, HTM, is also
   our nearest cousin in kind: an online sequence memory that flags what it did not predict.
-- **Where:** `metrics.py` (`deviation_roc`, `ratchet_threshold`); paper §IV.
+- **Where:** `metrics.py` (`deviation_roc`, `ratchet_threshold`). Not cited in the paper.
 
 ### Tatbul, Lee, Zdonik, Alam & Gottschlich, 2018 — "Precision and Recall for Time Series"
 - *NeurIPS 2018*. Range-based precision/recall.
@@ -344,7 +346,7 @@ work can say why, and so the framing is not mistaken for ours.
   prediction error — with frame-level AUC on UCSD Ped2 / CUHK Avenue / ShanghaiTech
   (92.9 / 90.6 / 74.7 %) as the reference numbers. Ours is the same principle over a
   learned path rather than over pixels.
-- **Where:** paper related-work; §IV framing.
+- **Where:** paper §II (`Liu2018Future`); §IV framing.
 
 ### "Benchmark AUC Is Not Deployable Reliability: A Cross-Dataset Audit", 2026
 - arXiv:2606.29506.
@@ -352,12 +354,11 @@ work can say why, and so the framing is not mistaken for ours.
   scoring held-out clips once and for reporting false alarms per minute alongside AUC.
 - **Where:** paper §IV methodology note; the held-out protocol's justification.
 
-### Mendes, Zhang, Peyrard & Berrada, 2021 — "Using Visual Anomaly Detection for Task Execution Monitoring"
-- *IROS 2021*, arXiv:2107.14206. Authors unverified.
-- **Why:** the application-side cousin — model the nominal motion of a repeated task, flag
-  the deviation from it, from vision. Closest published problem statement to ours outside
-  neuromorphic work, on frames and with a robot's own kinematics available.
-- **Where:** paper related-work.
+### Thoduka, Gall & Plöger, 2021 — "Using Visual Anomaly Detection for Task Execution Monitoring"
+- *IROS 2021*, arXiv:2107.14206.
+- **Why:** the application-side cousin — learns the optical flow of successful executions of
+  a robot task and flags where the observed flow departs from the predicted one.
+- **Where:** paper §I, §II (`Thoduka2021Using`).
 
 ### Neto et al., 2024 — "Warped Time Series Anomaly Detection"
 - arXiv:2404.12134. Authors unverified.
@@ -389,8 +390,7 @@ work can say why, and so the framing is not mistaken for ours.
 - Cambridge University Press.
 - **Why:** the trigonometric seasonal component — rotating harmonic pairs in a Kalman state,
   the model `PeriodicKalman` uses. Assumes the period is known.
-- **Where:** `baseline.py` (`PeriodicKalman`); paper §II periodic-motion paragraph
-  (candidate), §IV-C.
+- **Where:** `baseline.py` (`PeriodicKalman`); paper §II (`Harvey1989Forecasting`), §IV-C.
 
 ### Ijspeert, Nakanishi & Schaal, 2002 — rhythmic dynamic movement primitives
 - "Learning rhythmic movements by demonstration using nonlinear oscillators." *IROS 2002*.
