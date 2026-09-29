@@ -29,6 +29,7 @@ WINDOW_US = 5000
 CROP = (60, 600, 40, 400)     # x0, x1, y0, y1 in pixels
 ON, OFF, BG = "#ff6b5b", "#4fb3ff", "#0d0d10"
 OURS = "#c98500"
+PRED = "#e03cf0"
 
 
 def frame_image(events, t0_us, t1_us, res):
@@ -91,7 +92,7 @@ def main() -> None:
         ax.plot(closed[:, 0], closed[:, 1], color="white", lw=3.6, alpha=0.9, solid_capstyle="round")
         ax.plot(closed[:, 0], closed[:, 1], color=OURS, lw=2.0, solid_capstyle="round")
         ax.plot(*now, "o", ms=8, color="white", mec="black", mew=1.0)
-        ax.plot(*pred, "o", ms=9, color=OURS, mec="white", mew=1.4)
+        ax.plot(*pred, "o", ms=9, color=PRED, mec="white", mew=1.4)
         ax.annotate("", xy=pred, xytext=now,
                     arrowprops=dict(arrowstyle="-|>", color="white", lw=1.6, shrinkA=6, shrinkB=6,
                                     connectionstyle="arc3,rad=0.15"))

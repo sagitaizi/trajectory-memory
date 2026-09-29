@@ -26,9 +26,9 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 | III-A  | Problem Definition         | reviewed    | —                   | —                        |
 | III-B  | Event Input                | reviewed    | —                   | —                        |
 | III-C  | Spiking Localiser          | reviewed    | —                   | —                        |
-| III-D  | Trajectory-Memory Network  | in review   | —                   | half-period fix          |
-| IV-A   | Event-Camera Simulator     | drafted     | —                   | —                        |
-| IV-B   | Live Runs                  | drafted     | —                   | —                        |
+| III-D  | Trajectory-Memory Network  | reviewed    | —                   | half-period fix          |
+| IV-B   | Event-Camera Simulator     | drafted     | —                   | —                        |
+| IV-A   | Live Runs                  | drafted     | —                   | —                        |
 | IV-C   | Baselines                  | drafted     | —                   | —                        |
 | IV-D   | Evaluation Protocol        | drafted     | —                   | —                        |
 | IV-E   | Metrics                    | drafted     | —                   | —                        |
@@ -36,9 +36,9 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 | V-B    | Results: Prediction + path | drafted     | —                   | other held-out           |
 | V-C    | Results: Deviation         | drafted     | —                   | other held-out           |
 | V-D    | Results: Ablations         | drafted     | —                   | —                        |
-| VI     | Discussion                 | writable    | —                   | —                        |
-| VII    | Conclusion                 | writable    | —                   | —                        |
-| —      | Acknowledgment             | writable    | —                   | —                        |
+| VI     | Discussion                 | drafted     | —                   | —                        |
+| VII    | Conclusion                 | drafted     | —                   | —                        |
+| —      | Acknowledgment             | drafted     | —                   | —                        |
 | Fig. 1 | System overview            | reviewed    | —                   | —                        |
 | Fig. 2 | Recording setups           | dropped     | —                   | —                        |
 
@@ -87,7 +87,15 @@ Sagi's, managed outside the repo; the state it was in when he took it over is
 
 ## Pending
 
-**Review** (drafted, not yet reviewed), in paper order: §III-D (in review), §IV-A–E, §V-A–D.
+**First, next session — renaming across the whole paper, results first** (asked by Sagi):
+- Setup names "fan", "wall target", "brush" read as informal; give the setups descriptive
+  names (the fan setup is a single run). Includes the labels baked into `results_horizon`
+  and the table titles (`scripts/paper_figures.py`, `runs/paper/tables.tex`).
+- "held-out" → "evaluation"; "development" stays.
+- §IV: say plainly that no real recording was ever trained on — "development" only means
+  the clips were looked at while building the system.
+
+**Review** (drafted, not yet reviewed), in paper order: §IV-A–E, §V-A–D, §VI.
 
 **Write**, in suggested order:
 
@@ -137,7 +145,7 @@ Writing early buys speed and costs staleness. Nothing is *final* until these are
       "no false positives" (development clips only so far) and "within a fraction of a
       motion cycle" (0.23 s median on development) must hold on the held-out clips.
 - [ ] Final sweep validating every reference, once all writing is done. Known so far:
-      missing `MacNeil2011Fine`, `Voelker2019Legendre`, `Hu2021v2e` (each has a
+      missing `Voelker2019Legendre`, `Hu2021v2e` (each has a
       `% CITE:` comment in `main.tex`); `Alberico2025Egocentric` has the last author
       reversed and is the arXiv version, not CVPR Workshops 2025; `Harvey2002Forecasting` is
       a 2-page *Wilmott* piece, not Harvey's 1989 book (doi:10.1017/CBO9781107049994);

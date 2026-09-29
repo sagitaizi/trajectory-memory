@@ -22,38 +22,33 @@
 \title{A Spiking Trajectory Memory for Predicting Repetitive Motion from Event Cameras}
 
 \author{\IEEEauthorblockN{Sagi Taizi}
-\IEEEauthorblockA{\textit{Dept.\ of Mathematics and Computer Science} \\
+\IEEEauthorblockA{\textit{Neuro-Biomorphic Engineering Lab} \\
+\textit{Dept.\ of Mathematics and Computer Science} \\
 \textit{The Open University of Israel}\\
 Ra'anana, Israel \\
 sagisagi229000@gmail.com}
 \and
 \IEEEauthorblockN{Elishai Ezra Tsur}
 \IEEEauthorblockA{\textit{Neuro-Biomorphic Engineering Lab} \\
+\textit{Dept.\ of Mathematics and Computer Science} \\
 \textit{The Open University of Israel}\\
 Ra'anana, Israel \\
-elishai85@gmail.com}
+elishai@nbel-lab.com}
 }
 
 \maketitle
 
 \begin{abstract}
-%% ~150--230 words, one paragraph, no citations, no custom macros.
-%% State: problem, gap, what we do, how it is evaluated, headline result, why it matters.
-% Placeholder. Event cameras report per-pixel brightness changes with microsecond latency,
-% making them a natural sensor for anticipating fast, repetitive target motion. We present a
-% spiking network that observes a target moving in a repeating path, builds a memory of that
-% path online, predicts its position a short horizon ahead, and signals when the motion stops
-% matching the learned pattern. The network is pretrained on trajectories rendered through a
-% calibrated event-camera simulator and evaluated, with frozen weights, on real recordings of
-% fan-driven, pendulum, hand-moved, and motor-driven motion. We report prediction error,
-% lock-on time, and deviation-detection latency against classical periodic baselines. The
-% contribution is a spiking formulation of trajectory anticipation as predictive inference,
-% positioned as a component of a low-latency neuromorphic tracking pipeline.
+% Must include:
+% 1. Beyond almost the whole pipeline being spiking, each stage is also bio-inspired
+%    (place cells in the localiser's output, phase cells in the memory).
+% 2. To the best of our knowledge, the first spiking memory of a repeating trajectory from
+%    event-camera input.
 \end{abstract}
 
 \begin{IEEEkeywords}
-event camera, spiking neural network, trajectory prediction, online learning,
-novelty detection, neuromorphic vision
+event camera, spiking neural network, trajectory prediction, periodic motion,
+anomaly detection, online learning, neuromorphic computing
 \end{IEEEkeywords}
 
 \begin{figure*}[t]
@@ -76,9 +71,9 @@ In this work, we propose a spiking system for online prediction built in two sta
 
 The main contributions of this paper are as follows:
 \begin{itemize}
-\item A spiking trajectory memory built from a clock and a map that learns a repetitive path online without any pretraining, and predicts the target's position a short horizon ahead.
-\item A deviation signal read from the same memory, which compares the target's position against a slowly updated copy of the learned path and raises an alarm within a fraction of a motion cycle and with no false positives.
-\item An evaluation of the full pipeline on real event-camera motion of a swinging pendulum and other repetitive trajectories, with a localiser trained on simulated data only, against classical periodic baselines and manual annotations.
+\item To our knowledge, the first spiking trajectory memory for event-camera input: a clock and a map of phase cells that learn a repeating path online and predict it ahead.
+\item A deviation signal from the same memory, which flags a change within a fraction of a cycle with no false alarms.
+\item An evaluation on real event-camera input against classical periodic baselines, with a localiser trained on simulation only.
 \end{itemize}
 The rest of the paper is organised as follows--Section~\ref{sec:related} reviews related work, Section~\ref{sec:method} describes the method, and Section~\ref{sec:setup} the experimental setup. Section~\ref{sec:results} presents the results, which are discussed in Section~\ref{sec:discussion}, and Section~\ref{sec:conclusion} concludes the paper.
 
@@ -129,44 +124,45 @@ The network is trained on simulated recordings only (Section~\ref{sec:setup}) wi
 
 \subsection{Trajectory-Memory Network}
 \label{sec:memory}
-The memory receives the target's position every 5~ms and learns, online, where the target is at each point of its cycle (Fig.~\ref{fig:pipeline}, Stage~2). It consists of a clock that follows the phase of the motion, a ring of phase cells that represents that phase, and a map from the phase cells to position.
+The memory receives the localiser's estimate $\tilde{p}(t)$ every 5~ms and outputs a prediction $\hat{p}(t+h)$ and a deviation score (Fig.~\ref{fig:pipeline}, Stage~2). A repeating motion can be fully described by where the target is at each \emph{phase} of its cycle, and can be translated to a trajectory given a connection between the phase and the target's position. The memory therefore consists of two main components: a clock that follows the phase, and a map that learns online the target's position at each phase.
 
-\emph{Clock.} The motion is first reduced to a single signal $F(t)$: the position projected on the main axis of the motion, found online from a running estimate of the positions' covariance, and scaled to a unit amplitude. The clock is a variant of the adaptive-frequency oscillator \cite{Righetti2006Dynamic}, whose state $(x_c, y_c)$ turns around a limit cycle at a rate $\omega$ while $F$ pulls on its phase $\varphi$ and, more slowly, on its rate:
+\emph{Clock.} The clock is a variant of the adaptive-frequency oscillator seen in \cite{Righetti2006Dynamic}, an oscillator that synchronizes with a rhythmic input and learns its frequency. Its input $F(t)$ is the target's position projected on the main axis of motion, found online from a running estimate of the positions' covariance, and scaled to a unit amplitude. The clock's state $(x_c, y_c)$ turns around a unit circle at a rate $\omega$ while $F$ pulls on its phase $\varphi$ and, more slowly, on its rate:
 \begin{align}
 \dot{x}_c &= \gamma(1-r^2)\,x_c - \omega\,(1-\kappa F y_c)\,y_c, \nonumber\\
 \dot{y}_c &= \gamma(1-r^2)\,y_c + \omega\,(1-\kappa F y_c)\,x_c, \label{eq:clock}\\
 \dot{\omega} &= -\eta_\omega\,\omega F y_c, \nonumber
 \end{align}
-with $r^2 = x_c^2 + y_c^2$, $\varphi = \mathrm{atan2}(y_c, x_c)$, $\gamma = 2$, $\kappa = 0.3$ and $\eta_\omega = 0.6$. After a few cycles the rate matches the frequency of the motion and the phase keeps a fixed relation to it, so $\varphi$ tells how far through its cycle the target is. The clock's state, together with $\omega$ and $F$, is represented by a population of 1,500 LIF neurons, and the recurrent connections that make the population follow \eqref{eq:clock} are found with the Neural Engineering Framework \cite{Eliasmith2003Neural} in Nengo \cite{Bekolay2014Nengo}. The rate itself is updated outside the population and fed back into it, since holding it as a neural integrator made it drift. Six clocks, started at periods between 0.8 and 7~s, run side by side, and after the first 3~s the one whose period is closest to that measured from the crossings of $F$ through zero is used.
+with $r^2 = x_c^2 + y_c^2$, $\varphi = \mathrm{atan2}(y_c, x_c)$, and the constants $\gamma = 2$, $\kappa = 0.3$ and $\eta_\omega = 0.6$. The first term of each of the first two equations pulls the state back to the unit circle each step, and the second turns it around the circle at a rate of $\omega(1-\kappa F y_c)$, so that $F$ either speeds the clock up or slows it down depending on where it is in its cycle. The last equation applies the same product $F y_c$ to $\omega$ itself--when the clock runs ahead of its input, $F y_c$ is positive on average and $\omega$ decreases, and when it runs behind, $\omega$ increases. After a few cycles the rate syncs with the frequency of the motion and the phase keeps a fixed relation to it, so $\varphi$ tells how far through its cycle the target is.
 
-\emph{Phase cells.} The phase is passed, as the unit vector $(\cos\varphi, \sin\varphi)$, to a ring of 400 LIF neurons, each tuned to one direction on the unit circle. At any moment the neurons tuned near $\varphi$ fire, forming a bump of activity $a(t)$ that travels around the ring as the clock turns.
+The clock's state $(x_c, y_c)$ together with $\omega$ and $F$ were represented by a population of 1,500 LIF neurons, and the recurrent connections that make the population follow \eqref{eq:clock} were built using the Neural Engineering Framework in Nengo. Nengo solves the weights by least squares, so that the neurons' activity fed back through their synapses reproduces \eqref{eq:clock}. The rate itself is updated outside the population and fed back into it, since holding it as a neural integrator made it drift slightly. Since one clock will only sync with periods near its own, six clocks, started at periods between 0.8~s and 7~s, are run simultaneously. After 3~s of motion, the clock whose period is closest to the motion's period measured roughly from the times $F$ crosses zero is used. The clock's final outputs then fed to the map are its phase $\varphi$ and its rate $\omega$.
 
-% CITE: MacNeil2011Fine missing from refs.bib -- MacNeil & Eliasmith, "Fine-Tuning and the Stability of Recurrent Neural Networks", PLoS ONE, 2011.
-\emph{Map.} The map is a set of connections $W$ from the phase cells to the target's position, which starts at zero in every run and is learned by an error-driven rule of the PES family \cite{MacNeil2011Fine}:
+\emph{Map.} The phase $\varphi$ is stored for the map to read as phase cells, which follow the idea of the place cells of the localiser (Section~\ref{sec:localiser}): while a place cell fires when the target is at one location, a phase cell fires when the motion is at one point of its cycle. The phase cells are a ring of 400 LIF neurons, each tuned to one direction on the unit circle and receiving the phase as a unit vector $(\cos\varphi, \sin\varphi)$. At any given step, the cells tuned near $\varphi$ fire, so their activity $a(t)$, which is the smoothed spiking of the 400 cells, is a bump that travels around the ring as the phase advances and marks where in the cycle the target is. The map is a set of connections $W$ from the phase cells to the target's position. It starts at zero in every run and is learned by the error-driven PES rule \cite{MacNeil2011Fine}, normalised by the activity's power rather than the number of neurons:
 \begin{equation}
 \Delta W = \eta\,\frac{\big(\tilde{p}(t) - W a(t)\big)\,a(t)^{\top}}{\lVert a(t)\rVert^{2}},
 \end{equation}
-where the learning rate $\eta$ decays from 0.3 to 0.02 over the first seconds of motion. Each update moves the position stored at the active phase towards the observed one, so after a few cycles $W$ holds the target's path, one position per phase. A slow correction of the output's centre and scale follows gradual changes of the path, such as the decaying amplitude of a pendulum, and once a clock is chosen, a position far from where the map expects the target is treated as unseen, which protects the map from a momentary error of the localiser.
+where the learning rate $\eta$ decays from 0.3 to 0.02 over the first few seconds of motion. After a few cycles $W$ holds the target's path, one position per phase. Two further mechanisms keep the map in line with a real target. First, The map's output is stretched or shrunk slowly around its center, so it follows gradual imperfections of real life repetitive paths, without relearning every phase. Second, once a clock is chosen, a position much further than usual from where the map expects the target is ignored, so a momentary error of the localiser does not affect the map.
 
-\emph{Prediction.} To predict $h$ ahead, the phase is advanced by $\omega h$ and the map is read through $\bar{a}(\varphi + \omega h)$, the activity the ring would have at the advanced phase:
+\emph{Prediction.} To predict a horizon of $h$ ahead, the phase is advanced by $\omega h$ and the map is read through $\bar{a}(\varphi + \omega h)$, the activity the ring would have at the advanced phase:
 \begin{equation}
 \hat{p}(t+h) = W\,\bar{a}(\varphi + \omega h) + e^{-h/\tau_r}\,\rho(t),
 \end{equation}
-where $\rho(t)$ is the recent error of the map, smoothed over 20~ms, which lets the prediction follow a target that is momentarily off its path, and $\tau_r = 2$~s; the map's output is taken after the centre and scale correction above. The neurons of the clock and the ring use Nengo's LIF model (membrane time constant 20~ms, refractory period 2~ms) and are simulated in PyTorch in steps of 1~ms, five per frame.
+where $\rho(t)$ is the recent error of the map, smoothed over 20~ms. The second term lets the prediction follow a target that is momentarily off its path, and its weight $e^{-h/\tau_r}$, with $\tau_r = 2$~s, makes its influence fade the further ahead the prediction is.
 
-\emph{Deviation.} Measured against the working map, a deviation would fade within a few cycles as the map learns the new motion. The score is therefore measured against a slow copy $W_s$ of the map, taken once the memory has settled and updated from then on with a time constant that grows to 30~s, so it keeps the path as first learned: $s(t) = \lVert \tilde{p}(t) - W_s\,a(t) \rVert$, smoothed over 0.2~s.
+The neurons of the clock and the ring use Nengo's LIF model (membrane time constant 20~ms, refractory period 2~ms). Rather than in Nengo's own simulator, they run in PyTorch with the weights Nengo solved, so that the memory is stepped frame by frame in the same loop as the localiser and the steps computed alongside it, with the six clocks as one batch.
+
+\emph{Deviation.} Measured against the active map, a deviation would fade within a few cycles as the map constantly learns the new motion. The score is therefore measured against a slow copy $W_s$ of the map, taken once memory has settled. The copy moves towards the working map a little a step: quickly at first, while the map is still settling, and more slowly as the copy ages. A slow drift of the path is thus still followed, while during a deviation the copy barely changes, so the score stays high for as long as the it lasts. The final deviation score is the distance between the target and where the copy expects it, $s(t) = \lVert \tilde{p}(t) - W_s\,a(t) \rVert$, averaged over the last 0.2~s.
 
 \section{Experimental Setup}
 \label{sec:setup}
 
+\subsection{Live Runs}
+\label{sec:runs}
+Every run performed is recorded using the DV's api recorder and the event stream is replayed as if live, so that every method receives exactly the same input and can be scored reliably against hand labels. The runs are divided into development runs used while building the system, and held-out runs scored once at the end (Section~\ref{sec:protocol}). All live runs last 25--30~s and come from three setups. \emph{Pendulum}: a swinging target hung from a string, with a period of about 1.2~s and swings of 170--370~px from end to end; three development and three held-out runs, one of each with a deviation (a push that changes the swing). \emph{Fan}: a target tied to a ceiling-fan blade, tracing an ellipse of about $80\times40$~px once every 1.2~s; one development run. \emph{Wall target}: a printed square moved by hand along a wall; two development runs, a horizontal sweep of about 150~px repeated every 1.8~s, and a diagonal sweep that turns horizontal as its deviation. The target's position and the onset of each deviation are marked by hand, and the positions are linearly interpolated. On the pendulum the marked point is the centre of the target, which sits 27--43~px below the densest events.
+
 \subsection{Event-Camera Simulator}
 \label{sec:sim}
 % CITE: Hu2021v2e missing from refs.bib -- Hu, Liu & Delbruck, "v2e: From Video Frames to Realistic DVS Events", CVPR Workshops 2021.
-Simulated recordings are made with the v2e event-camera simulator \cite{Hu2021v2e}: a target is rendered moving along a known path through our camera's calibrated lens model and converted to events, so the ground truth is exact. The simulator was matched to one live run on five event statistics, all within 17\%. The main corpus holds 320 recordings on five path families (circle, ellipse, figure-eight, Lissajous and straight sweep) with periods of 0.8--4~s, each with its own camera and target settings, and about half with one scripted deviation. A second corpus of 100 recordings renders a brush swinging like the real pendulum.
-
-\subsection{Live Runs}
-\label{sec:runs}
-All live runs last 25--30~s and come from three setups. \emph{Pendulum}: a brush hung from a string swinging in front of a wall, with a period of about 1.2~s and swings of 170--370~px from end to end; three development and three held-out runs, one of each with a deviation, a push that changes the swing. \emph{Fan}: a brush tied to a ceiling-fan blade, tracing an ellipse of about $80\times40$~px once every 1.2~s; one development run. \emph{Wall target}: a printed square moved by hand along a wall; two development runs, a horizontal sweep of about 150~px repeated every 1.8~s, and a diagonal sweep that turns horizontal as its deviation. The target's position and the onset of each deviation are marked by hand, and the positions are linearly interpolated. On the pendulum the marked point is the centre of the brush, which sits 27--43~px below the densest events.
+Simulated recordings are made with the v2e event-camera simulator \cite{Hu2021v2e}: a target is rendered moving along a known path through our camera's calibrated lens model and converted to events, so the ground truth is exact. The simulator was matched to one live run on five event statistics, all within 17\%. The main corpus holds 320 recordings on five path families (circle, ellipse, figure-eight, Lissajous and straight sweep) with periods of 0.8--4~s, each with its own camera and target settings, and about half with one scripted deviation. A second corpus of 100 recordings renders a target swinging like the real pendulum.
 
 \subsection{Baselines}
 \label{sec:baselines}
@@ -186,8 +182,7 @@ The \emph{prediction error} is the distance in pixels between $\hat{p}(t+h)$ and
 
 \section{Results}
 \label{sec:results}
-Every result below comes from a live run of the pipeline: events are processed in the order they arrive, one 5~ms step at a time, and each output uses only the events seen so far, as with the camera connected. With the localiser and the memory running side by side on a laptop CPU (Intel Core i7-12650H), a 5~ms step takes 4.0--4.4~ms on average, so the pipeline keeps up with the camera in real time. The runs were recorded so that every method could be given exactly the same input and scored afterwards against the hand labels.
-
+Every result below comes from a live run of the pipeline: events are processed in the order they arrive, one 5~ms step at a time, and each output uses only the events seen so far, as with the camera connected. With the localiser and the memory running side by side on a laptop CPU (Intel Core i7-12650H), a 5~ms step takes 4.0--4.4~ms on average, so the pipeline keeps up with the camera in real time.
 \subsection{Localiser}
 \label{sec:res-localiser}
 On the pendulum, the spiking localiser places the target far closer to the labelled point than the classical centroid does (Fig.~\ref{fig:localiser}). Over the six pendulum runs, its median distance from the label is 14~px (90th percentile 28~px), against 65~px (125~px) for the centroid. The gap is widest on the held-out runs, 12 against 98~px, where the centroid settles on a different part of the target than the one marked. Most of the centroid's error is a constant offset: removing it per run leaves 8--40~px, against 8--13~px for the spiking localiser. On the fan and the wall target, the spiking localiser, fine-tuned on simulated pendulum motion only, brings no gain (fan 10~px against the centroid's 5~px; wall target 17--23~px for both), and the classical centroid remains their input in what follows.
@@ -277,6 +272,13 @@ The deviation signal is where the spiking memory stands out (Table~\ref{tab:pend
 \label{fig:break}
 \end{figure}
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{results_paths}
+\caption{The remembered cycle of each memory just before the deviation in a development pendulum run, over the labelled path of the preceding 6~s (grey), all through the spiking localiser. Only the clock-and-map memory and the Kalman filter hold the swing.}
+\label{fig:paths}
+\end{figure*}
+
 \subsection{Ablations}
 \label{sec:res-ablations}
 % CITE: Voelker2019Legendre missing from refs.bib -- Voelker, Kajic & Eliasmith, "Legendre Memory Units", NeurIPS 2019.
@@ -286,32 +288,20 @@ The deviation signal is where the spiking memory stands out (Table~\ref{tab:pend
 
 \emph{Input.} With the classical centroid in place of the spiking localiser, the spiking memory's 100~ms error against the pendulum labels rises from 18--32~px to 27--49~px on the development runs and from 11--22~px to 76--130~px on the held-out ones, mostly through the centroid's constant offset from the marked point (Section~\ref{sec:res-localiser}); on this setup the localiser sets the accuracy the whole pipeline can reach.
 
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{results_paths}
-\caption{The remembered cycle of each memory just before the deviation in a development pendulum run, over the labelled path of the preceding 6~s (grey), all through the spiking localiser. Only the clock-and-map memory and the Kalman filter hold the swing.}
-\label{fig:paths}
-\end{figure*}
-
 \section{Discussion}
 \label{sec:discussion}
-% Where the spiking version wins / costs accuracy; event-native and latency arguments.
-% Neuromorphic-hardware energy/latency: cited, not measured (no Loihi/Lava access).
-% Limitations. Future work: online re-learning of a new pattern; attention across objects.
+\emph{Prediction and detection.} The memory predicts about as well as the classical periodic filters at short horizons, but falls behind them as the horizon grows. Reading the map ahead multiplies any error in the clock's rate by the horizon, and the clock settles up to 4\% short of the true period; on the development runs the spiking neurons add to this error at the longest horizon (Section~\ref{sec:res-ablations}). The deviation signal is where the design pays off. The slow copy of the map keeps the path as first learned and gives the score a stable reference, so the memory flags each deviation within a fraction of a cycle and without false alarms, while the Kalman filter, whose score measures each step against its own short-term forecast, raises up to 45 per minute.
+
+\emph{What is spiking.} The localiser, the clock's state and the phase cells are spiking, and the map is a set of learned weights read from them, but several steps around the memory are computed conventionally (Section~\ref{sec:memory}). They are low-dimensional and change over seconds, the kind of work a neuromorphic system leaves to the processor beside the chip; on our CPU, adding them as neural populations would also cost time in a step that already uses 4.0--4.4 of its 5~ms. Each is a simple function of a few variables, of the kind the Neural Engineering Framework can build into LIF populations, so the memory can be made fully spiking without changing its design. All timing was measured on a CPU; the energy and latency expected of SNNs on neuromorphic hardware were not measured, as none was available to us.
+
+\emph{Limitations and future work.} The evaluation rests on few real runs, six on the pendulum with one deviation in each group, so the latencies are indicative. The localiser, trained on simulated pendulum motion, did not improve on the classical centroid for the fan and wall target, and on one wall-target run the clock locked on to half the period of the motion. The memory also learns a single path and keeps it: re-learning a new path after a deviation, following several targets at once, and a localiser that reads the raw events without framing them are left for future work.
 
 \section{Conclusion}
 \label{sec:conclusion}
-% One paragraph.
+We presented a spiking system that learns a repeating trajectory online from an event camera, predicts the target's position a short horizon ahead, and flags when the motion departs from the learned path. A spiking localiser, trained on simulated data only, reads the target's position from 5~ms event frames through place cells, and a spiking memory, built from a clock and a map of phase cells, learns the path within a few cycles without any pretraining. On real recordings of a swinging pendulum, the full pipeline runs in real time on a laptop CPU, predicts within 14~px of the labelled position 50~ms ahead, close to classical periodic filters, and detects the held-out deviation 0.07~s after it begins without a single false alarm, where the periodic Kalman filter takes 0.67~s and raises 14 false alarms per minute. These results show that event cameras and spiking networks together can anticipate repetitive motion and notice when it changes, a step towards neuromorphic systems that predict rather than react.
 
 \section*{Acknowledgment}
-% Supervision, lab, funding.
-% Start: one or two sentences -- Dr. Elishai Ezra Tsur's supervision; the Neuro-Biomorphic
-% Engineering Lab (Open University of Israel) for the DVXplorer and the pan-tilt rig; any
-% funding line the lab requires. No reviewers-thanks in the submitted version (double-blind
-% check: confirm with the CFP whether author names must be removed at submission).
-
-\label{sec:impl}
-% If space allows, a short implementation-notes paragraph or move framework details here.
+We would like to thank the Neuro-Biomorphic Engineering Lab at the Open University of Israel for the DVXplorer event camera used in this work and for the insightful discussions.
 
 \bibliographystyle{IEEEtran}
 \bibliography{refs}
