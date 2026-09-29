@@ -26,12 +26,12 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 | III-A  | Problem Definition         | reviewed    | —                   | —                        |
 | III-B  | Event Input                | reviewed    | —                   | —                        |
 | III-C  | Spiking Localiser          | reviewed    | —                   | —                        |
-| III-D  | Trajectory-Memory Network  | reviewed    | —                   | half-period fix          |
-| IV-A   | Event-Camera Simulator     | writable    | —                   | —                        |
-| IV-B   | Real Recordings            | writable    | —                   | —                        |
-| IV-C   | Baselines                  | writable    | —                   | —                        |
+| III-D  | Trajectory-Memory Network  | in review   | —                   | half-period fix          |
+| IV-A   | Event-Camera Simulator     | drafted     | —                   | —                        |
+| IV-B   | Live Runs                  | drafted     | —                   | —                        |
+| IV-C   | Baselines                  | drafted     | —                   | —                        |
 | IV-D   | Evaluation Protocol        | drafted     | —                   | —                        |
-| IV-E   | Metrics                    | writable    | —                   | —                        |
+| IV-E   | Metrics                    | drafted     | —                   | —                        |
 | V-A    | Results: Localiser         | drafted     | —                   | other held-out           |
 | V-B    | Results: Prediction + path | drafted     | —                   | other held-out           |
 | V-C    | Results: Deviation         | drafted     | —                   | other held-out           |
@@ -40,7 +40,7 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 | VII    | Conclusion                 | writable    | —                   | —                        |
 | —      | Acknowledgment             | writable    | —                   | —                        |
 | Fig. 1 | System overview            | reviewed    | —                   | —                        |
-| Fig. 2 | Recording setups           | writable    | —                   | —                        |
+| Fig. 2 | Recording setups           | dropped     | —                   | —                        |
 
 Notes on the rows:
 
@@ -64,7 +64,7 @@ Notes on the rows:
   `materials/02-methods/legendre-memory-unit.md`.
 - **III-D deviation, IV-D alarm** — `materials/01-literature/deviation-and-novelty.md`.
 - **IV-A** — `materials/02-methods/simulation-with-v2e.md`; `trajmem/simulate.py`; `params.yaml`.
-- **IV-B, Fig. 2** — `RECORDING_LOG.md`; `corpus/sets.yaml`; `corpus/real/`.
+- **IV-B** — `RECORDING_LOG.md`; `corpus/sets.yaml`; `corpus/real/`.
 - **IV-C** — `materials/02-methods/{kalman-periodic,rhythmic-dmp}.md`;
   `materials/01-literature/classical-baselines.md`.
 - **IV-D** — `PLAN.md`: pretrain on simulation, freeze, test on real; `corpus/sets.yaml`.
@@ -87,7 +87,7 @@ Sagi's, managed outside the repo; the state it was in when he took it over is
 
 ## Pending
 
-**Review** (drafted, not yet reviewed), in paper order: §IV-D, §V-A–D.
+**Review** (drafted, not yet reviewed), in paper order: §III-D (in review), §IV-A–E, §V-A–D.
 
 **Write**, in suggested order:
 
@@ -95,7 +95,7 @@ Sagi's, managed outside the repo; the state it was in when he took it over is
 2. **§IV-E Metrics.** Definitions, not values: prediction error at the horizon, lock-on time,
    deviation ROC, median detection latency.
 3. **§IV-A Simulator** — including the v2e citation and the simulated corpus moved out of §III-C.
-4. **§IV-B Real Recordings** and **Fig. 2.** `RECORDING_LOG.md` has the setups, clip
+4. **§IV-B Real Recordings.** `RECORDING_LOG.md` has the setups, clip
    counts and durations. **Caveat:** every clip's ground truth is hand-labels plus
    interpolation, including the `wall/` (4a) clips — do not claim exact encoder ground truth
    for them. See "The 4a encoder ground truth was abandoned" below.
@@ -137,7 +137,7 @@ Writing early buys speed and costs staleness. Nothing is *final* until these are
       "no false positives" (development clips only so far) and "within a fraction of a
       motion cycle" (0.23 s median on development) must hold on the held-out clips.
 - [ ] Final sweep validating every reference, once all writing is done. Known so far:
-      missing `OKeefe1971Hippocampus`, `MacNeil2011Fine`, `Voelker2019Legendre` (each has a
+      missing `MacNeil2011Fine`, `Voelker2019Legendre`, `Hu2021v2e` (each has a
       `% CITE:` comment in `main.tex`); `Alberico2025Egocentric` has the last author
       reversed and is the arXiv version, not CVPR Workshops 2025; `Harvey2002Forecasting` is
       a 2-page *Wilmott* piece, not Harvey's 1989 book (doi:10.1017/CBO9781107049994);

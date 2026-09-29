@@ -125,7 +125,7 @@ The position readout is inspired by place cells \cite{OKeefe1971The}, neurons in
 and likewise for $\hat{y}$, giving the estimate $\tilde{p}(t) = (\hat{x}, \hat{y})$ that the memory receives.
 One more output tells whether the target is visible; when it is not, the step reaches the memory as unseen.
 
-The network is trained on simulated recordings only (Section~\ref{sec:setup}) with a loss function aiming to match a bell-shaped bump one cell wide centred on the true position and a penalty that keeps the fully connected layer spiking on about 10\% of steps. Camera effects the simulator does not produce, such as background noise, brightness changes and short gaps in the target's events, are added to the frames during training. The network is then fine-tuned on simulated pendulum motion and kept fixed.
+The network is trained on simulated recordings only (Section~\ref{sec:setup}) with a loss function aiming to match a Gaussian bump one cell wide centred on the true position and a penalty that keeps the fully connected layer spiking on about 10\% of steps. Camera effects the simulator does not produce, such as background noise, brightness changes and short gaps in the target's events, are added to the frames during training. The network is then fine-tuned on simulated pendulum motion and kept fixed.
 
 \subsection{Trajectory-Memory Network}
 \label{sec:memory}
@@ -160,82 +160,29 @@ where $\rho(t)$ is the recent error of the map, smoothed over 20~ms, which lets 
 \label{sec:setup}
 
 \subsection{Event-Camera Simulator}
-% v2e configured with the DVXplorer intrinsics, lens distortion, contrast threshold, noise.
-% Trajectory families: circle, ellipse, figure-eight, Lissajous; scripted deviations.
-% Start: v2e's EventEmulator (Hu, Liu, Delbruck 2021) fed a 650 fps render of a target on
-% an analytic path, DVXplorer 640x480 through the calibrated lens model; ground truth is the
-% target's APPARENT (distorted) position, the same thing hand-labels record. Matched to the
-% real fan clip on five statistics (real vs sim): target rate 82.0k vs 84.5k ev/s, ON
-% fraction 0.509 vs 0.504, blob footprint 18.2 vs 18.4 px, trail behind the target 19.6 vs
-% 17.1 px, noise floor 0.105 vs 0.088 ev/px/s (median 32 px tile). Photoreceptor filter off:
-% v2e scales its time constant by intensity and left a 60--90 ms event trail behind fast
-% targets that the real camera does not show. Per-clip domain randomisation: thresholds
-% 0.15--0.30, sigma 0.01--0.06, shot noise 0.03--0.5 Hz/px, contrast, radius 8--30 px, aspect
-% 1--4 (disc to brush), a string to a pivot (half the clips), body texture, an optional
-% 60--200 Hz lag (half); paths from five families (circle, ellipse, straight sweep,
-% figure-8, Lissajous), T 0.8--4 s, half with one scripted deviation in the middle third,
-% 30% exact and the rest with small smooth imperfections. Corpus summary table: see
-% materials/02-methods/simulation-with-v2e.md (added once the 100 clips are generated).
+\label{sec:sim}
+% CITE: Hu2021v2e missing from refs.bib -- Hu, Liu & Delbruck, "v2e: From Video Frames to Realistic DVS Events", CVPR Workshops 2021.
+Simulated recordings are made with the v2e event-camera simulator \cite{Hu2021v2e}: a target is rendered moving along a known path through our camera's calibrated lens model and converted to events, so the ground truth is exact. The simulator was matched to one live run on five event statistics, all within 17\%. The main corpus holds 320 recordings on five path families (circle, ellipse, figure-eight, Lissajous and straight sweep) with periods of 0.8--4~s, each with its own camera and target settings, and about half with one scripted deviation. A second corpus of 100 recordings renders a brush swinging like the real pendulum.
 
 \subsection{Live Runs}
-% Four regimes: ceiling-fan (circular), string pendulum, hand-moved, motor-driven on a blank
-% wall (exact encoder ground truth via calibration). Single high-contrast target; daylight.
-% NOTE the line above is stale: the encoder ground truth was abandoned (PAPER_PROGRESS.md);
-% ALL ground truth is hand-labels + linear interpolation, every setup, 4a included.
-% Start: 54 clips recorded 2026-09-10 (RECORDING_LOG.md), 14 with a deviation; evaluated on
-% 6 development + 11 held-out (PLAN.md table). Per regime, give period / amplitude / rate:
-% fan brush on a string, a rigid 74x46 px ellipse, T = 1.19 s, 165k ev/s; pendulum brush,
-% T = 1.18--1.27 s, 135--430 px swings, 0.6--1.5M ev/s, with a visible string; hand-moved
-% wall target: straight sweeps of ~160 px at T = 1.8 s and 1.0 s, 0.3--1M ev/s, marginal
-% SNR; motor-swept scene (4a): the whole scene moves, T = 1--4 s, reported as a separate
-% condition. Labelling: one mark per 0.1 s (pendulum), 0.15 s (fan), 0.25 s (wall target);
-% the fan labels sit 4.5 px (median) from a fitted ellipse. Convention caveat to state: the
-% marked point is the brush centre, which sits 27--43 px below the event centroid on the
-% pendulum -- how that is handled belongs in Metrics. Fig. 2: one accumulated frame per
-% setup, from scripts/replay_gt.py --save.
+\label{sec:runs}
+All live runs last 25--30~s and come from three setups. \emph{Pendulum}: a brush hung from a string swinging in front of a wall, with a period of about 1.2~s and swings of 170--370~px from end to end; three development and three held-out runs, one of each with a deviation, a push that changes the swing. \emph{Fan}: a brush tied to a ceiling-fan blade, tracing an ellipse of about $80\times40$~px once every 1.2~s; one development run. \emph{Wall target}: a printed square moved by hand along a wall; two development runs, a horizontal sweep of about 150~px repeated every 1.8~s, and a diagonal sweep that turns horizontal as its deviation. The target's position and the onset of each deviation are marked by hand, and the positions are linearly interpolated. On the pendulum the marked point is the centre of the brush, which sits 27--43~px below the densest events.
 
 \subsection{Baselines}
-% Classical centroid (moved from Event Input; must be defined before V-A uses it):
-% As a classical alternative to the spiking localiser, the target's position is also
-% estimated directly from the events: the events of a window are counted in cells of
-% $16\times16$ pixels, the cells holding at least 30\% of the fullest one are kept, and the
-% position is the mean of their events. This keeps the estimate on the dense target rather
-% than on noise or on the string of a hanging target. We refer to it as the classical
-% centroid; it is the input of every method on the fan and wall-target runs, and
-% replaces the spiking localiser in the input ablation.
-% Periodic Kalman filter; harmonic / Fourier fit; rhythmic dynamic movement primitive.
-% Start (two are implemented, trajmem/baseline.py; the DMP only if it gets built):
-% (1) Kalman filter with a harmonic state per coordinate, [mean, (c_k, d_k) k = 1, 2],
-% each pair rotating at k*omega per step; q = 1e-6, r = 1e-4 (normalised units); the
-% prediction is the same rotation carried to t+h; surprise = normalised innovation, smoothed
-% with tau = 100 ms. (2) Sliding least-squares harmonic fit (2 harmonics, last 3 periods),
-% evaluated at t+h; surprise = distance of the new observation from the previous fit,
-% relative to that fit's residual spread. Both estimate T from a 5 s warm-up by residual
-% search and keep it (stated in the protocol below). Development-set numbers at 100 ms (runs/results/development_*.csv,
-% Kalman / harmonic, px median): fan 8.0 / 7.3; pendulum 26--48 (label offset dominates);
-% wall target 19--56; pooled 24.2 / 32.6. Simulated clips with exact truth: ~3 px. Breaks:
-% wide_break AUC 0.86 / 0.67, loop_break_01 0.75 / 0.81. Frame these as the accuracy bar the
-% spiking version must meet on clean motion, per the claim in the Introduction.
+\label{sec:baselines}
+\emph{Classical centroid.} As a classical alternative to the spiking localiser, the position is taken as the mean of the events in the densest regions of each frame. It is the input of every method on the fan and wall-target runs, and replaces the spiking localiser in the input ablation.
+
+\emph{Memories.} Three classical memories receive the same positions as ours. The \emph{periodic Kalman filter} \cite{Kalman1960A} holds the mean and three harmonics of each coordinate, each harmonic rotating at a multiple of the motion's frequency \cite{Harvey2002Forecasting}; it predicts by carrying the rotation $h$ ahead, and its deviation score is the normalised innovation. The \emph{harmonic fit} fits the same harmonics by least squares to the last few periods and extends them $h$ ahead, and the \emph{constant-velocity} extrapolator continues the recent motion. For both, the deviation score is the distance of each new position from where the previous fit placed it, relative to its usual size.
 
 \subsection{Evaluation Protocol}
 \label{sec:protocol}
 The live runs are never used for training or fine-tuning and are divided in advance into development runs, which were used freely while building the system and to choose the alarm constant, and held-out runs, which were labelled last and scored once, after every setting had been fixed. Every method's deviation score raises an alarm when it stays for 15~ms above a threshold set from the score itself: its median over the last 2~s plus $k$ times its spread, never raised once lowered. The alarm constant $k$ is set for each input as the smallest value that detects every deviation in the development runs without a false alarm, and it is applied unchanged to the held-out ones.
 
-Every method, spiking or classical, receives the same stream of positions, one every 5~ms, from the same localiser, and none is given the period of the motion. The classical baselines estimate the period from the first 5~s of each run and keep it, while the memory finds it through its clock. Prediction errors are measured from the sixth second of a run, once every method has had time to learn the motion, and up to the start of any deviation.
+Every method, spiking or classical, receives the same stream of positions from the same localiser, and none is given the period of the motion. The classical baselines estimate the period from the first 5~s of each run and keep it, while the memory finds it through its clock. Prediction errors are measured from the sixth second of a run, once every method has had time to learn the motion, and up to the start of any deviation.
 
 \subsection{Metrics}
-% Prediction error at the horizon; lock-on time; deviation-detection ROC and median latency.
-% Start (definitions as implemented in trajmem/metrics.py, after materials/02-methods/
-% metrics.md): error = Euclidean distance in px between p^(t+h) and truth at t+h, over the
-% scoring window set in the protocol above, reported as median and IQR per clip and pooled
-% as the median of per-clip medians; lock-on = first time after which the error stays under
-% a tolerance for the rest of the clip, in seconds and in cycles, tolerance stated per
-% regime; deviation: positives are steps at or after the break, AUC is Mann--Whitney over
-% the score, a flag is the alarm of the Evaluation Protocol (refer, don't redefine),
-% latency is the first flag after the break, false alarms are flags per minute on
-% negatives. Decide and state here how the pendulum's
-% constant label offset is handled: subtract the per-clip median offset, or score prediction
-% against the frontend's own track and report localisation against labels separately.
+\label{sec:metrics}
+The \emph{prediction error} is the distance in pixels between $\hat{p}(t+h)$ and the labelled position at $t+h$, as a median over the scored steps of each run. The \emph{path error} compares a memory's remembered cycle with one cycle of the labelled path, as the mean distance between the two at the best phase shift. For deviation detection, the \emph{AUC} measures how well the score separates the steps after the onset from those before it, the \emph{latency} is the time from the onset to the first alarm, and \emph{false alarms} are counted per minute before the onset. Pendulum runs are scored against the labels as they stand; on the fan and wall target, where the marked point differs from where the events are densest, each run's constant offset between the two is removed first.
 
 \section{Results}
 \label{sec:results}
