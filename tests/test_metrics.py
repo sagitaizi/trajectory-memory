@@ -73,10 +73,26 @@ def test_deviation_roc_latency_is_unbounded_when_never_flagged():
     assert deviation_roc(s, t, [5.0], threshold=1.0)["latency_s"] == np.inf
 
 
+def test_deviation_roc_counts_an_alarm_just_before_the_mark_as_the_detection():
+    s, t = a_score_trace()
+    s[(t > 4.55) & (t < 5.0)] = 10.0                     # starts 0.4 s before the hand mark, within the 0.5 s window
+    r = deviation_roc(s, t, [5.0], threshold=1.0, hold_n=3)
+    assert r["fp_per_min"] == 0.0
+    assert r["latency_s"] == pytest.approx(-0.2)         # flagged at 4.8 s, the third step held
+
+
+def test_deviation_roc_still_counts_an_alarm_well_before_the_mark_as_false():
+    s, t = a_score_trace()
+    s[(t > 2.95) & (t < 3.45)] = 10.0                    # 2 s before the mark
+    r = deviation_roc(s, t, [5.0], threshold=1.0, hold_n=3)
+    assert r["fp_per_min"] > 0.0
+    assert r["latency_s"] == pytest.approx(0.2)
+
+
 def test_deviation_roc_default_threshold_sits_above_the_pre_break_scores():
     s, t = a_score_trace(noise=0.5, rise=5.0)
     r = deviation_roc(s, t, [5.0])
-    assert r["threshold"] >= np.percentile(s[t < 5.0], 99) - 1e-9
+    assert r["threshold"] >= np.percentile(s[t < 4.5], 99) - 1e-9     # negatives end 0.5 s before the mark
     assert r["latency_s"] < 1.0
 
 

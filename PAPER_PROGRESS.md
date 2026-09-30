@@ -19,7 +19,7 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 
 | §      | Section                    | Status      | Blocked on          | Revisit after            |
 |--------|----------------------------|-------------|---------------------|--------------------------|
-| —      | Abstract                   | drafted     | —                   | —                        |
+| —      | Abstract                   | reviewed    | —                   | —                        |
 | I      | Introduction               | reviewed    | —                   | —                        |
 | II     | Related Work               | reviewed    | —                   | —                        |
 | III    | Method (opening paragraph) | reviewed    | —                   | —                        |
@@ -36,9 +36,9 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 | V-B    | Results: Prediction + path | reviewed    | —                   | —                        |
 | V-C    | Results: Deviation         | reviewed    | —                   | —                        |
 | V-D    | Results: Ablations         | reviewed    | —                   | —                        |
-| VI     | Discussion                 | drafted     | —                   | —                        |
-| VII    | Conclusion                 | drafted     | —                   | —                        |
-| —      | Acknowledgment             | drafted     | —                   | —                        |
+| VI     | Discussion                 | reviewed    | —                   | —                        |
+| VII    | Conclusion                 | reviewed    | —                   | —                        |
+| —      | Acknowledgment             | reviewed    | —                   | —                        |
 | Fig. 1 | System overview            | reviewed    | —                   | —                        |
 | Fig. 2 | Recording setups           | dropped     | —                   | —                        |
 
@@ -98,8 +98,7 @@ both localisers move onto its string (centroid to mid-string, flickering; spikin
 the string's top). The 5.5 s detection is a single brief crossing of the threshold. Decided:
 keep 6 of 6 and name the cause in §V-C. §IV-A gives no size for the arm.
 
-**Review** (drafted, not yet reviewed): the Abstract, §VI, §VII. Then the fixes below, and one
-last read of the whole paper.
+**Review:** every section is reviewed. Left: the fixes below and one last read of the whole paper.
 
 ## The 4a encoder ground truth was abandoned (2026-09-12)
 
@@ -135,9 +134,9 @@ Writing early buys speed and costs staleness. Nothing is *final* until these are
 
 - [x] §I contribution claims match the results: the bullets carry no numbers; "stays quiet
       on steady motion" holds on all 13 runs without a deviation.
-- [ ] Abstract reviewed by Sagi. Its numbers match §V: 19 runs, 50 ms as accurate as the
-      periodic filters, 6 of 6 deviations (median latency 0.32 s), one alarm outside them,
-      Kalman 3 of 6 at 36 false alarms/min.
+- [x] Abstract reviewed by Sagi. Its numbers match §V: 19 runs, 50 ms as accurate as the
+      periodic filters, 6 of 6 deviations (median latency 0.32 s), no false alarms (scored with
+      a 0.5 s tolerance before each hand mark), Kalman 3 of 6 at 35 false alarms/min.
 - [ ] `refs.bib` fixes still open (swept 2026-09-30; months, URLs, capitals, formatting slips,
       published versions and the Harvey book are done):
       - author names swapped: `Sho2026A` (Okazaki, Sho … Ota, Jun), `Righetti2006Dynamic`
@@ -148,10 +147,8 @@ Writing early buys speed and costs staleness. Nothing is *final* until these are
         full title ("…: Computation, Representation, and Dynamics in Neurobiological Systems").
       Re-exporting from the reference manager brings back `month`, `day` and `url` unless the
       export drops them.
-- [ ] Back to 8 pages (dealt with at the end). With URLs gone, three references still sit on
-      page 9. Tested on a copy: IEEE-abbreviated venue names save one, the "Learned memories"
-      rewording and dropping Neftci's subtitle a second; about four lines of text cuts remain,
-      one more once v2e's venue is fixed.
+- [x] 8 pages, with no room to spare: venue names are IEEE-abbreviated, Neftci's subtitle is
+      dropped, and fixing v2e's venue will add a line.
 - [ ] Text fixes left from the 2026-09-30 review, not taken so far (typos, dashes, units,
       PES, notation and the two content points are done): grammar l.71 "actual deviation",
       l.87 "Neither works involve", l.102 "must alert it", l.148 "real life", l.258 "fired …

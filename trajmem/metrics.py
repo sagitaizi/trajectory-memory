@@ -80,6 +80,9 @@ RATCHET_K = 25.0                   # spreads above the settled score: the smalle
                                    # no false alarm on the development clips (breaks still caught in 0.23 s)
 
 
+DEVIATION_TOLERANCE_S = 0.5        # an alarm this soon before a hand-marked break is its detection
+
+
 def k_for_input(name: str | None, checkpoint=None) -> float:
     """The alarm constant calibrated for that position input: its checkpoint's own if it has
     one (RATCHET_K_BY_CHECKPOINT), else the input's (RATCHET_K_BY_INPUT)."""
@@ -146,21 +149,25 @@ class RatchetAlarm:
 
 
 def deviation_roc(scores, times, deviation_times, threshold=None,
-                  hold_n: int = 3) -> dict:
+                  hold_n: int = 3, tolerance_s: float = DEVIATION_TOLERANCE_S) -> dict:
     """Score the deviation signal as a detector.
 
-    Positives are steps at or after the first break, negatives the steps before it
-    (all steps, on a clip without a break). `auc` is threshold-free. At the operating
+    Positives are steps at or after the first break, negatives the steps more than
+    `tolerance_s` before it (all steps, on a clip without a break); the steps in between
+    are neither, since a hand-marked break is only accurate to a fraction of a second.
+    `auc` is threshold-free. At the operating
     `threshold` -- a number, a per-step array, a rule (scores, times) -> per-step array,
     or "ratchet" for `ratchet_threshold`;
     the default, the 99th percentile of the negatives, needs the labels and so is a
     reference rather than a detector -- a flag is `hold_n`
-    consecutive steps above it: `latency_s` is the first flag after the break,
-    `fp_per_min` the flags raised on negative steps.
+    consecutive steps above it: `latency_s` is the first flag from `tolerance_s` before
+    the break on (negative when it comes before the mark), `fp_per_min` the flags raised
+    on negative steps.
     """
     s, t = np.asarray(scores, dtype=float), np.asarray(times, dtype=float)
     t_break = min(deviation_times) if len(deviation_times) else np.inf
     positive = t >= t_break
+    negative = t < t_break - tolerance_s
     if isinstance(threshold, str):
         if threshold != "ratchet":
             raise ValueError(f"unknown threshold rule {threshold!r}")
@@ -168,17 +175,17 @@ def deviation_roc(scores, times, deviation_times, threshold=None,
     elif callable(threshold):
         threshold = threshold(s, t)
     elif threshold is None:
-        threshold = float(np.nanpercentile(s[~positive], 99)) if (~positive).any() else np.inf
+        threshold = float(np.nanpercentile(s[negative], 99)) if negative.any() else np.inf
 
     flags = _sustained(s > threshold, hold_n)
     step = float(np.median(np.diff(t))) if len(t) > 1 else np.nan
-    neg_minutes = (~positive).sum() * step / 60
+    neg_minutes = negative.sum() * step / 60
     out = {"threshold": float(np.min(threshold)) if np.ndim(threshold) else float(threshold),
            "auc": np.nan, "latency_s": np.nan,
-           "fp_per_min": float(_rising_edges(flags & ~positive) / neg_minutes) if neg_minutes else np.nan}
-    if positive.any() and (~positive).any():
-        out["auc"] = _auc(s[positive], s[~positive])
-        hit = np.flatnonzero(flags & positive)
+           "fp_per_min": float(_rising_edges(flags & negative) / neg_minutes) if neg_minutes else np.nan}
+    if positive.any() and negative.any():
+        out["auc"] = _auc(s[positive], s[negative])
+        hit = np.flatnonzero(flags & ~negative)
         out["latency_s"] = float(t[hit[0]] - t_break) if len(hit) else np.inf
     return out
 

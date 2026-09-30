@@ -19,6 +19,9 @@ import numpy as np  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from trajmem.metrics import DEVIATION_TOLERANCE_S  # noqa: E402
+
 RUNS = ROOT / "runs" / "paper"
 FIGS = ROOT / "paper" / "figures"
 COL, DCOL = 3.5, 7.16
@@ -175,13 +178,15 @@ def alarm_times(t, ratio, hold=3) -> np.ndarray:
 
 
 def scored_alarm_times(t, ratio, hold=3) -> np.ndarray:
-    """The alarms the scoring counts, with `t` relative to the deviation: every one before it
-    (false alarms), then only the first after it (the detection), or none if one is still on."""
+    """The alarms the scoring counts, with `t` relative to the deviation: every one before its
+    tolerance window (false alarms), then only the first from the window on (the detection), or
+    none if a false alarm is still on when the window opens."""
     above = np.nan_to_num(ratio) > 1.0
     run = np.convolve(above.astype(int), np.ones(hold, int), mode="full")[:len(above)] >= hold
     onsets = alarm_times(t, ratio, hold)
-    before, after = onsets[onsets < 0], onsets[onsets >= 0]
-    at_start = np.flatnonzero(t >= 0)
+    start = -DEVIATION_TOLERANCE_S
+    before, after = onsets[onsets < start], onsets[onsets >= start]
+    at_start = np.flatnonzero(t >= start)
     if len(after) == 0 or (len(at_start) and run[at_start[0]]):
         return before
     return np.r_[before, after[:1]]
