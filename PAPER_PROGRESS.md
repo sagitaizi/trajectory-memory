@@ -98,7 +98,7 @@ both localisers move onto its string (centroid to mid-string, flickering; spikin
 the string's top). The 5.5 s detection is a single brief crossing of the threshold. Decided:
 keep 6 of 6 and name the cause in §V-C. §IV-A gives no size for the arm.
 
-**Review:** every section is reviewed. Left: the fixes below and one last read of the whole paper.
+**Review:** every section is reviewed; the paper is done (2026-09-30). Left: submission on EDAS.
 
 ## The 4a encoder ground truth was abandoned (2026-09-12)
 
@@ -149,10 +149,6 @@ Writing early buys speed and costs staleness. Nothing is *final* until these are
       export drops them.
 - [x] 8 pages, with no room to spare: venue names are IEEE-abbreviated, Neftci's subtitle is
       dropped, and fixing v2e's venue will add a line.
-- [ ] Text fixes left from the 2026-09-30 review, not taken so far (typos, dashes, units,
-      PES, notation and the two content points are done): grammar l.71 "actual deviation",
-      l.87 "Neither works involve", l.102 "must alert it", l.148 "real life", l.258 "fired …
-      fires"; US spellings l.91, 134, 148, 183; l.128 cites §IV where §IV-B is meant.
 - [x] Real-time claim: `scripts/time_live.py`, mains power, held-out pendulum runs. With
       localiser and memory overlapped (separate processes, identical outputs) a 5 ms frame
       costs 4.0–4.4 ms (1.15–1.26×); one after the other it is 5.2–5.5 ms (0.91–0.96×).
