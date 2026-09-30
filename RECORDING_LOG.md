@@ -31,16 +31,16 @@ predict than a clean circle. GT = hand-labels + interpolation, not analytic.
 |---|---|---|
 | fan/fan_brush_slow_01 | 259 k/s | denoised rate rises ~10x over the clip (fan spin-up) — non-stationary, use with care or trim the ramp |
 | fan/fan_brush_slow_02 | 165 k/s | **Labelled** — a clean, rigid **ellipse** ~85 × 45 px, T = 1.20 s (50 rpm), 25 laps at constant amplitude. The only true 2-D loop in the development set and the closest real clip to the simulator's analytic paths. Brush behaved as if on a rod, not a swinging string |
-| fan/fan_brush_slow_03 | 166 k/s | stats OK; frame check pending |
-| fan/fan_brush_fast_01 | 218 k/s | stats OK; frame check pending |
-| fan/fan_brush_fast_02 | 200 k/s | stats OK; frame check pending |
+| fan/fan_brush_slow_03 | 166 k/s | stats OK; unlabelled, scored against its tracked position (`tracks` set) |
+| fan/fan_brush_fast_01 | 218 k/s | stats OK; unlabelled, scored against its tracked position (`tracks` set) |
+| fan/fan_brush_fast_02 | 200 k/s | stats OK; unlabelled, scored against its tracked position (`tracks` set) |
 | fan/fan_string_01 | 213 k/s | stats OK; frame check pending |
 | fan/fan_two_strings_01 | 256 k/s | stats OK; frame check pending |
 | fan/fan_blade_01 | 615 k/s | one bare blade — extended object, not a blob; questionable fit, frame check pending |
-| fan/break/fan_brush_break_01 | 248 k/s | stats OK; frame check pending |
-| fan/break/fan_brush_break_02 | 278 k/s | stats OK; frame check pending |
-| fan/break/fan_string_break_01 | 248 k/s | stats OK; frame check pending |
-| fan/break/fan_two_strings_break_01 | 288 k/s | stats OK; frame check pending |
+| fan/break/fan_brush_break_01 | 248 k/s | **Onset marked** 17.00 s; no position labels (`held_out_breaks`, `tracks`) |
+| fan/break/fan_brush_break_02 | 278 k/s | **Onset marked** 17.17 s; no position labels (`held_out_breaks`, `tracks`) |
+| fan/break/fan_string_break_01 | 248 k/s | not the paper's target (string); unused |
+| fan/break/fan_two_strings_break_01 | 288 k/s | not the paper's target (strings); unused |
 
 ## Clips — Setup 4a (motor-swept camera, printed square on blank wall)
 
@@ -111,12 +111,12 @@ pendulum, T ≈ 1.2 s). No motors (`--no-motors`). All 25 s, no drops.
 | Clip | Dur | Mean rate | Notes |
 |---|---|---|---|
 | pendulum/small_01 | 25.0 s | 1331 k/s | small amplitude. **Labelled** — T = 1.181 s, settled from t = 0, no net decay, amplitude beating (see GT note below) |
-| pendulum/small_02 | 25.0 s | 734 k/s | small amplitude |
+| pendulum/small_02 | 25.0 s | 734 k/s | small amplitude; unlabelled, scored against its tracked position (`tracks` set) |
 | pendulum/small_03 | 25.0 s | 821 k/s | small amplitude |
 | pendulum/wide_01 | 25.0 s | 1218 k/s | large amplitude |
 | pendulum/wide_02 | 25.1 s | 1529 k/s | large amplitude. **Labelled** — T = 1.274 s, 7.9% longer than small_01 (anharmonic, real). First ~5 s is the push settling; steady from t ≈ 6 s |
-| pendulum/wide_03 | 25.0 s | 1429 k/s | large amplitude (recorded as `wide_break`, no real break — renamed) |
-| pendulum/updown_02 | 25.0 s | 428 k/s | toward/away or vertical variation; only one such clip (no `updown_01`) |
+| pendulum/wide_03 | 25.0 s | 1429 k/s | large amplitude (recorded as `wide_break`, no real break — renamed); unlabelled, `tracks` set |
+| pendulum/updown_02 | 25.0 s | 428 k/s | toward/away or vertical variation; only one such clip (no `updown_01`); unlabelled, `tracks` set |
 | pendulum/small_break | 25.0 s | 603 k/s | deviation — re-push / out-of-plane nudge mid-swing |
 | pendulum/wide_break | 25.0 s | 1021 k/s | deviation. **Labelled** — steady swing to 12.9 s (T = 1.27 s, as wide_02), push at ~13.0 s overshoots to x = 600, out of frame 13.9–14.1 s, wild to 17 s, then caught and held ~110 px lower and near-static from 18 s. Two things to detect: the path departing (13 s) and the path ceasing (18 s) |
 
@@ -155,9 +155,9 @@ centroid + interpolation; photograph the loop shape (measurement pending). All 2
 |---|---|---|---|
 | wall_target/loop_01 | 25.0 s | 311 k/s | cleanest rate of the batch. **Labelled** — **not a loop**: a horizontal sweep, x 250–410 px at T = 1.80 s, y flat within 37 px. Amplitude grows ~90 → 160 px over the clip. Target sits high in frame (y ≈ 70) |
 | wall_target/loop_02 | 25.0 s | 776 k/s | square clips out top-left — reframe if retaken |
-| wall_target/loop_03 | 25.0 s | 687 k/s | frame check pending |
+| wall_target/loop_03 | 25.0 s | 687 k/s | unlabelled, scored against its tracked position (`tracks` set) |
 | wall_target/loop_break_01 | 25.0 s | 1047 k/s | deviation clip; highest rate, 26M events; framed OK. **Labelled** — diagonal sweep to ~10.5 s, break with an excursion to x = 366, then a *horizontal* sweep from ~13 s: the deviation is a change of direction. Lap period 1.0 s on this take, so 0.2 s marks are only 5 per lap — turnarounds undershoot by ~15–25 px. Fine for detection; use loop_01 for prediction error, or densify to 0.1 s if needed. **Usable three ways:** two independent repetitive segments (diagonal ~10 laps, horizontal ~12 laps) plus a break with a known path on *both* sides — and the natural test of re-learning after a break, which is future work, not this paper |
-| wall_target/loop_break_02 | 25.0 s | 480 k/s | deviation clip; frame check pending |
+| wall_target/loop_break_02 | 25.0 s | 480 k/s | deviation clip. **Onset marked** 18.87 s; no position labels (`held_out_breaks`, `tracks`) |
 
 For anything recorded after this (Setup 2, 3, fan re-checks): power-cycle the
 DVXplorer or add `--desensitize` (contrast thresholds → 17/17) to cut the noise.

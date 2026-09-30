@@ -20,21 +20,21 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 | §      | Section                    | Status      | Blocked on          | Revisit after            |
 |--------|----------------------------|-------------|---------------------|--------------------------|
 | —      | Abstract                   | placeholder | everything          | write last               |
-| I      | Introduction               | reviewed    | —                   | results (claims)         |
+| I      | Introduction               | reviewed    | —                   | —                        |
 | II     | Related Work               | reviewed    | —                   | —                        |
 | III    | Method (opening paragraph) | reviewed    | —                   | —                        |
 | III-A  | Problem Definition         | reviewed    | —                   | —                        |
 | III-B  | Event Input                | reviewed    | —                   | —                        |
 | III-C  | Spiking Localiser          | reviewed    | —                   | —                        |
 | III-D  | Trajectory-Memory Network  | reviewed    | —                   | half-period fix          |
-| IV-B   | Event-Camera Simulator     | drafted     | —                   | —                        |
+| IV-B   | Event-Camera Simulator     | reviewed    | —                   | —                        |
 | IV-A   | Live Runs                  | reviewed    | —                   | —                        |
-| IV-C   | Baselines                  | drafted     | —                   | —                        |
-| IV-D   | Evaluation Protocol        | drafted     | —                   | —                        |
-| IV-E   | Metrics                    | drafted     | —                   | —                        |
-| V-A    | Results: Localiser         | drafted     | —                   | other held-out           |
-| V-B    | Results: Prediction + path | drafted     | —                   | other held-out           |
-| V-C    | Results: Deviation         | drafted     | —                   | other held-out           |
+| IV-C   | Baselines                  | reviewed    | —                   | —                        |
+| IV-D   | Evaluation Protocol        | reviewed    | —                   | —                        |
+| IV-E   | Metrics                    | reviewed    | —                   | —                        |
+| V-A    | Results: Localiser         | reviewed    | —                   | —                        |
+| V-B    | Results: Prediction + path | reviewed    | —                   | —                        |
+| V-C    | Results: Deviation         | drafted     | —                   | —                        |
 | V-D    | Results: Ablations         | drafted     | —                   | —                        |
 | VI     | Discussion                 | drafted     | —                   | —                        |
 | VII    | Conclusion                 | drafted     | —                   | —                        |
@@ -46,11 +46,6 @@ Notes on the rows:
 
 - **III-C** — Sagi's twelve review notes sit as `%` comments in the subsection above the
   paragraphs they refer to; he deletes them himself.
-- **IV-A** — comments only. Also takes what left III-C: the v2e citation and the 300 simulated
-  recordings of about 15 s.
-- **IV-C** — comments only, including the classical-centroid definition that left III-B
-  (it must be defined before V-A uses it).
-- **IV-B, IV-E, VI, VII** — heading only, or comments only.
 
 ### Where each section's material lives
 
@@ -70,12 +65,16 @@ Notes on the rows:
 - **IV-D** — `PLAN.md`: pretrain on simulation, freeze, test on real; `corpus/sets.yaml`.
 - **IV-E** — `materials/02-methods/metrics.md`.
 - **Fig. 1** — `docs/implementation-plan.md`.
-- **§V (all)** — `scripts/paper_results.py run` (traces + scores, `runs/paper/`) and
-  `scripts/paper_figures.py` (figures to `paper/figures/results_*.pdf`, tables to
-  `runs/paper/tables.tex`). Scores and tables are kept in `docs/results/paper_*`.
-  Held-out: the three pendulum clips, each scored once (2026-09-25); the other held-out
-  clips are not labelled yet. Unused figure: `results_learning.pdf` (error vs time from
-  the clip's start), `results_break_dev.pdf` (the development break).
+- **§V (all)** — pools every real run. Sources, all under `runs/paper/`:
+  `scripts/paper_results.py run` (labelled runs: `development/`, `held_out/`),
+  `scripts/score_breaks.py` (deviation-only runs: `held_out_breaks/`),
+  `scripts/score_tracks.py` (unlabelled runs against the tracked position: `tracks/`),
+  `scripts/paper_results.py run --inputs snn --clips fan_brush_slow_02 loop_01 loop_break_01
+  --out runs/paper/reverse_swap` (the input swap on the other setups),
+  `scripts/spike_counts.py` (activity). `scripts/paper_figures.py` makes the figures
+  (`paper/figures/results_*.pdf`) and tables (`runs/paper/tables.tex`);
+  `scripts/paper_numbers.py` writes every in-text number to `runs/paper/numbers.csv`.
+  Unused figure: `results_learning.pdf` (error vs time from the clip's start).
 - **Architecture figures** — `figures/architecture/`, TikZ sources + PDFs. `pipeline` is
   Fig. 1 (in `main.tex`, placed before §I so it floats to page 2; raster panels from
   `make_assets.py`). Not in `main.tex`: `clock_and_map` (§III-D, one column); `rig` (left
@@ -87,22 +86,21 @@ Sagi's, managed outside the repo; the state it was in when he took it over is
 
 ## Pending
 
-Naming in the paper: the setups are *pendulum*, *rotating arm* and *hand-moved*; the real
-runs are *development* and *evaluation* (the corpus and code still say `held_out`).
+Naming in the paper: the setups are *pendulum*, *rotating arm* and *hand-moved*. Results pool
+every real run (19, six with a deviation). §IV-D says the system was developed on six of the
+runs, where k (centroid 25, spiking localiser 30) and the slow copy's rate were chosen; it gives
+no selection rule (the "smallest k" rule would give 21 and 12). The corpus and code still say
+`development`/`held_out`. The paper never uses "onset", and calls ours and the classical
+comparators *memories*, not *methods*.
 
-**Review** (drafted, not yet reviewed), in paper order: §IV-B–E, §V-A–D, §VI.
+Rotating-arm deviation runs (`fan_brush_break_01/02`): once per turn the target turns faint and
+both localisers move onto its string (centroid to mid-string, flickering; spiking localiser to
+the string's top). The 5.5 s detection is a single brief crossing of the threshold. Decided:
+keep 6 of 6 and name the cause in §V-C. §IV-A gives no size for the arm.
 
-**Write**, in suggested order:
+**Review** (drafted, not yet reviewed), in paper order: §V-C–D, §VI, §VII.
 
-1. **§IV-C Baselines** — the classical centroid first; §V-A already uses it.
-2. **§IV-E Metrics.** Definitions, not values: prediction error at the horizon, lock-on time,
-   deviation ROC, median detection latency.
-3. **§IV-A Simulator** — including the v2e citation and the simulated corpus moved out of §III-C.
-4. **§IV-B Real Recordings.** `RECORDING_LOG.md` has the setups, clip
-   counts and durations. **Caveat:** every clip's ground truth is hand-labels plus
-   interpolation, including the `wall/` (4a) clips — do not claim exact encoder ground truth
-   for them. See "The 4a encoder ground truth was abandoned" below.
-5. **§VI Discussion**, **§VII Conclusion**, then the **Abstract** last.
+**Write:** the **Abstract**, last.
 
 ## The 4a encoder ground truth was abandoned (2026-09-12)
 
@@ -136,12 +134,13 @@ Nothing in the calibration was changed.
 
 Writing early buys speed and costs staleness. Nothing is *final* until these are cleared:
 
-- [ ] §I contribution claims match what the results actually support — in particular
-      "no false positives" (development clips only so far) and "within a fraction of a
-      motion cycle" (0.23 s median on development) must hold on the held-out clips.
+- [x] §I contribution claims match the results: the bullets carry no numbers; "stays quiet
+      on steady motion" holds on all 13 runs without a deviation.
+- [ ] Abstract matches the pooled results: 6 of 6 deviations detected (median 0.32 s; 1.6
+      and 5.5 s on the rotating arm), one alarm before an onset (`loop_break_02`, 0.27 s
+      before the hand mark).
 - [ ] Final sweep validating every reference, once all writing is done. Known so far:
-      missing `Voelker2019Legendre`, `Hu2021v2e` (each has a
-      `% CITE:` comment in `main.tex`); `Alberico2025Egocentric` has the last author
+      missing `Voelker2019Legendre` (has a `% CITE:` comment in `main.tex`); `Alberico2025Egocentric` has the last author
       reversed and is the arXiv version, not CVPR Workshops 2025; `Harvey2002Forecasting` is
       a 2-page *Wilmott* piece, not Harvey's 1989 book (doi:10.1017/CBO9781107049994);
       `Eshraghian2022Training` and `Neftci2019Surrogate` are the arXiv versions, not
@@ -149,11 +148,11 @@ Writing early buys speed and costs staleness. Nothing is *final* until these are
 - [x] Real-time claim: `scripts/time_live.py`, mains power, held-out pendulum runs. With
       localiser and memory overlapped (separate processes, identical outputs) a 5 ms frame
       costs 4.0–4.4 ms (1.15–1.26×); one after the other it is 5.2–5.5 ms (0.91–0.96×).
-      §V opening quotes the overlapped number. Re-run it if either network changes.
+      §VI ("What is spiking") quotes the overlapped number. Re-run it if either network changes.
 - [ ] §III-B, §IV-A, §IV-C holes filled with real values.
 - [ ] §IV-B describes ground truth as hand-labelled and interpolated, for every setup.
 - [ ] Abstract written last, matching the results.
-- [ ] `\nocite{*}` removed from `main.tex` (it currently lists every bib entry).
+- [x] `\nocite{*}` removed from `main.tex`; every bib entry is cited.
 
 ## Online-only tasks
 

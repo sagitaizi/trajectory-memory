@@ -28,6 +28,29 @@ held_out:
   - {clip: corpus/real/wall/scan_both_slow_01}
   - {clip: corpus/real/wall/scan_diag_break_01}
 
+# Evaluation runs with a deviation but no position labels: only the onset is marked
+# (scripts/mark_breaks.py), enough for detection. Scored once by scripts/score_breaks.py.
+held_out_breaks:
+  - {clip: corpus/real/fan/break/fan_brush_break_01}
+  - {clip: corpus/real/fan/break/fan_brush_break_02}
+  - {clip: corpus/real/wall_target/loop_break_02}
+
+# Runs without position labels, scored for prediction against the tracked position
+# (scripts/score_tracks.py). Every unlabelled run of the paper's three setups except
+# fan_brush_slow_01 (spin-up, not steady), loop_02 (target leaves the frame) and the
+# string and blade runs (not the paper's target).
+tracks:
+  - {clip: corpus/real/pendulum/small_02}
+  - {clip: corpus/real/pendulum/wide_03}
+  - {clip: corpus/real/pendulum/updown_02}
+  - {clip: corpus/real/fan/fan_brush_slow_03}
+  - {clip: corpus/real/fan/fan_brush_fast_01}
+  - {clip: corpus/real/fan/fan_brush_fast_02}
+  - {clip: corpus/real/wall_target/loop_03}
+  - {clip: corpus/real/fan/break/fan_brush_break_01}
+  - {clip: corpus/real/fan/break/fan_brush_break_02}
+  - {clip: corpus/real/wall_target/loop_break_02}
+
 sim:
   - {glob: "corpus/sim/sim_[0-3]*.npz"}
 

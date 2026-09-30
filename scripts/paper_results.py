@@ -5,9 +5,9 @@ figures need.
     python scripts/paper_results.py run --set sim_long --inputs centroid
 
 Each clip's positions are computed once per input and replayed to every memory. The
-spiking localiser is `pend_ft` on pendulum clips and `snn` elsewhere (PLAN.md, input per
-setup). Every trace is scored twice: against the labels as-is (the primary pendulum
-numbers) and with the clip's constant label offset removed.
+spiking localiser is `pend_ft` on every setup, the one the paper describes. Every trace
+is scored twice: against the labels as-is (the primary pendulum numbers) and with the
+clip's constant label offset removed.
 """
 from __future__ import annotations
 
@@ -31,8 +31,7 @@ OUT = ROOT / "runs" / "paper"
 MEMORIES = ("snn_phasemap", "phasemap", "kalman", "harmonic", "constant_velocity")
 ABLATIONS = {"two_layer": ROOT / "runs/memory/snn_anchor20.pt", "lmu": ROOT / "runs/memory/lmu_quick.pt"}
 HORIZONS = (0.025, 0.05, 0.1, 0.2)
-PENDULUM_LOCALISER = ROOT / "runs/localiser/pend_ft.pt"
-DEFAULT_LOCALISER = ROOT / "runs/localiser/snn.pt"
+LOCALISER = ROOT / "runs/localiser/pend_ft.pt"
 WINDOW_US = 5000
 FIELDS = ("set", "clip", "setup", "memory", "input", "offset", "horizon_s", "fde_px", "fde_iqr_px",
           "lock_on_s", "path_median_px", "path_last_px", "period_ratio", "auc", "latency_s",
@@ -73,7 +72,7 @@ def run(args) -> None:
     entries = load_set(args.set_name)
     if args.clips:
         entries = [e for e in entries if e["name"] in args.clips]
-    out_dir = OUT / args.set_name
+    out_dir = args.out / args.set_name
     if args.set_name == "held_out":
         done = out_dir / "scores.csv"
         if done.exists():
@@ -93,9 +92,7 @@ def run(args) -> None:
         name = entry["name"].replace("/", "__")
         setup = setup_of(entry)
         for input_name in args.inputs:
-            ckpt = None
-            if input_name == "snn":
-                ckpt = PENDULUM_LOCALISER if setup == "pendulum" else DEFAULT_LOCALISER
+            ckpt = LOCALISER if input_name == "snn" else None
             txy = cached_positions(clip, input_name, ckpt, out_dir / "positions" / f"{name}__{input_name}.npz")
             replay = Replay(txy[:, 1:]) if input_name != "centroid" else None
             k = k_for_input(input_name, ckpt)
@@ -146,6 +143,7 @@ def main(argv=None) -> None:
     p.add_argument("--memories", nargs="+", default=list(MEMORIES))
     p.add_argument("--ablations", action="store_true", help="also run the two learned memories")
     p.add_argument("--clips", nargs="+", help="only these entries of the set, by name")
+    p.add_argument("--out", type=pathlib.Path, default=OUT, help="results root; a partial run belongs outside runs/paper")
     p.add_argument("--final", action="store_true",
                    help="required for the held-out set: each held-out clip is scored once, ever")
     args = p.parse_args(argv)

@@ -22,10 +22,10 @@ target); offset-removed numbers are a secondary column.
 
 | Phase | State |
 |---|---|
-| A — Data | 🟨 Real corpus recorded and split; development set labelled; sim corpus generated. Held-out pendulum clips labelled and **scored once** (2026-09-25, `scripts/paper_results.py --final`, `runs/paper/held_out/`); settings frozen for them from here. The other held-out clips stay unlabelled: dropped for the submission. |
+| A — Data | ✅ Real corpus recorded; sim corpus generated. The paper uses 19 real runs of its three setups: 9 with hand-labelled positions (`development`, `held_out`), 3 with only a marked deviation onset (`held_out_breaks`), 10 unlabelled scored against their tracked position (`tracks`; the 3 onset-only runs are among them). Results pool them all; settings are frozen. |
 | B — Frontend + baselines | ✅ |
 | C — Trajectory memory, Stage 1 | 🟨 **In progress.** Memory (clock and map, `snn_phasemap`) built: at the Kalman bar on prediction, better on path and deviation (development). Pendulum localiser `pend_ft.pt` beats the centroid on the pendulum. **Open: the half-period lock.** |
-| D — Deviation detection | ✅ Label-free ratcheting alarm, k calibrated per position input on development (centroid 25, `pend_ft` 30): AUC 0.98, 0.23 s, no false alarms (Kalman 0.86, 39.9/min). Held-out: the pendulum break (below). |
+| D — Deviation detection | ✅ Label-free ratcheting alarm, k calibrated per position input on development (centroid 25, `pend_ft` 30). Over all 19 real runs: 6/6 deviations detected, median AUC 0.97, median 0.32 s; one alarm before an onset (`loop_break_02`, 0.27 s before the hand mark, with the target already leaving its path). Kalman: 3/6, 36 false alarms/min. |
 | E — Raw events, Stage 2 | Dropped for the submission; future work. |
 | F — Paper | 🟨 Written as sections unlock; draft due 2026-10-01. |
 
@@ -45,6 +45,8 @@ target); offset-removed numbers are a secondary column.
   | Held-out | `small_03` `wide_01` `small_break` | `fan_brush_fast_01` `fan_string_01` `fan_brush_break_01` | `loop_03` `loop_break_02` | `scan_pan_slow_01` `scan_both_slow_01` `scan_diag_break_01` |
 
   Promoting a spare clip is fine; promoting a held-out clip after seeing a result on it is not.
+  `held_out_breaks` (onset only, `scripts/score_breaks.py`) and `tracks` (unlabelled, scored
+  against the tracked position, `scripts/score_tracks.py`) complete the paper's 19 runs.
 - **Simulated corpus**: 100 clips × 15 s in `corpus/sim/` (`scripts/make_sim_dataset.py`,
   seed-reproducible, resumable). v2e through the calibrated DVXplorer lens model, matched
   to `fan_brush_slow_02` on rate, polarity, footprint, trail and noise floor

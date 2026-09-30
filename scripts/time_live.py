@@ -1,7 +1,7 @@
 """How fast the full pipeline runs: spiking localiser + spiking memory, per 5 ms frame.
 
     python scripts/time_live.py corpus/real/pendulum/small_03 corpus/real/pendulum/wide_01
-    python scripts/time_live.py --set held_out
+    python scripts/time_live.py --set held_out       # also -> runs/paper/timing_held_out.csv
 
 Two ways per clip: `sequential` (localise, then remember, one frame at a time) and
 `overlapped` (the localiser in its own process, already on frame t+1 while the memory
@@ -11,6 +11,7 @@ Time on mains power: battery saving slows the CPU by a third.
 from __future__ import annotations
 
 import argparse
+import csv
 import multiprocessing as mp
 import pathlib
 import sys
@@ -18,6 +19,7 @@ import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 WINDOW_US = 5000
+LOCALISER = ROOT / "runs/localiser/pend_ft.pt"
 
 
 def _setup() -> None:
@@ -53,7 +55,7 @@ def _localise_into(entry, q, go) -> None:
     _setup()
     from trajmem.experiment import make_localiser
     clip = _open(entry)
-    loc = make_localiser("snn")
+    loc = make_localiser("snn", LOCALISER)
     loc.reset()
     q.put("ready")
     go.wait()
@@ -84,7 +86,7 @@ def overlapped(entry) -> tuple[int, float]:
 def sequential(entry) -> tuple[int, float]:
     from trajmem.experiment import make_localiser, make_memory
     clip = _open(entry)
-    loc = make_localiser("snn")
+    loc = make_localiser("snn", LOCALISER)
     mem = make_memory("snn_phasemap", dt_s=WINDOW_US / 1e6)
     loc.reset()
     mem.reset()
@@ -108,12 +110,22 @@ def main(argv=None) -> None:
         entries = [{"clip": c, "slice": None, "name": pathlib.Path(c).name} for c in args.clips]
     if not entries:
         p.error("give clip paths or --set")
+    rows = []
     for entry in entries:
         for name, fn in (("sequential", sequential), ("overlapped", overlapped)):
             n, wall = fn(entry)
             span = n * WINDOW_US / 1e6
             print(f"{entry['name']:24s} {name:10s} {wall / n * 1e3:5.2f} ms/frame  x{span / wall:.2f} real time "
                   f"({span:.1f} s of events in {wall:.1f} s)")
+            rows.append({"clip": entry["name"], "mode": name, "frames": n, "ms_per_frame": wall / n * 1e3,
+                         "x_real_time": span / wall})
+    if args.set:
+        out = ROOT / "runs" / "paper" / f"timing_{args.set}.csv"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with open(out, "w", newline="", encoding="utf-8") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(rows[0]))
+            w.writeheader()
+            w.writerows(rows)
 
 
 if __name__ == "__main__":

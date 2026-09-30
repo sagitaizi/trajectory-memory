@@ -117,50 +117,52 @@ def fig_prediction_vs_horizon(panels, name="results_horizon") -> None:
     save(fig, name)
 
 
-def fig_break_trace(set_name, clip, name="results_break", window=(-6.0, 4.0), input_name="snn") -> None:
-    """One break clip: the target's horizontal position with the 100 ms prediction, then the
-    deviation score against its alarm bar, for the spiking memory and the Kalman."""
-    ours = trace(set_name, clip, "snn_phasemap", input_name)
-    kal = trace(set_name, clip, "kalman", input_name)
-    if ours is None or kal is None or not len(ours["deviation_times"]):
-        print("skip", name, "(no trace or no break)")
-        return
-    tb = float(ours["deviation_times"][0])
-    t = ours["t"] - tb
-    sel = (t >= window[0]) & (t <= window[1])
-    res = ours["resolution"]
-    hi = list(ours["horizons"]).index(0.1)
-    fig, axes = plt.subplots(3, 1, figsize=(COL, 2.9), sharex=True,
-                             gridspec_kw={"height_ratios": [1.5, 1, 1], "hspace": 0.18})
-    ax = axes[0]
-    ax.plot(t[sel], ours["gt_now"][sel, 0] * res[0], color=TRUTH, lw=2.4, alpha=0.45, label="Label")
-    ahead = t + 0.1
-    ax.plot(ahead[sel], ours["pred"][hi][sel, 0] * res[0], color=STYLE["snn_phasemap"][1], lw=1.0,
-            label="Prediction, 100 ms ahead")
-    ax.set_ylabel("$x$ (px)")
-    ax.legend(loc="lower left", bbox_to_anchor=(0.0, 1.0), ncol=2, handlelength=1.6, borderaxespad=0.2)
-    for ax, tr, m in ((axes[1], ours, "snn_phasemap"), (axes[2], kal, "kalman")):
-        tt = tr["t"] - tb
-        s = (tt >= window[0]) & (tt <= window[1])
-        ratio = tr["score"] / np.where(tr["bar"] > 0, tr["bar"], np.nan)
-        colour = STYLE[m][1]
-        ax.plot(tt[s], ratio[s], color=colour, lw=0.9)
-        ax.axhline(1.0, color=INK, lw=0.6, ls=(0, (3, 2)))
-        flags = alarm_times(tt, ratio)
-        for f in flags[(flags >= window[0]) & (flags <= window[1])]:
-            ax.axvline(f, color="#d03b3b", lw=0.6, alpha=0.7)
-        ax.set_yscale("log")
-        ax.set_ylim(0.05, 40)
-        ax.set_yticks([0.1, 1, 10], ["0.1", "1", "10"])
-        ax.minorticks_off()
-        ax.set_ylabel("Score / bar")
-        ax.text(0.01, 0.92, STYLE[m][0], transform=ax.transAxes, va="top", fontsize=7, color=INK)
-    for ax in axes:
-        ax.axvline(0.0, color=INK, lw=0.9)
-    axes[0].annotate("deviation", xy=(0, 1), xycoords=("data", "axes fraction"), xytext=(3, -2),
-                     textcoords="offset points", va="top", fontsize=7)
-    axes[-1].set_xlabel("Time from the deviation (s)")
-    fig.align_ylabels(axes)
+def fig_break_pair(runs, name="results_break", window=(-6.0, 4.0)) -> None:
+    """Runs with a deviation side by side, one column each: the position on top (label and
+    100 ms prediction where the run is labelled, the tracked position where it is not), then
+    the deviation score over its alarm bar for the spiking memory and the Kalman."""
+    fig, axes = plt.subplots(3, len(runs), figsize=(DCOL, 2.9), sharex="col",
+                             gridspec_kw={"height_ratios": [1.5, 1, 1], "hspace": 0.18, "wspace": 0.22})
+    for col, (set_name, clip, input_name, title) in zip(axes.T, runs):
+        ours = trace(set_name, clip, "snn_phasemap", input_name)
+        kal = trace(set_name, clip, "kalman", input_name)
+        tb = float(ours["deviation_times"][0])
+        t = ours["t"] - tb
+        sel = (t >= window[0]) & (t <= window[1])
+        res = ours["resolution"]
+        ax = col[0]
+        if "pred" in ours:
+            hi = list(ours["horizons"]).index(0.1)
+            ax.plot(t[sel], ours["gt_now"][sel, 0] * res[0], color=TRUTH, lw=2.4, alpha=0.45, label="Label")
+            ax.plot(t[sel] + 0.1, ours["pred"][hi][sel, 0] * res[0], color=STYLE["snn_phasemap"][1], lw=1.0,
+                    label="100 ms prediction")
+            ax.set_ylabel("$x$ (px)")
+        else:
+            ax.plot(t[sel], ours["obs"][sel, 0] * res[0], color=INK, lw=0.8, label="Tracked $x$")
+            ax.plot(t[sel], ours["obs"][sel, 1] * res[1], color=TRUTH, lw=0.8, label="Tracked $y$")
+            ax.set_ylabel("Position (px)")
+        ax.set_title(title, loc="left")
+        ax.legend(loc="lower right", bbox_to_anchor=(1.0, 1.0), ncol=2, handlelength=1.6, borderaxespad=0.2)
+        for ax, tr, m in ((col[1], ours, "snn_phasemap"), (col[2], kal, "kalman")):
+            tt = tr["t"] - tb
+            s = (tt >= window[0]) & (tt <= window[1])
+            ratio = tr["score"] / np.where(tr["bar"] > 0, tr["bar"], np.nan)
+            ax.plot(tt[s], ratio[s], color=STYLE[m][1], lw=0.9)
+            ax.axhline(1.0, color=INK, lw=0.6, ls=(0, (3, 2)))
+            flags = alarm_times(tt, ratio)
+            for f in flags[(flags >= window[0]) & (flags <= window[1])]:
+                ax.axvline(f, color="#d03b3b", lw=0.6, alpha=0.7)
+            ax.set_yscale("log")
+            ax.set_ylim(0.05, 40)
+            ax.set_yticks([0.1, 1, 10], ["0.1", "1", "10"])
+            ax.minorticks_off()
+            if col is axes.T[0]:
+                ax.set_ylabel("Score / bar")
+            ax.text(0.01, 0.92, STYLE[m][0], transform=ax.transAxes, va="top", fontsize=7, color=INK)
+        for ax in col:
+            ax.axvline(0.0, color=INK, lw=0.9)
+        col[-1].set_xlabel("Time from the marked start of the deviation (s)")
+    fig.align_ylabels(axes[:, 0])
     save(fig, name)
 
 
@@ -417,33 +419,98 @@ TABLE_HEAD = [r"\begin{tabular}{lrrrrrrr}", r"\toprule",
 TABLE_FOOT = [r"\bottomrule", r"\end{tabular}"]
 
 
-def tables(dev, held) -> str:
-    pend = dict(input="snn", offset="as_is")
-    main_table = (TABLE_HEAD + table_block(held, "Pendulum, evaluation (3 clips, 1 break)", **pend) + [r"\midrule"]
-                  + table_block(dev, "Pendulum, development (3 clips, 1 break)", setup="pendulum", **pend)
-                  + TABLE_FOOT)
-    other = (TABLE_HEAD + table_block(dev, "Rotating arm and hand-moved target, development (3 recordings, 1 with a deviation)",
-                                      setup=lambda s: s in ("fan", "wall_target"), input="centroid",
-                                      offset="removed") + TABLE_FOOT)
-    return ("% Table: pendulum, full spiking pipeline, labels as-is\n" + "\n".join(main_table)
-            + "\n\n% Table: other setups, classical centroid input, label offset removed\n" + "\n".join(other) + "\n")
+def read_csv(path: pathlib.Path) -> list[dict]:
+    if not path.exists():
+        return []
+    rows = list(csv.DictReader(path.open(encoding="utf-8")))
+    for r in rows:
+        for k, v in r.items():
+            if k not in ("set", "clip", "setup", "memory", "input", "offset"):
+                r[k] = float(v) if v not in ("", "nan") else np.nan
+    return rows
+
+
+LABELLED = dict(pendulum=dict(setup="pendulum", input="snn", offset="as_is"),
+                other=dict(setup=lambda s: s in ("fan", "wall_target"), input="centroid", offset="removed"))
+
+
+def prediction_table(rows, tracks) -> str:
+    out = [r"\begin{tabular}{lrrrr}", r"\toprule", r" & \multicolumn{3}{c}{Error at $h$ (px)} & Path \\",
+           r"\cmidrule(lr){2-4}", r"Memory & 50\,ms & 100\,ms & 200\,ms & (px) \\", r"\midrule"]
+    groups = [(rows, "Pendulum, spiking localiser, against the labels (6 runs)", LABELLED["pendulum"]),
+              (rows, "Rotating arm and hand-moved, against the labels (3 runs)", LABELLED["other"]),
+              (tracks, f"Unlabelled runs, against the tracked position ({len({r['clip'] for r in tracks})} runs)", {})]
+    for i, (got_rows, title, sel) in enumerate(g for g in groups if g[0]):
+        out += ([r"\midrule"] if i else []) + [r"\multicolumn{5}{l}{\emph{" + title + r"}} \\"]
+        for m in TABLE_MEMORIES:
+            got = pick(got_rows, memory=m, **sel)
+            if not got:
+                continue
+            with np.errstate(all="ignore"):
+                err = [np.nanmedian([r["fde_px"] for r in got if r["horizon_s"] == h]) for h in (0.05, 0.1, 0.2)]
+                paths = [r["path_median_px"] for r in got if r["horizon_s"] == 0.1]
+                path = np.nanmedian(paths) if np.isfinite(paths).any() else np.nan
+            out.append(" & ".join([_name(m)] + [_cell(v) for v in err] + [_cell(path)]) + r" \\")
+    return "\n".join(out + [r"\bottomrule", r"\end{tabular}"])
+
+
+def deviation_runs(rows, breaks) -> list[dict]:
+    """One row per (real run with a deviation, memory), each through its paper input."""
+    one = [r for r in rows if r["horizon_s"] == 0.1 and r["offset"] == "as_is"
+           and r["input"] == ("snn" if r["setup"] == "pendulum" else "centroid")]
+    return [r for r in one if np.isfinite(r["auc"])] + breaks
+
+
+def all_runs(rows, tracks) -> list[dict]:
+    """One row per (real run, memory) for false alarms: labelled runs through their paper
+    input, then the unlabelled ones."""
+    one = [r for r in rows if r["horizon_s"] == 0.1 and r["offset"] == "as_is"
+           and r["input"] == ("snn" if r["setup"] == "pendulum" else "centroid")]
+    return one + [r for r in tracks if r["horizon_s"] == 0.1]
+
+
+def detected(r) -> bool:
+    return np.isfinite(r["latency_s"]) and r["auc"] >= 0.75
+
+
+def deviation_table(rows, breaks, tracks) -> str:
+    dev, every = deviation_runs(rows, breaks), all_runs(rows, tracks)
+    n_dev, n_all = len({r["clip"] for r in dev}), len({r["clip"] for r in every})
+    out = [r"\begin{tabular}{lrrrr}", r"\toprule",
+           r" & AUC & Detected & Latency & False al./min \\",
+           r"Memory & (median) & (of " + str(n_dev) + r") & (s, median) & (" + str(n_all) + r" runs) \\", r"\midrule"]
+    for m in TABLE_MEMORIES:
+        d = [r for r in dev if r["memory"] == m]
+        hits = [r["latency_s"] for r in d if detected(r)]
+        fp = [r["fp_per_min"] for r in every if r["memory"] == m]
+        out.append(" & ".join([_name(m), _cell(np.median([r["auc"] for r in d]), 2), str(len(hits)),
+                               _cell(np.median(hits) if hits else np.nan, 2), _cell(np.mean(fp))]) + r" \\")
+    return "\n".join(out + [r"\bottomrule", r"\end{tabular}"])
+
+
+def _name(m) -> str:
+    name = STYLE[m][0].replace(" (ours)", "").replace("Clock-and-map, arithmetic", "Clock-and-map, arith.")
+    return r"\textbf{" + name + "}" if m == "snn_phasemap" else name
 
 
 def main() -> None:
     setup_style()
-    dev = read_scores("development")
-    held = read_scores("held_out")
-    pend = dict(setup="pendulum", input="snn", offset="as_is")
-    other = dict(setup=lambda s: s in ("fan", "wall_target"), input="centroid", offset="removed")
-    fig_prediction_vs_horizon([(held, "(a) Pendulum, evaluation", pend),
-                               (dev, "(b) Pendulum, development", pend),
-                               (dev, "(c) Rotating arm and hand-moved, development", other)], "results_horizon")
-    fig_break_trace("held_out", "small_break", "results_break")
-    fig_break_trace("development", "wide_break", "results_break_dev")
+    rows = read_scores("development") + read_scores("held_out")
+    tracks = read_csv(RUNS / "tracks" / "tracks.csv")
+    breaks = read_csv(RUNS / "held_out_breaks" / "breaks.csv")
+    panels = [(rows, "(a) Pendulum", LABELLED["pendulum"]),
+              (rows, "(b) Rotating arm and hand-moved", LABELLED["other"])]
+    if tracks:
+        panels.append((tracks, "(c) Runs without position labels", {}))
+    fig_prediction_vs_horizon(panels, "results_horizon")
+    fig_break_pair([("held_out", "small_break", "snn", "(a) Pendulum"),
+                    ("tracks", "loop_break_02", "centroid", "(b) Hand-moved")])
     fig_paths("development", "wide_break", "results_paths")
     fig_localiser_cdf(["development", "held_out"])
     fig_learning(["development", "held_out"])
-    (RUNS / "tables.tex").write_text(tables(dev, held), encoding="utf-8")
+    (RUNS / "tables.tex").write_text("% Table: prediction and path\n" + prediction_table(rows, tracks)
+                                     + "\n\n% Table: deviation detection, every real run\n"
+                                     + deviation_table(rows, breaks, tracks) + "\n", encoding="utf-8")
     print("wrote", RUNS / "tables.tex")
 
 
