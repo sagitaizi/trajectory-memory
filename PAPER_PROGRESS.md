@@ -28,7 +28,7 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 | III-C  | Spiking Localiser          | reviewed    | —                   | —                        |
 | III-D  | Trajectory-Memory Network  | reviewed    | —                   | half-period fix          |
 | IV-B   | Event-Camera Simulator     | drafted     | —                   | —                        |
-| IV-A   | Live Runs                  | drafted     | —                   | —                        |
+| IV-A   | Live Runs                  | reviewed    | —                   | —                        |
 | IV-C   | Baselines                  | drafted     | —                   | —                        |
 | IV-D   | Evaluation Protocol        | drafted     | —                   | —                        |
 | IV-E   | Metrics                    | drafted     | —                   | —                        |
@@ -90,7 +90,7 @@ Sagi's, managed outside the repo; the state it was in when he took it over is
 Naming in the paper: the setups are *pendulum*, *rotating arm* and *hand-moved*; the real
 runs are *development* and *evaluation* (the corpus and code still say `held_out`).
 
-**Review** (drafted, not yet reviewed), in paper order: §IV-A–E, §V-A–D, §VI.
+**Review** (drafted, not yet reviewed), in paper order: §IV-B–E, §V-A–D, §VI.
 
 **Write**, in suggested order:
 
