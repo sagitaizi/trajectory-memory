@@ -87,13 +87,8 @@ Sagi's, managed outside the repo; the state it was in when he took it over is
 
 ## Pending
 
-**First, next session — renaming across the whole paper, results first** (asked by Sagi):
-- Setup names "fan", "wall target", "brush" read as informal; give the setups descriptive
-  names (the fan setup is a single run). Includes the labels baked into `results_horizon`
-  and the table titles (`scripts/paper_figures.py`, `runs/paper/tables.tex`).
-- "held-out" → "evaluation"; "development" stays.
-- §IV: say plainly that no real recording was ever trained on — "development" only means
-  the clips were looked at while building the system.
+Naming in the paper: the setups are *pendulum*, *rotating arm* and *hand-moved*; the real
+runs are *development* and *evaluation* (the corpus and code still say `held_out`).
 
 **Review** (drafted, not yet reviewed), in paper order: §IV-A–E, §V-A–D, §VI.
 
