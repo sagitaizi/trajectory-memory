@@ -419,10 +419,10 @@ TABLE_FOOT = [r"\bottomrule", r"\end{tabular}"]
 
 def tables(dev, held) -> str:
     pend = dict(input="snn", offset="as_is")
-    main_table = (TABLE_HEAD + table_block(held, "Pendulum, held-out (3 clips, 1 break)", **pend) + [r"\midrule"]
+    main_table = (TABLE_HEAD + table_block(held, "Pendulum, evaluation (3 clips, 1 break)", **pend) + [r"\midrule"]
                   + table_block(dev, "Pendulum, development (3 clips, 1 break)", setup="pendulum", **pend)
                   + TABLE_FOOT)
-    other = (TABLE_HEAD + table_block(dev, "Fan and wall target, development (3 recordings, 1 with a deviation)",
+    other = (TABLE_HEAD + table_block(dev, "Rotating arm and hand-moved target, development (3 recordings, 1 with a deviation)",
                                       setup=lambda s: s in ("fan", "wall_target"), input="centroid",
                                       offset="removed") + TABLE_FOOT)
     return ("% Table: pendulum, full spiking pipeline, labels as-is\n" + "\n".join(main_table)
@@ -435,9 +435,9 @@ def main() -> None:
     held = read_scores("held_out")
     pend = dict(setup="pendulum", input="snn", offset="as_is")
     other = dict(setup=lambda s: s in ("fan", "wall_target"), input="centroid", offset="removed")
-    fig_prediction_vs_horizon([(held, "(a) Pendulum, held-out", pend),
+    fig_prediction_vs_horizon([(held, "(a) Pendulum, evaluation", pend),
                                (dev, "(b) Pendulum, development", pend),
-                               (dev, "(c) Fan and wall target, development", other)], "results_horizon")
+                               (dev, "(c) Rotating arm and hand-moved, development", other)], "results_horizon")
     fig_break_trace("held_out", "small_break", "results_break")
     fig_break_trace("development", "wide_break", "results_break_dev")
     fig_paths("development", "wide_break", "results_paths")
