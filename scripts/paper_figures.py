@@ -123,7 +123,7 @@ def fig_break_pair(runs, name="results_break", window=(-6.0, 4.0)) -> None:
     the deviation score over its alarm bar for the spiking memory and the Kalman."""
     fig, axes = plt.subplots(3, len(runs), figsize=(DCOL, 2.9), sharex="col",
                              gridspec_kw={"height_ratios": [1.5, 1, 1], "hspace": 0.18, "wspace": 0.22})
-    for col, (set_name, clip, input_name, title) in zip(axes.T, runs):
+    for i, (col, (set_name, clip, input_name, title)) in enumerate(zip(axes.T, runs)):
         ours = trace(set_name, clip, "snn_phasemap", input_name)
         kal = trace(set_name, clip, "kalman", input_name)
         tb = float(ours["deviation_times"][0])
@@ -149,20 +149,20 @@ def fig_break_pair(runs, name="results_break", window=(-6.0, 4.0)) -> None:
             ratio = tr["score"] / np.where(tr["bar"] > 0, tr["bar"], np.nan)
             ax.plot(tt[s], ratio[s], color=STYLE[m][1], lw=0.9)
             ax.axhline(1.0, color=INK, lw=0.6, ls=(0, (3, 2)))
-            flags = alarm_times(tt, ratio)
+            flags = scored_alarm_times(tt, ratio)
             for f in flags[(flags >= window[0]) & (flags <= window[1])]:
                 ax.axvline(f, color="#d03b3b", lw=0.6, alpha=0.7)
             ax.set_yscale("log")
             ax.set_ylim(0.05, 40)
             ax.set_yticks([0.1, 1, 10], ["0.1", "1", "10"])
             ax.minorticks_off()
-            if col is axes.T[0]:
-                ax.set_ylabel("Score / bar")
             ax.text(0.01, 0.92, STYLE[m][0], transform=ax.transAxes, va="top", fontsize=7, color=INK)
         for ax in col:
             ax.axvline(0.0, color=INK, lw=0.9)
         col[-1].set_xlabel("Time from the marked start of the deviation (s)")
     fig.align_ylabels(axes[:, 0])
+    axes[1, 0].set_ylabel("Score / threshold")                 # one label for both score rows
+    axes[1, 0].yaxis.set_label_coords(-0.105, -0.09)
     save(fig, name)
 
 
@@ -173,6 +173,18 @@ def alarm_times(t, ratio, hold=3) -> np.ndarray:
     onset = run & ~np.r_[False, run[:-1]]
     return t[onset]
 
+
+def scored_alarm_times(t, ratio, hold=3) -> np.ndarray:
+    """The alarms the scoring counts, with `t` relative to the deviation: every one before it
+    (false alarms), then only the first after it (the detection), or none if one is still on."""
+    above = np.nan_to_num(ratio) > 1.0
+    run = np.convolve(above.astype(int), np.ones(hold, int), mode="full")[:len(above)] >= hold
+    onsets = alarm_times(t, ratio, hold)
+    before, after = onsets[onsets < 0], onsets[onsets >= 0]
+    at_start = np.flatnonzero(t >= 0)
+    if len(after) == 0 or (len(at_start) and run[at_start[0]]):
+        return before
+    return np.r_[before, after[:1]]
 
 def fig_paths(set_name, clip, name="results_paths", input_name="snn") -> None:
     """The remembered cycle of each memory, at the last step before any break, over the
@@ -438,7 +450,7 @@ def prediction_table(rows, tracks) -> str:
     out = [r"\begin{tabular}{lrrrr}", r"\toprule", r" & \multicolumn{3}{c}{Error at $h$ (px)} & Path \\",
            r"\cmidrule(lr){2-4}", r"Memory & 50\,ms & 100\,ms & 200\,ms & (px) \\", r"\midrule"]
     groups = [(rows, "Pendulum, spiking localiser, against the labels (6 runs)", LABELLED["pendulum"]),
-              (rows, "Rotating arm and hand-moved, against the labels (3 runs)", LABELLED["other"]),
+              (rows, "Rotating arm and hand-moved, centroid, offset removed (3 runs)", LABELLED["other"]),
               (tracks, f"Unlabelled runs, against the tracked position ({len({r['clip'] for r in tracks})} runs)", {})]
     for i, (got_rows, title, sel) in enumerate(g for g in groups if g[0]):
         out += ([r"\midrule"] if i else []) + [r"\multicolumn{5}{l}{\emph{" + title + r"}} \\"]

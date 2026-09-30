@@ -19,7 +19,7 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 
 | §      | Section                    | Status      | Blocked on          | Revisit after            |
 |--------|----------------------------|-------------|---------------------|--------------------------|
-| —      | Abstract                   | placeholder | everything          | write last               |
+| —      | Abstract                   | drafted     | —                   | —                        |
 | I      | Introduction               | reviewed    | —                   | —                        |
 | II     | Related Work               | reviewed    | —                   | —                        |
 | III    | Method (opening paragraph) | reviewed    | —                   | —                        |
@@ -34,8 +34,8 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 | IV-E   | Metrics                    | reviewed    | —                   | —                        |
 | V-A    | Results: Localiser         | reviewed    | —                   | —                        |
 | V-B    | Results: Prediction + path | reviewed    | —                   | —                        |
-| V-C    | Results: Deviation         | drafted     | —                   | —                        |
-| V-D    | Results: Ablations         | drafted     | —                   | —                        |
+| V-C    | Results: Deviation         | reviewed    | —                   | —                        |
+| V-D    | Results: Ablations         | reviewed    | —                   | —                        |
 | VI     | Discussion                 | drafted     | —                   | —                        |
 | VII    | Conclusion                 | drafted     | —                   | —                        |
 | —      | Acknowledgment             | drafted     | —                   | —                        |
@@ -98,9 +98,8 @@ both localisers move onto its string (centroid to mid-string, flickering; spikin
 the string's top). The 5.5 s detection is a single brief crossing of the threshold. Decided:
 keep 6 of 6 and name the cause in §V-C. §IV-A gives no size for the arm.
 
-**Review** (drafted, not yet reviewed), in paper order: §V-C–D, §VI, §VII.
-
-**Write:** the **Abstract**, last.
+**Review** (drafted, not yet reviewed): the Abstract, §VI, §VII. Then the fixes below, and one
+last read of the whole paper.
 
 ## The 4a encoder ground truth was abandoned (2026-09-12)
 
@@ -136,22 +135,34 @@ Writing early buys speed and costs staleness. Nothing is *final* until these are
 
 - [x] §I contribution claims match the results: the bullets carry no numbers; "stays quiet
       on steady motion" holds on all 13 runs without a deviation.
-- [ ] Abstract matches the pooled results: 6 of 6 deviations detected (median 0.32 s; 1.6
-      and 5.5 s on the rotating arm), one alarm before an onset (`loop_break_02`, 0.27 s
-      before the hand mark).
-- [ ] Final sweep validating every reference, once all writing is done. Known so far:
-      missing `Voelker2019Legendre` (has a `% CITE:` comment in `main.tex`); `Alberico2025Egocentric` has the last author
-      reversed and is the arXiv version, not CVPR Workshops 2025; `Harvey2002Forecasting` is
-      a 2-page *Wilmott* piece, not Harvey's 1989 book (doi:10.1017/CBO9781107049994);
-      `Eshraghian2022Training` and `Neftci2019Surrogate` are the arXiv versions, not
-      *Proc. IEEE* 2023 and *IEEE Signal Processing Magazine* 2019 (BIBLIOGRAPHY.md has both).
+- [ ] Abstract reviewed by Sagi. Its numbers match §V: 19 runs, 50 ms as accurate as the
+      periodic filters, 6 of 6 deviations (median latency 0.32 s), one alarm outside them,
+      Kalman 3 of 6 at 36 false alarms/min.
+- [ ] `refs.bib` fixes still open (swept 2026-09-30; months, URLs, capitals, formatting slips,
+      published versions and the Harvey book are done):
+      - author names swapped: `Sho2026A` (Okazaki, Sho … Ota, Jun), `Righetti2006Dynamic`
+        (Ijspeert, Auke Jan);
+      - `Hu2021V2e` prints "Thecvf.com": make it `@inproceedings`, booktitle CVPRW 2021;
+      - `Alberico2025Egocentric` pages 5025–5034 vs 5064–5073 on the CVF copy: check;
+      - missing fields: Xu 16:2121–2129; Kalman pp. 35–45; Bekolay article 48; Eliasmith's
+        full title ("…: Computation, Representation, and Dynamics in Neurobiological Systems").
+      Re-exporting from the reference manager brings back `month`, `day` and `url` unless the
+      export drops them.
+- [ ] Back to 8 pages (dealt with at the end). With URLs gone, three references still sit on
+      page 9. Tested on a copy: IEEE-abbreviated venue names save one, the "Learned memories"
+      rewording and dropping Neftci's subtitle a second; about four lines of text cuts remain,
+      one more once v2e's venue is fixed.
+- [ ] Text fixes left from the 2026-09-30 review, not taken so far (typos, dashes, units,
+      PES, notation and the two content points are done): grammar l.71 "actual deviation",
+      l.87 "Neither works involve", l.102 "must alert it", l.148 "real life", l.258 "fired …
+      fires"; US spellings l.91, 134, 148, 183; l.128 cites §IV where §IV-B is meant.
 - [x] Real-time claim: `scripts/time_live.py`, mains power, held-out pendulum runs. With
       localiser and memory overlapped (separate processes, identical outputs) a 5 ms frame
       costs 4.0–4.4 ms (1.15–1.26×); one after the other it is 5.2–5.5 ms (0.91–0.96×).
       §VI ("What is spiking") quotes the overlapped number. Re-run it if either network changes.
-- [ ] §III-B, §IV-A, §IV-C holes filled with real values.
-- [ ] §IV-B describes ground truth as hand-labelled and interpolated, for every setup.
-- [ ] Abstract written last, matching the results.
+- [x] §III-B, §IV-A, §IV-C holes filled with real values.
+- [x] Ground truth described as hand-labelled and interpolated (§IV-A).
+- [x] Abstract written last, matching the results.
 - [x] `\nocite{*}` removed from `main.tex`; every bib entry is cited.
 
 ## Online-only tasks

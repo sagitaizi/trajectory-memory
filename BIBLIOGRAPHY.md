@@ -448,3 +448,47 @@ work can say why, and so the framing is not mistaken for ours.
 - **Why:** single-object event tracking benchmark (DAVIS346); noted as a lower-resolution
   alternative external test.
 - **Where:** Phase F external check (secondary).
+
+## Background cited in the paper's introduction and method
+
+### Berry, Brivanlou, Jordan & Meister, 1999 — "Anticipation of moving stimuli by the retina"
+- *Nature* 398:334–338.
+- **Why:** visual signals arrive 30–100 ms late, yet a moving target is not seen behind its
+  position; the retina itself anticipates. Motivates prediction over reaction.
+- **Where:** paper §I (`Berry1999Anticipation`).
+
+### Clark, 2013 — "Whatever next? Predictive brains, situated agents, and the future of cognitive science"
+- *Behavioral and Brain Sciences* 36(3):181–204.
+- **Why:** the brain as a prediction machine that models what comes next and attends to what
+  deviates — the framing for prediction plus a deviation signal.
+- **Where:** paper §I (`Clark2013Whatever`).
+
+### Mahowald & Mead, 1991 — "The silicon retina"
+- *Scientific American* 264(5):76–83.
+- **Why:** the event camera's origin as a silicon counterpart of the retina.
+- **Where:** paper §I (`Mahowald1991The`).
+
+### Gallego et al., 2022 — "Event-based vision: A survey"
+- *IEEE TPAMI* 44(1):154–180.
+- **Why:** the standard reference for what an event camera reports and why (per-pixel
+  brightness changes, microsecond latency, low power).
+- **Where:** paper §I (`Gallego2022Event`).
+
+### Okazaki et al., 2026 — "A spatio-temporal anomaly detection system to support understanding of abnormal phenomena in automated manufacturing lines"
+- *Computers in Industry* 178:104481. Okazaki, Kaminishi, Wang, Fujiu, Nakata, Hamamoto,
+  Yokose, Hara, Umeda & Ota.
+- **Why:** an application of the task — flagging departures from the cyclic motion of a
+  production line.
+- **Where:** paper §I (`Sho2026A`).
+
+### Xu, Liu, Xing & Wei, 2022 — "Motion-aware future frame prediction for video anomaly detection based on saliency perception"
+- *Signal, Image and Video Processing* 16:2121–2129.
+- **Why:** video anomaly detection as prediction error — predict the next frame, flag the ones
+  predicted poorly; the principle behind the deviation score.
+- **Where:** paper §II (`Xu2022Motion`).
+
+### O'Keefe & Dostrovsky, 1971 — "The hippocampus as a spatial map"
+- *Brain Research* 34(1):171–175.
+- **Why:** place cells — the model for the localiser's position readout, and by analogy the
+  memory's phase cells.
+- **Where:** paper §III-C (`OKeefe1971The`).

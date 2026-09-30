@@ -63,6 +63,20 @@ def learning_delay(set_names, memory: str, horizon=0.1, span_s=20.0) -> float:
     return float(grid[np.flatnonzero(med <= 1.1 * steady)[0]])
 
 
+def recovery(set_name: str, clip: str, memory: str, horizon=0.1, input_name="snn") -> str:
+    """Median prediction error in 2 s bins around the deviation, to show re-learning after it."""
+    tr = np.load(RUNS / set_name / "traces" / f"{clip}__{memory}__{input_name}.npz")
+    hi = list(np.round(tr["horizons"], 3)).index(horizon)
+    e = np.linalg.norm((tr["pred"][hi] - tr["gt_ahead"][hi]) * tr["resolution"], axis=1)
+    rel = tr["t"] - float(tr["deviation_times"][0])
+    edges = np.arange(-2, 14, 2)
+    cells = []
+    for lo, hi_s in zip(edges[:-1], edges[1:]):
+        w = e[(rel >= lo) & (rel < hi_s) & np.isfinite(e)]
+        cells.append(f"{lo:+d}..{hi_s:+d} s {np.median(w):.1f}" if len(w) else f"{lo:+d}..{hi_s:+d} s -")
+    return "; ".join(cells)
+
+
 def medians(rows, memory, **sel) -> str:
     got = pick(rows, memory=memory, **sel)
     with np.errstate(all="ignore"):
@@ -114,6 +128,8 @@ def main() -> None:
     put("V.B", "clock period / true period, pendulum runs", f"{min(ratios):.3f}-{max(ratios):.3f}")
     for m in ("snn_phasemap", "kalman", "harmonic"):
         put("V.B", f"learning delay to steady 100 ms error, {m} (s)", f"{learning_delay(list(sets), m):.2f}")
+    for m in ("snn_phasemap", "kalman", "harmonic"):
+        put("V.B", f"wide_break, {m}: 100 ms px around the push (recovery)", recovery("development", "wide_break", m))
     for r in pick(rows, memory="snn_phasemap", horizon_s=0.1, **LABELLED["other"]):
         put("V.B", f"{r['clip']}, spiking memory: path px / period ratio", f"{r['path_median_px']:.1f} / {r['period_ratio']:.2f}")
     if tracks:
