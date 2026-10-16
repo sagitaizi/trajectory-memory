@@ -74,11 +74,10 @@ Notes on the rows:
   `scripts/spike_counts.py` (activity). `scripts/paper_figures.py` makes the figures
   (`paper/figures/results_*.pdf`) and tables (`runs/paper/tables.tex`);
   `scripts/paper_numbers.py` writes every in-text number to `runs/paper/numbers.csv`.
-  Unused figure: `results_learning.pdf` (error vs time from the clip's start).
 - **Architecture figures** — `figures/architecture/`, TikZ sources + PDFs. `pipeline` is
-  Fig. 1 (in `main.tex`, placed before §I so it floats to page 2; raster panels from
-  `make_assets.py`). Not in `main.tex`: `clock_and_map` (§III-D, one column); `rig` (left
-  out: the motors are never used). `system_overview` is superseded.
+  Fig. 1 (in `main.tex`, placed before §I so it floats to page 2; opens with the plain rig
+  photo; raster panels from `make_assets.py`). Not in `main.tex`: `clock_and_map` (§III-D,
+  one column); `rig` (the labelled photo; the motors are never used). `system_overview` is superseded.
 
 Every paper cited needs an entry in `BIBLIOGRAPHY.md` in the same change. `paper/refs.bib` is
 Sagi's, managed outside the repo; the state it was in when he took it over is

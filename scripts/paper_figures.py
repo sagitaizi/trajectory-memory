@@ -524,7 +524,6 @@ def main() -> None:
                     ("tracks", "loop_break_02", "centroid", "(b) Hand-moved")])
     fig_paths("development", "wide_break", "results_paths")
     fig_localiser_cdf(["development", "held_out"])
-    fig_learning(["development", "held_out"])
     (RUNS / "tables.tex").write_text("% Table: prediction and path\n" + prediction_table(rows, tracks)
                                      + "\n\n% Table: deviation detection, every real run\n"
                                      + deviation_table(rows, breaks, tracks) + "\n", encoding="utf-8")

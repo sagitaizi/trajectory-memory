@@ -1,5 +1,5 @@
-% Fig. 1 candidate (illustrative): events -> spiking localiser -> clock and map -> prediction,
-% (clock and map). Two-column width (7.16 in = 516 pt).
+% Fig. 1: camera -> events -> spiking localiser -> clock and map -> prediction.
+% Two-column width (7.16 in = 516 pt).
 % Assets: python figures/architecture/make_assets.py.   Build: pdflatex pipeline.tex
 \documentclass[tikz,border=1pt]{standalone}
 \usepackage[T1]{fontenc}
@@ -44,7 +44,9 @@
 \begin{tikzpicture}[x=1mm, y=1mm]
 \coordinate (row) at (0,11);       % height of the main left-to-right flow
 
-% ---------------------------------------------------------------- input frame
+% ---------------------------------------------------------------- camera photo and input frame
+\node[imgframe, anchor=south east] (rig) at (-5,0)
+  {\includegraphics[height=21mm]{assets/rig.jpg}};
 \node[imgframe, anchor=south west] (ev) at (0,0)
   {\includegraphics[height=21mm]{assets/event_frame.png}};
 \node[sub, anchor=north] at (ev.south) {5\,ms of events\\(ON {\color{onc}$\bullet$}, OFF {\color{offc}$\bullet$})};
@@ -114,6 +116,7 @@
 \node[stage] at (g1.north west) {Stage 1: spiking localiser (LIF neurons)};
 \node[stage] at (g2.north west) {Stage 2: trajectory memory};
 
+\draw[flow] (rig.east |- row) -- (ev.west |- row);
 \draw[flow] (ev.east |- row) -- (g1.west |- row);
 \draw[flow] (g1.east |- row) -- node[sub, above] {$\tilde{p}(t)$} (g2.west |- row);
 \draw[flow] (g2.east |- row) -- (out.west |- row);
