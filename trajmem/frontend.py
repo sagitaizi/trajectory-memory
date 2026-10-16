@@ -62,6 +62,61 @@ def to_frames(clip: Clip, window_us: int, kind: str = "count", downsample: int =
         raise ValueError(f"unknown frame kind: {kind!r}")
 
 
+class LiveFrames:
+    """`to_frames(kind="count")` for events arriving in chunks from a camera: time counts
+    from the first event, as a loaded recording's does, and a window is handed out once an
+    event past its end has come. The stuck-pixel cut can only see the past here: the rate
+    over every event so far, refreshed each second, from 5 s on."""
+
+    def __init__(self, resolution, window_us: int, downsample: int = 1, max_rate: float = HOT_PIXEL_RATE,
+                 refresh_us: int = 1_000_000):
+        self.w, self.h = resolution
+        if self.w % downsample or self.h % downsample:
+            raise ValueError(f"downsample {downsample} must divide the sensor {self.w}x{self.h}")
+        self.window_us, self.downsample, self.max_rate, self.refresh_us = window_us, downsample, max_rate, refresh_us
+        self.origin_us = None
+        self.pending = None
+        self.next_k = 0
+        self.counts, self.seen = np.zeros(self.w * self.h, np.int64), []
+        self.hot = np.zeros(self.w * self.h, bool)
+        self.hot_due_us = 5_000_000
+
+    def push(self, events) -> list[tuple[int, np.ndarray, np.ndarray]]:
+        """(t_start_us, raw window events, count frame) for every window this chunk closes."""
+        if len(events) == 0:
+            return []
+        if self.origin_us is None:
+            self.origin_us = int(events["timestamp"][0])
+        ev = events.copy()
+        ev["timestamp"] -= self.origin_us
+        self.pending = ev if self.pending is None else np.concatenate([self.pending, ev])
+        last_k = int(self.pending["timestamp"][-1]) // self.window_us
+        starts = np.arange(self.next_k, last_k + 1) * self.window_us
+        edges = np.searchsorted(np.ascontiguousarray(self.pending["timestamp"]), starts)
+        closed = self.pending[:edges[-1]]
+        idx = closed["y"].astype(np.intp) * self.w + closed["x"].astype(np.intp)
+        keep = ~self.hot[idx]                                 # the cut as it stood before this chunk
+        out = []
+        for t0, lo, hi in zip(starts[:-1], edges[:-1], edges[1:]):
+            win = self.pending[lo:hi]
+            out.append((int(t0), win, _count_frame(win[keep[lo:hi]], self.w, self.h, self.downsample)))
+        self._update_hot(idx, last_k * self.window_us)
+        self.pending = self.pending[edges[-1]:]
+        self.next_k = last_k
+        return out
+
+    def _update_hot(self, idx, t_us: int) -> None:
+        """Pixel counts are summed only at a refresh, the one time they are read."""
+        if self.max_rate <= 0 or len(idx) == 0:
+            return
+        self.seen.append(idx)
+        if t_us >= self.hot_due_us:
+            self.counts += np.bincount(np.concatenate(self.seen), minlength=self.w * self.h)
+            self.seen = []
+            self.hot = self.counts / (t_us / 1e6) > self.max_rate
+            self.hot_due_us = t_us + self.refresh_us
+
+
 def _count_frame(ev, w: int, h: int, downsample: int) -> np.ndarray:
     """Counts straight into the downsampled grid: one bincount over flat cell indices
     (np.add.at on the full-resolution frame was the pipeline's slowest step)."""

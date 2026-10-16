@@ -34,6 +34,7 @@ python scripts/run_experiment.py --set development             # scorecard for e
 python scripts/run_experiment.py corpus/sim/sim_003.npz --memory kalman
 python scripts/check_localiser.py --set development            # centroid vs hand-labels
 python scripts/replay_gt.py corpus/real/fan/fan_brush_slow_02 --model kalman   # watch it live
+python scripts/run_live.py --record runs/live/live_01.aedat4    # the event camera, live: q quits, r re-learns
 python scripts/make_tracks.py                                  # position tracks for pretraining
 python scripts/make_frames.py --downsample 8                   # frame sets for the localiser
 python scripts/train_localiser.py                              # train the spiking localiser -> runs/localiser/snn.pt

@@ -174,8 +174,6 @@ def _read_events(player) -> np.ndarray:
     without it a recorded clip and a simulated one reach the frontend as
     different dtypes.
     """
-    from .simulate import EVENT_DTYPE
-
     chunks = []
     while player.isRunning():
         batch = player.getNextEventBatch()
@@ -183,8 +181,13 @@ def _read_events(player) -> np.ndarray:
             chunks.append(batch.numpy())
     if not chunks:
         raise ValueError("recording has no events")
+    return to_event_array(np.concatenate(chunks))
 
-    raw = np.concatenate(chunks)
+
+def to_event_array(raw) -> np.ndarray:
+    """A dv event batch's numpy view as EVENT_DTYPE, for recordings and the live camera alike."""
+    from .simulate import EVENT_DTYPE
+
     out = np.empty(len(raw), dtype=EVENT_DTYPE)
     for name in ("x", "y", "timestamp", "polarity"):
         out[name] = raw[name]

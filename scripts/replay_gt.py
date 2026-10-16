@@ -155,29 +155,36 @@ class LiveOverlay:
             if tw > t:
                 return self.step
             self.pending = None
-            self.memory.observe(x, y)
-            pred = np.array(self.memory.predict(self.horizon_s), dtype=float) * self.scale
-            err = np.nan
-            if self.clip.gt is not None and tw + self.horizon_s <= self.clip.duration_us / 1e6:
-                err = float(np.hypot(*(pred - np.asarray(self.clip.gt(tw + self.horizon_s), dtype=float) * self.scale)))
-            self.step = {"obs_px": np.array([x, y]) * self.scale, "pred_px": pred,
-                         "score": float(self.memory.deviation_score()), "err_px": err, "horizon_s": self.horizon_s,
-                         "accepted": bool(getattr(self.memory, "accepted", True)),
-                         "cycle_px": self._cycle(tw), "period_s": self._period()}
-            self.stepped.append((self.step["score"], tw))
+            self.observe(tw, x, y)
+
+    def observe(self, tw: float, x: float, y: float) -> dict:
+        """One window's position into the memory; its output becomes the current step."""
+        self.memory.observe(x, y)
+        pred = np.array(self.memory.predict(self.horizon_s), dtype=float) * self.scale
+        err = np.nan
+        if self.clip.gt is not None and tw + self.horizon_s <= self.clip.duration_us / 1e6:
+            err = float(np.hypot(*(pred - np.asarray(self.clip.gt(tw + self.horizon_s), dtype=float) * self.scale)))
+        self.step = {"obs_px": np.array([x, y]) * self.scale, "pred_px": pred,
+                     "score": float(self.memory.deviation_score()), "err_px": err, "horizon_s": self.horizon_s,
+                     "accepted": bool(getattr(self.memory, "accepted", True)),
+                     "cycle_px": self._cycle(tw), "period_s": self._period()}
+        self.stepped.append((self.step["score"], tw))
+        return self.step
 
     def _period(self) -> float:
         return float(self.memory.period()) if hasattr(self.memory, "period") else np.nan
 
+    cycle_every_s = 0.1
+
     def _cycle(self, t_now: float):
-        """The remembered path as a closed curve (px), every 100 ms of clip time."""
+        """The remembered path as a closed curve (px), every `cycle_every_s` of clip time."""
         if not hasattr(self.memory, "path_points") or not np.isfinite(self._period()):
             return getattr(self, "_last_cycle", None)
         self._cycle_due = getattr(self, "_cycle_due", 0.0)
         if t_now >= self._cycle_due:
             pts = self.memory.path_points(np.arange(48) / 48)
             self._last_cycle = None if pts is None or not np.isfinite(pts).all() else np.asarray(pts) * self.scale
-            self._cycle_due = t_now + 0.1
+            self._cycle_due = t_now + self.cycle_every_s
         return getattr(self, "_last_cycle", None)
 
 
@@ -228,7 +235,9 @@ def _draw(img, gt_px, trail_px, anchor, view_zoom, label, t, view_window_s,
         ax, ay = int(round(anchor[0] * z)), int(round(anchor[1] * z))
         cv2.drawMarker(view, (ax, ay), (200, 120, 255), cv2.MARKER_TILTED_CROSS, 14, 1)
 
-    if np.isnan(gt_px).any():                   # target not seen here: say so, draw nothing
+    if gt_px is None:                           # no ground truth at all (the live camera)
+        pass
+    elif np.isnan(gt_px).any():                 # target not seen here: say so, draw nothing
         cv2.putText(view, "TARGET NOT VISIBLE (no ground truth)", (8, 42),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2, cv2.LINE_AA)
     else:

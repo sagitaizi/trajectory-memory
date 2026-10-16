@@ -164,13 +164,7 @@ class Panels:
             if self.errors[k]:
                 cv2.putText(view, f"median err {np.median(self.errors[k]):5.1f} px", (view.shape[1] - 190, 42),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1, cv2.LINE_AA)
-            if self.flagged[k]:                                  # the memory says: not the remembered path
-                cv2.rectangle(view, (2, 2), (view.shape[1] - 3, view.shape[0] - 3), (0, 0, 255), 4)
-                cv2.putText(view, "DEVIATION", (view.shape[1] // 2 - 80, 64), cv2.FONT_HERSHEY_SIMPLEX,
-                            0.9, (0, 0, 255), 2, cv2.LINE_AA)
-            bar = f"alarm bar {self.alarms[k].bar:5.1f} px" if np.isfinite(self.alarms[k].bar) else "alarm settling"
-            cv2.putText(view, bar, (8, view.shape[0] - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
-                        (120, 200, 255), 1, cv2.LINE_AA)
+            draw_alarm(view, self.alarms[k], self.flagged[k])
             panels.append(view)
         tiled = np.hstack(panels)
         header = np.zeros((_HEADER_PX, tiled.shape[1], 3), np.uint8)
@@ -181,6 +175,19 @@ class Panels:
             f = self.max_width / out.shape[1]
             out = cv2.resize(out, None, fx=f, fy=f, interpolation=cv2.INTER_AREA)
         return out
+
+
+def draw_alarm(view, alarm, flagged: bool) -> None:
+    """The deviation mark: a red border and DEVIATION while the alarm holds, and its bar."""
+    import cv2
+
+    if flagged:                                              # the memory says: not the remembered path
+        cv2.rectangle(view, (2, 2), (view.shape[1] - 3, view.shape[0] - 3), (0, 0, 255), 4)
+        cv2.putText(view, "DEVIATION", (view.shape[1] // 2 - 80, 64), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.9, (0, 0, 255), 2, cv2.LINE_AA)
+    bar = f"alarm bar {alarm.bar:5.1f} px" if np.isfinite(alarm.bar) else "alarm settling"
+    cv2.putText(view, bar, (8, view.shape[0] - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
+                (120, 200, 255), 1, cv2.LINE_AA)
 
 
 def render_clip(panels: Panels, out: pathlib.Path, fps: float) -> pathlib.Path:
