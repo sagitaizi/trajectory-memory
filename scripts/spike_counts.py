@@ -88,6 +88,7 @@ def count_memory(mem):
             counts[key] += float((spk > 0).sum())
             return spk, v, r
         pop._lif = counted
+        pop.eager = True                                  # the scripted step does not call `_lif`
     observe = mem.observe
 
     def counted_observe(x, y):

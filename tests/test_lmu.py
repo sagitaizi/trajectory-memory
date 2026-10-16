@@ -105,3 +105,21 @@ def test_torch_population_matches_nengo_simulating_the_same_network():
     out = np.array(out)
     late = slice(200, None)
     assert np.sqrt(np.mean((out[late] - ref[4::5][late]) ** 2)) < 0.05
+
+
+def test_the_scripted_population_step_is_the_plain_loop_to_the_bit():
+    import torch
+
+    from trajmem.lmu import SpikingLmu
+    from trajmem.snn_phasemap import SpikingPhaseMap
+
+    clock = SpikingPhaseMap(dt_s=0.005, n_clock=300, n_ring=100).clock
+    plain = SpikingLmu(clock.w, 0.005)
+    plain.eager = True
+    g = torch.Generator().manual_seed(0)
+    s_fast, s_plain = clock.init_state(3), plain.init_state(3)
+    for _ in range(200):
+        u = torch.randn(3, 4, generator=g)
+        a_fast, s_fast = clock.step(u, s_fast)
+        a_plain, s_plain = plain.step(u, s_plain)
+        assert torch.equal(a_fast, a_plain) and all(torch.equal(a, b) for a, b in zip(s_fast, s_plain))

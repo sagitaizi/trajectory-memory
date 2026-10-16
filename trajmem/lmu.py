@@ -113,6 +113,7 @@ class SpikingLmu:
     synapse-filtered spike rates (B, N) in Hz -- what readouts see -- and the state."""
 
     TAU_RC, TAU_REF = 0.02, 0.002
+    eager = False                                     # the plain loop, for hooking `_lif` (scripts/spike_counts.py)
 
     def __init__(self, weights: LmuWeights, dt: float = 0.005, substeps: int = 5, device=None):
         self.w = weights
@@ -127,6 +128,10 @@ class SpikingLmu:
         for k, v in vars(self.w).items():
             if isinstance(v, torch.Tensor):
                 setattr(self.w, k, v.to(self.device))
+        f = lambda x: torch.tensor(x, dtype=torch.float32, device=self.device)  # noqa: E731
+        # Python numbers made tensors once rather than on every op; the rounding is the same
+        self._consts = (self.w.w_rec.T, self.w.scaled_encoders.T, self.w.bias, f(self.decay), f(1.0 - self.decay),
+                        f(self.dt_sub), f(self.TAU_RC), f(self.TAU_REF), f(0.0), f(1.0), f(0.999))
         return self
 
     def init_state(self, batch: int):
@@ -138,6 +143,9 @@ class SpikingLmu:
         v, r, act, x_in = state
         w = self.w
         drive = u.to(self.device) @ w.w_in.T                                    # (B, D), tau B u
+        if not self.eager:
+            act, v, r, x_in = _substeps(drive, v, r, act, x_in, *self._consts, self.substeps)
+            return act, (v, r, act, x_in)
         for _ in range(self.substeps):
             x_in = self.decay * x_in + (1.0 - self.decay) * drive
             x = act @ w.w_rec.T + x_in                                          # represented-space input
@@ -160,6 +168,26 @@ class SpikingLmu:
     def decode(self, act: torch.Tensor) -> torch.Tensor:
         """Filtered rates (B, N) -> represented state (B, C, q)."""
         return (act @ self.w.decoders.T).reshape(act.shape[0], self.w.n_channels, self.w.q)
+
+
+@torch.jit.script
+def _substeps(drive, v, r, act, x_in, w_rec_t, enc_t, bias, decay, one_m_decay, dt, tau, tau_ref, zero, one, cap,
+              substeps: int):
+    """`substeps` LIF steps of Nengo's LIF, scripted: the same ops in the same order as the
+    plain loop (outputs identical to the bit), without the Python between them."""
+    for _ in range(substeps):
+        x_in = decay * x_in + one_m_decay * drive
+        x = act @ w_rec_t + x_in                                                # represented-space input
+        j = x @ enc_t + bias
+        r = r - dt
+        delta = (dt - r).clamp(zero, dt)
+        v = v - (j - v) * torch.expm1(-delta / tau)
+        spiked = v > one
+        t_spike = dt + tau * torch.log1p(-((v - one) / (j - one)).clamp(max=cap))
+        v = torch.where(spiked, zero, v.clamp(min=zero))
+        r = torch.where(spiked, tau_ref + t_spike, r)
+        act = decay * act + one_m_decay * (spiked.to(v.dtype) / dt)
+    return act, v, r, x_in
 
 
 def state_radii(positions, q: int, theta: float, dt: float, margin: float = 1.25) -> np.ndarray:
