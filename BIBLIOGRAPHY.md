@@ -45,6 +45,18 @@ each before citing in the manuscript. Entries whose author list could not be che
   matrices, the delay readout, and the window-holds-the-cycle argument.
 - **Where:** `lmu.py`; `PLAN.md` §C; paper §V-D ablations (`Voelker2019Legendre`).
 
+### Hazan, Cohen-Duwek & Ezra Tsur, 2026 — "Convolutional Legendre Memory Unit (ConvLMU) for stereo neuromorphic event-based depth estimation"
+- *International Journal of Computer Vision* 134(10):432.
+- **Why:** a spiking LMU applied to event-camera input; added by the supervisor alongside the
+  original LMU paper.
+- **Where:** paper §V-D ablations (`hazan2026convolutional`).
+
+### Hazan, Greenberg & Ezra Tsur, 2025 — "Neuromorphic classification of geophone signals with Legendre memory units"
+- *IEEE BioCAS 2025*, pp. 552–556.
+- **Why:** a neuromorphic LMU on a time signal; added by the supervisor alongside the original
+  LMU paper.
+- **Where:** paper §V-D ablations (`hazan2025neuromorphic`).
+
 ### Voelker & Eliasmith, 2018 — "Improving spiking dynamical networks: accurate delays, higher-order synapses, and time cells"
 - *Neural Computation* 30(3):569–609.
 - **Why:** the spiking implementation of the delay network (the LMU's predecessor) with the NEF:
@@ -466,7 +478,18 @@ work can say why, and so the framing is not mistaken for ours.
 ### Mahowald & Mead, 1991 — "The silicon retina"
 - *Scientific American* 264(5):76–83.
 - **Why:** the event camera's origin as a silicon counterpart of the retina.
-- **Where:** paper §I (`Mahowald1991The`).
+- **Where:** not cited (the sentence was cut from §I); the entry stays in `refs.bib`.
+
+### Ezra Tsur, 2021 — "Neuromorphic Engineering: The Scientist's, Algorithms Designer's and Computer Architect's Perspectives on Brain-Inspired Computing"
+- CRC Press (book).
+- **Why:** background on SNNs' sparse, low-energy computation and on the NEF.
+- **Where:** paper §I, twice (`tsur2021neuromorphic`).
+
+### Ezra Tsur & Rivlin-Etzion, 2020 — "Neuromorphic implementation of motion detection using oscillation interference"
+- *Neurocomputing* 374:54–63.
+- **Why:** oscillators built as neuromorphic circuits; cited next to the adaptive-frequency
+  oscillator.
+- **Where:** paper §I (`tsur2020neuromorphic`).
 
 ### Gallego et al., 2022 — "Event-based vision: A survey"
 - *IEEE TPAMI* 44(1):154–180.
