@@ -27,7 +27,7 @@ target); offset-removed numbers are a secondary column.
 | C — Trajectory memory, Stage 1 | 🟨 **In progress.** Memory (clock and map, `snn_phasemap`) built: at the Kalman bar on prediction, better on path and deviation (development). Pendulum localiser `pend_ft.pt` beats the centroid on the pendulum. **Open: the half-period lock.** |
 | D — Deviation detection | ✅ Label-free ratcheting alarm, k calibrated per position input on development (centroid 25, `pend_ft` 30). Scored with a 0.5 s tolerance before each hand mark (`metrics.DEVIATION_TOLERANCE_S`; `scripts/rescore_deviation.py` re-scores the saved traces). Over all 19 real runs: 6/6 deviations detected, median AUC 0.98, median 0.32 s, no false alarms (`loop_break_02` is caught 0.27 s before the hand mark). Kalman: 3/6, 35 false alarms/min. |
 | E — Raw events, Stage 2 | Dropped for the submission; future work. |
-| F — Paper | 🟨 Written as sections unlock; draft due 2026-10-01. |
+| F — Paper | 🟨 Accepted at MCSoC 2026; camera-ready due 2026-11-08 (`PAPER_PROGRESS.md`). What follows is in `ROADMAP.md`. |
 
 ## A — Data
 

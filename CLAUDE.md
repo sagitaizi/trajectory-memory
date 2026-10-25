@@ -34,6 +34,7 @@ Read `PLAN.md` first for what's next. `TIMELINE.md` has the dated milestones.
 |---|---|
 | `PLAN.md` | Phased plan + current status. Start here. |
 | `TIMELINE.md` | Dated milestones with checkmarks. |
+| `ROADMAP.md` | After acceptance: camera-ready, CogSci version, learning sessions; how the two papers are kept apart. |
 | `PAPER_PROGRESS.md` | Which paper sections are writable, blocked, drafted. The paper is written as we go. |
 | `docs/implementation-plan.md` | Architecture, modules, data flow, frameworks. |
 | `RECORDING_LOG.md` | Every real clip: setup, rate, what it shows, label status. |
