@@ -1,16 +1,15 @@
 # Timeline
 
-Camera away until **2026-10-10** (laptop only). Deadlines are fixed; the work plan is the
-order things must land to make the draft.
+Deadlines are fixed. The camera-ready to-do list is in `PAPER_PROGRESS.md`.
 
 ## Deadlines
 
 | Date | Milestone | |
 |---|---|---|
-| 2026-10-01 | Draft to Dr. Ezra Tsur for review | ⬜ |
-| 2026-10-10 | **MCSoC 2026 submission** (EDAS, hard), 8 pages | ⬜ |
-| 2026-10-31 | Notification | ⬜ |
-| 2026-11-08 | Camera-ready + author registration | ⬜ |
+| 2026-10-01 | Draft to Dr. Ezra Tsur for review | ✅ |
+| 2026-10-10 | **MCSoC 2026 submission** (EDAS, hard), 8 pages | ✅ |
+| 2026-10-31 | Notification: accepted as a regular paper | ✅ |
+| 2026-11-08 | **Camera-ready + copyright form + author registration** (IEEE CPS, hard) | ⬜ |
 | 2026-12-14…17 | Conference, Shanghai Jiao Tong University | ⬜ |
 
 ## Work plan
@@ -22,7 +21,8 @@ order things must land to make the draft.
 | Sep 21–27 | Deviation thresholds on development clips; label and score the held-out pendulum clips; Stage 1 result frozen | ✅ |
 | Sep 28–Oct 1 | Held-out run, results table, draft to supervisor | ⬜ |
 | Oct 2–9 | Supervisor comments, final 8 pages | ⬜ |
-| Oct 10 | Submit | ⬜ |
+| Oct 10 | Submit | ✅ |
+| Oct 25–Nov 8 | Answer the reviewers, camera-ready, copyright, registration | ⬜ |
 
 ## Fallback ladder
 
