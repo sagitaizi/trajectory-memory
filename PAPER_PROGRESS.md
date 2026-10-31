@@ -56,15 +56,15 @@ author kit (the link is in the acceptance email), not EDAS. The limit is 8 pages
 
 Reviewer points:
 
-- [ ] **R1**: running on a laptop CPU (i7-12650H) sits oddly with the venue's hardware scope.
-      How would more advanced architectures help? §VI has one sentence on neuromorphic
-      hardware turning synaptic-operation counts into measured energy.
+- [x] **R1**: running on a laptop CPU (i7-12650H) sits oddly with the venue's hardware scope.
+      §VI: the ~40,000 LIF neurons fit on one Loihi chip, Nengo compiles such populations to
+      Loihi with on-chip PES, events enter as input spikes (Davies 2018).
 - [x] **R2**: why six clocks started at different periods? §III-D: a clock locks on only
       within a factor of ~1.4 of its starting period (outside it, to two or three cycles or
       to half of one), so six spaced by 1.5 cover 0.8–7 s.
-- [ ] **R2**: compare compute cost and energy, spiking against non-spiking. §VI gives the
-      localiser's activity (2.5–11 % firing, 9–25× fewer synaptic operations) and nothing for
-      the memory.
+- [x] **R2**: compare compute cost and energy, spiking against non-spiking. §VI: per 5 ms
+      step, spiking pipeline 0.9–1.5 µJ, the same networks run conventionally 35 µJ, centroid
+      + Kalman 0.05 µJ (Horowitz 45 nm energies; `scripts/energy.py` → `runs/paper/energy.csv`).
 - R3 asks for nothing.
 
 Submission:

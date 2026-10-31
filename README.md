@@ -30,6 +30,8 @@ python scripts/evaluate.py --set development                   # every paper tab
 python scripts/evaluate.py --set development --inputs centroid snn   # add the spiking-localiser rows
 python scripts/paper_results.py run --ablations                 # the paper's runs + traces -> runs/paper/development/
 python scripts/paper_figures.py                                  # results figures -> paper/figures/, tables -> runs/paper/tables.tex
+python scripts/spike_counts.py                                   # firing and synaptic-operation counts -> runs/paper/spike_counts.csv
+python scripts/energy.py                                         # energy per 5 ms step from those counts -> runs/paper/energy.csv
 python scripts/run_experiment.py --set development             # scorecard for every memory
 python scripts/run_experiment.py corpus/sim/sim_003.npz --memory kalman
 python scripts/check_localiser.py --set development            # centroid vs hand-labels

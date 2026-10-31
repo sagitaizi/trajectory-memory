@@ -515,3 +515,15 @@ work can say why, and so the framing is not mistaken for ours.
 - **Why:** place cells — the model for the localiser's position readout, and by analogy the
   memory's phase cells.
 - **Where:** paper §III-C (`OKeefe1971The`).
+
+### Horowitz, 2014 — "1.1 Computing's energy problem (and what we can do about it)"
+- *IEEE ISSCC 2014*, pp. 10–14. doi:10.1109/ISSCC.2014.6757323.
+- **Why:** per-operation energies at 45 nm, 32-bit float (addition 0.9 pJ, multiply-add
+  4.6 pJ) that turn the pipeline's operation counts into an energy estimate.
+- **Where:** paper §VI (`Horowitz20141`); `scripts/energy.py`.
+
+### Davies et al., 2018 — "Loihi: A neuromorphic manycore processor with on-chip learning"
+- *IEEE Micro* 38(1):82–99. doi:10.1109/MM.2018.112130359.
+- **Why:** the chip the pipeline would move onto: 128 cores of 1,024 neurons, on-chip learning;
+  the pipeline's ~40,000 LIF neurons fit on one.
+- **Where:** paper §VI (`Davies2018Loihi`).
