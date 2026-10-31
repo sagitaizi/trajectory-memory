@@ -26,7 +26,7 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 | III-A  | Problem Definition         | reviewed    | —                   | —                        |
 | III-B  | Event Input                | reviewed    | —                   | —                        |
 | III-C  | Spiking Localiser          | reviewed    | —                   | —                        |
-| III-D  | Trajectory-Memory Network  | reviewed    | —                   | half-period fix; R2 six clocks |
+| III-D  | Trajectory-Memory Network  | reviewed    | —                   | half-period fix          |
 | IV-B   | Event-Camera Simulator     | reviewed    | —                   | —                        |
 | IV-A   | Live Runs                  | reviewed    | —                   | —                        |
 | IV-C   | Baselines                  | reviewed    | —                   | —                        |
@@ -36,16 +36,11 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 | V-B    | Results: Prediction + path | reviewed    | —                   | —                        |
 | V-C    | Results: Deviation         | reviewed    | —                   | —                        |
 | V-D    | Results: Ablations         | reviewed    | —                   | —                        |
-| VI     | Discussion                 | reviewed    | —                   | R1 hardware; R2 energy   |
+| VI     | Discussion                 | reviewed    | —                   | —                        |
 | VII    | Conclusion                 | reviewed    | —                   | —                        |
 | —      | Acknowledgment             | reviewed    | —                   | —                        |
 | Fig. 1 | System overview            | reviewed    | —                   | —                        |
 | Fig. 2 | Recording setups           | dropped     | —                   | —                        |
-
-Notes on the rows:
-
-- **III-C** — Sagi's twelve review notes sit as `%` comments in the subsection above the
-  paragraphs they refer to; he deletes them himself.
 
 ## Camera-ready (due 2026-11-08, hard)
 
