@@ -24,7 +24,7 @@ Deadlines are fixed. The camera-ready to-do list is in `PAPER_PROGRESS.md`.
 | Sep 28–Oct 1 | Held-out run, results table, draft to supervisor | ⬜ |
 | Oct 2–9 | Supervisor comments, final 8 pages | ⬜ |
 | Oct 10 | Submit | ✅ |
-| Oct 25–Nov 8 | Answer the reviewers, camera-ready, copyright, registration | ⬜ |
+| Oct 25–Nov 8 | Answer the reviewers, camera-ready, copyright, registration | ✅ |
 
 ## Fallback ladder
 
