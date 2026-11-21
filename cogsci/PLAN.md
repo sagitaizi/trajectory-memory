@@ -89,7 +89,10 @@ Decided:
   memories.
 - **D1, visual delay:** 100 ms, fixed (human pursuit onset 100–130 ms, models 80–100 ms;
   sources to verify). The main comparison is re-run at 80 and 120 ms as a robustness check.
-- Open in D1: the eye's response to a command, the reaction's strength. Delay and response
+- **D1, eye response:** the eye moves at the commanded speed at once. The eyeball itself is
+  slow (time constants ~170 and 13 ms, Robinson 1976), but the cerebellar drive cancels it
+  (Krauzlis & Lisberger 1994), so all the slowness sits in the delay. Sources to verify.
+- Open in D1: the reaction's strength. Delay and response
   are human values, never tuned; the reaction's strength is a setting shared by both
   memories (D6).
 
