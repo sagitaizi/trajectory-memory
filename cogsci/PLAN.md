@@ -63,16 +63,16 @@ camera → localiser (unchanged) → target position p
   time cells (`trajmem/lmu.py`); a map from them to target velocity is learned by PES, as
   in the clock memory. The cycle is timed between turnarounds; the output reads the map
   ahead by the delay (D4).
-- **Surprise signal:** slip much larger than the memory expects, with the same threshold
-  rule (`trajmem/metrics.py`) for both memories.
+- **Surprise signal:** the rebuilt target velocity far from what a slow copy of the map
+  expects, with the same threshold rule (`trajmem/metrics.py`) for both memories (D5).
 - **Loop:** `pursuit/loop.py`, modelled on `trajmem.experiment.evaluate_clip` (which stays
   the MCSoC loop). It already has what the hidden-target test needs: `blank=(t0, t1)` hides the
   position for a stretch of time.
 
-## Design questions, decided together
+## Design questions
 
-Asked one at a time, in this order, each with the options in plain words. Nothing in the
-SNN is built before its question is settled.
+D1-D4 decided together, one at a time; D5 and D6 are Claude's calls at Sagi's request,
+for him to check. Nothing in the SNN is built before its question is settled.
 
 | # | Question |
 |---|---|
@@ -147,6 +147,30 @@ Decided:
   spotting turnarounds and timing the cycle, reading the cells ahead by the delay. The
   paper lists these and notes each could be built from neurons. The eye, the delay and
   the rebuilt velocity stand for body and early vision and are not neurons.
+- **D5, the surprise signal** (Claude's call, for Sagi to check): each memory keeps a slow
+  copy of its map, as the MCSoC memory does, consolidating once the map has settled. The
+  score is how far the rebuilt target velocity is from what the slow copy expected, smoothed
+  over 0.2 s as in MCSoC. The slow copy matters because the map itself re-learns within a
+  few cycles and would absorb the surprise; it matches the slowly updated memory trace that
+  mismatch responses are compared against. The alarm is the MCSoC ratcheting rule
+  (`trajmem.metrics.RatchetAlarm`): the bar tightens as the memory settles and never
+  loosens; its constant k and floor are shared by both memories and set in D6. Slip was
+  set aside as the score: it mixes in the reaction, which hides the memory's own error.
+  Velocity is noisy, so false alarms on steady runs are checked in the build; if there are
+  too many, the score's smoothing goes up, the same for both.
+- **D6, fairness** (Claude's call, for Sagi to check):
+  - Fixed for both, never tuned: the eye's delay, response and reaction strength (D1), the
+    20 ms velocity smoothing (D2), the score smoothing (D5). The clock's oscillator
+    constants and cell counts stay as published in MCSoC; replay's time cells get the
+    same cell count as the clock's phase cells.
+  - Tuned, the same set for each memory: the map's learning-rate schedule (start rate, end
+    rate, how fast it falls; for replay this is the fading blend), and the alarm's k and
+    floor. Replay's turnaround detection has one more setting (its smoothing); the clock
+    gets the MCSoC period range in exchange, which is not tuned again.
+  - The same search for both: one grid of the same size, the same score: how well the eye
+    keeps up on steady motion (slip size) with no false alarms. Never a human number.
+  - Set on the MCSoC development pendulum runs and a few simulated clips; frozen before any
+    situation run (S1-S8). Grids and chosen values go in the paper or its supplement.
 
 ## Phases
 
