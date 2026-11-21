@@ -106,6 +106,12 @@ Decided:
   from slip. The reaction takes raw slip, since it changes the eye's speed gradually.
   Checked early in the build; if the learned velocity is too noisy, both memories take
   positions instead and read eye speed from the learned path.
+- **D3, what the clock locks on to:** the target's position along its main direction, rebuilt
+  as retinal position + gaze, as in the MCSoC clock. Not slip, which vanishes once the eye
+  keeps up. Its peaks are the turnarounds, where tapping studies suggest people take a
+  visual rhythm from (Iversen et al.; Gan et al. 2015; Hove et al. 2013; to verify), which
+  the paper can point to. Turnaround pulses (closest to that evidence) stay a possible
+  follow-up. Open in D3: what the map learns from; which MCSoC parts stay.
 
 ## Phases
 
