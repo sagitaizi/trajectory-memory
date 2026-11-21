@@ -127,6 +127,11 @@ Decided:
   `zero_crossings` in `SpikingPhaseMap`), like the most resonant oscillator in a bank. The
   MCSoC rule, timing the period from crossings, is interval timing and would blur clock
   against replay. Its lock-on speed is checked in the build.
+- **D4, how replay times a cycle:** from turnaround to turnaround (where the target reverses
+  along its main direction), the moments the D3 evidence points to and where the clock is
+  pulled hardest, so both models take their timing from the same moments. How sharply
+  turnarounds can be timed in noisy data is checked in the build. Open in D4: how many
+  recent cycles it uses, how long a record it keeps, spiking throughout or not.
 
 ## Phases
 
