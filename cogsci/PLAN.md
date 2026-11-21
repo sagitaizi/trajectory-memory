@@ -46,9 +46,10 @@ camera → localiser (unchanged) → target position p
              └─ eye velocity copy ────┤
                                       ▼
                      memory: clock  or  replay
-                     input  = target velocity rebuilt as slip + eye velocity
-                     output = eye velocity, read ahead to make up the delay
-                     learns from = retinal slip
+                     clock input = target position (retina + gaze)
+                     stores      = target velocity rebuilt as slip + eye velocity
+                     output      = eye velocity, read ahead to make up the delay
+                     reaction    = retinal slip, added to the output
 ```
 
 - **Localiser:** unchanged, frozen. The paper calls its output a population code over image
@@ -56,8 +57,8 @@ camera → localiser (unchanged) → target position p
 - **Simulated eye** (`pursuit/eye.py`): a gaze point over the image, a visual delay and
   an eye plant, with values taken from the pursuit literature. Shared by both memories.
 - **Clock memory** (`pursuit/clock.py`, from `trajmem/snn_phasemap.py`): the same clock
-  and ring of phase cells; the map now holds eye velocity at each phase, learned by PES with
-  the retinal slip as the error. The position-only parts (stretching the map, the outlier
+  and ring of phase cells; the map now holds target velocity at each phase, learned by PES from
+  the rebuilt target velocity, paired with the phase 100 ms earlier. The position-only parts (stretching the map, the outlier
   gate) are re-decided.
 - **Replay memory** (`pursuit/replay.py`): a spiking LMU (`trajmem/lmu.py`, already built)
   holds the last stretch of target velocity; the period is timed from repeated crossings;
@@ -102,8 +103,7 @@ Decided:
 - **D2, velocity:** the localiser's raw 5 ms velocity is noisy, 0.85-2.1x the pendulum's
   own speed (`scripts/cogsci/velocity_noise.py`; 50 ms of smoothing brings it to 0.3-0.6x
   at ~50 ms of extra delay). Velocity is smoothed lightly (~20 ms) and fed to both
-  memories, whose slow learning over many cycles averages the rest; the map still learns
-  from slip. The reaction takes raw slip, since it changes the eye's speed gradually.
+  memories, whose slow learning over many cycles averages the rest. The reaction takes raw slip, since it changes the eye's speed gradually.
   Checked early in the build; if the learned velocity is too noisy, both memories take
   positions instead and read eye speed from the learned path.
 - **D3, what the clock locks on to:** the target's position along its main direction, rebuilt
@@ -111,7 +111,14 @@ Decided:
   keeps up. Its peaks are the turnarounds, where tapping studies suggest people take a
   visual rhythm from (Iversen et al.; Gan et al. 2015; Hove et al. 2013; to verify), which
   the paper can point to. Turnaround pulses (closest to that evidence) stay a possible
-  follow-up. Open in D3: what the map learns from; which MCSoC parts stay.
+  follow-up.
+- **D3, what the map learns from:** the rebuilt target velocity (slip + the eye's own
+  speed), paired with the clock's phase 100 ms earlier, since the error arrives one delay
+  late. The map holds the whole motion and the reaction fixes what is left. Both memories
+  then store the same signal, so the comparison is only in how they recall it. Learning
+  from slip (the cerebellar picture) was set aside: the work between map and reaction
+  could split arbitrarily, and the two memories would store different things.
+  Open in D3: which MCSoC parts stay.
 
 ## Phases
 
