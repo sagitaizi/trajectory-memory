@@ -58,8 +58,7 @@ camera → localiser (unchanged) → target position p
   an eye plant, with values taken from the pursuit literature. Shared by both memories.
 - **Clock memory** (`pursuit/clock.py`, from `trajmem/snn_phasemap.py`): the same clock
   and ring of phase cells; the map now holds target velocity at each phase, learned by PES from
-  the rebuilt target velocity, paired with the phase 100 ms earlier. The position-only parts (stretching the map, the outlier
-  gate) are re-decided.
+  the rebuilt target velocity, paired with the phase 100 ms earlier (D3).
 - **Replay memory** (`pursuit/replay.py`): a spiking LMU (`trajmem/lmu.py`, already built)
   holds the last stretch of target velocity; the period is timed from repeated crossings;
   the output reads the record one period back, shifted by the delay. No training.
@@ -118,7 +117,16 @@ Decided:
   then store the same signal, so the comparison is only in how they recall it. Learning
   from slip (the cerebellar picture) was set aside: the work between map and reaction
   could split arbitrarily, and the two memories would store different things.
-  Open in D3: which MCSoC parts stay.
+- **D3, which MCSoC parts stay:** kept: six clocks started 0.8-7 s apart (a small bank of
+  oscillators, as in neural resonance models; interval-tuned cells in SMA/putamen, Merchant
+  et al.; to verify), fast learning at the start (values under D6), the start kick.
+  Dropped: the outlier gate (it would fake overshoot and late alarms when the target stops
+  or breaks), the map stretching (back only if the pendulum's shrinking swing needs it),
+  the short-term correction term (the reaction does it). The slow copy is decided in D5.
+- **D3, picking a clock:** the clock whose map predicts best (`elect` other than
+  `zero_crossings` in `SpikingPhaseMap`), like the most resonant oscillator in a bank. The
+  MCSoC rule, timing the period from crossings, is interval timing and would blur clock
+  against replay. Its lock-on speed is checked in the build.
 
 ## Phases
 
