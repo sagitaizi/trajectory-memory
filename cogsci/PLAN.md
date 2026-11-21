@@ -82,6 +82,12 @@ SNN is built before its question is settled.
 | D5 | The surprise signal in velocity, and its threshold. |
 | D6 | Fairness: the same settings budget for both memories, and which runs are used to set them. |
 
+Decided:
+
+- **D1, what moves the eye:** a reaction to the retinal slip (always on, one visual delay
+  late) plus the memory's predicted eye velocity, summed. The same reactive path for both
+  memories. Open in D1: the delay, the eye's response, the reaction's strength.
+
 ## Phases
 
 ### 1. Question and first design — Nov 21 – Nov 26
