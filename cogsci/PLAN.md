@@ -99,13 +99,20 @@ Decided:
   stay tests. Until that number is sourced: the strongest value that does not make the eye
   overshoot and ring at the 100 ms delay. One value, shared by both memories.
 - Delay, response and reaction strength are human values, never tuned.
+- **D2, velocity:** the localiser's raw 5 ms velocity is noisy, 0.85-2.1x the pendulum's
+  own speed (`scripts/cogsci/velocity_noise.py`; 50 ms of smoothing brings it to 0.3-0.6x
+  at ~50 ms of extra delay). Velocity is smoothed lightly (~20 ms) and fed to both
+  memories, whose slow learning over many cycles averages the rest; the map still learns
+  from slip. The reaction takes raw slip, since it changes the eye's speed gradually.
+  Checked early in the build; if the learned velocity is too noisy, both memories take
+  positions instead and read eye speed from the learned path.
 
 ## Phases
 
 ### 1. Question and first design — Nov 21 – Nov 26
 
 - [ ] Sagi signs off `cogsci/materials/question.md`.
-- [ ] D1 and D2 settled.
+- [x] D1 and D2 settled.
 - [ ] Download the CogSci template; Sagi and Elishai create PCS accounts (by 2027-01-08,
       two weeks before our submission).
 
@@ -154,7 +161,8 @@ In order, each one tested before the next:
 
 - [ ] `pursuit/eye.py` and `pursuit/loop.py`, tested with a "perfect" memory that outputs the true
       target velocity (the eye should then track with only the delay's error).
-- [ ] Velocity rebuilt from the localiser (D2), checked against labelled runs.
+- [ ] Velocity rebuilt from the localiser (D2), and the check that a memory's learned
+      velocity is clean enough (else the positions-in fallback).
 - [ ] Clock memory (D3); it should lock on to the steady pendulum runs.
 - [ ] Replay memory (D4); the same check.
 - [ ] Surprise signal (D5) for both.
@@ -234,5 +242,3 @@ this audience, not copied from MCSoC. Six pages, references extra:
 
 - Who attends Bilbao; the travel grant.
 - Whether any real recording has a clean stop (decides whether S4 is real or sim).
-- Whether the localiser's noise allows a usable velocity (D2); if not, the memories take
-  smoothed positions and differentiate inside.
