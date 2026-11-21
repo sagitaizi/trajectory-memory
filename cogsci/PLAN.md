@@ -72,7 +72,7 @@ camera → localiser (unchanged) → target position p
 ## Design questions
 
 D1-D4 decided together, one at a time; D5 and D6 are Claude's calls at Sagi's request,
-for him to check. Nothing in the SNN is built before its question is settled.
+checked by him. Nothing in the SNN is built before its question is settled.
 
 | # | Question |
 |---|---|
@@ -147,7 +147,7 @@ Decided:
   spotting turnarounds and timing the cycle, reading the cells ahead by the delay. The
   paper lists these and notes each could be built from neurons. The eye, the delay and
   the rebuilt velocity stand for body and early vision and are not neurons.
-- **D5, the surprise signal** (Claude's call, for Sagi to check): each memory keeps a slow
+- **D5, the surprise signal** (Claude's call, checked by Sagi): each memory keeps a slow
   copy of its map, as the MCSoC memory does, consolidating once the map has settled. The
   score is how far the rebuilt target velocity is from what the slow copy expected, smoothed
   over 0.2 s as in MCSoC. The slow copy matters because the map itself re-learns within a
@@ -158,7 +158,7 @@ Decided:
   set aside as the score: it mixes in the reaction, which hides the memory's own error.
   Velocity is noisy, so false alarms on steady runs are checked in the build; if there are
   too many, the score's smoothing goes up, the same for both.
-- **D6, fairness** (Claude's call, for Sagi to check):
+- **D6, fairness** (Claude's call, checked by Sagi):
   - Fixed for both, never tuned: the eye's delay, response and reaction strength (D1), the
     20 ms velocity smoothing (D2), the score smoothing (D5). The clock's oscillator
     constants and cell counts stay as published in MCSoC; replay's time cells get the
