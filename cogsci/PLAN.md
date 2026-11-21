@@ -86,7 +86,12 @@ Decided:
 
 - **D1, what moves the eye:** a reaction to the retinal slip (always on, one visual delay
   late) plus the memory's predicted eye velocity, summed. The same reactive path for both
-  memories. Open in D1: the delay, the eye's response, the reaction's strength.
+  memories.
+- **D1, visual delay:** 100 ms, fixed (human pursuit onset 100–130 ms, models 80–100 ms;
+  sources to verify). The main comparison is re-run at 80 and 120 ms as a robustness check.
+- Open in D1: the eye's response to a command, the reaction's strength. Delay and response
+  are human values, never tuned; the reaction's strength is a setting shared by both
+  memories (D6).
 
 ## Phases
 
