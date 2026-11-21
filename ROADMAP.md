@@ -6,7 +6,7 @@ What comes after the MCSoC acceptance: three tracks, in this order. Dates are in
 |---|---|---|
 | 1 | MCSoC camera-ready that answers every review | 2026-11-08 (hard) |
 | 3 | Learning sessions: relearn the paper section by section, then the talk | 2026-12-14 (conference) |
-| 2 | A CogSci 2027 version: the same system compared with how the brain predicts motion | ~2027-02-01 (deadline unconfirmed) |
+| 2 | A CogSci 2027 version: the same system compared with how the brain predicts motion | 2027-02-01 (UTC-11) |
 
 Track 3 starts alongside track 1, since knowing each section well is what lets us answer
 the reviews properly.
@@ -35,15 +35,23 @@ with biology, and keep the rest of the paper.
   so the CogSci paper cannot be the MCSoC paper with one section added. It needs a
   cognitive-science question of its own, new material, and a citation of the MCSoC paper.
   Raise this with Elishai before starting.
-- **Format.** 6 pages including appendices, CogSci's own template. CogSci proceedings are not
-  archival, so a journal version can follow.
-- **Reading list** (first pass): smooth pursuit and its prediction of periodic targets
-  (Barnes 1991 is already cited); the retina's own motion anticipation (Berry 1999);
-  predictive processing (Clark 2013); place cells and phase coding in the hippocampus;
-  entrainment of neural oscillations to rhythm; cerebellar forward models.
-- **Possible comparisons:** lock-on time in cycles against smooth pursuit; behaviour when
-  the rhythm stops or changes against the eye's predictive overshoot; the deviation alarm
-  against mismatch responses in the brain.
+- **Current plan (Sagi, not yet agreed with Elishai).** The system read as a model of how
+  people predict repetitive motion, compared with published human findings. No new
+  recordings; new runs on the existing ones where the comparison needs them. Authors as on
+  MCSoC. Who attends Bilbao, and the travel grant, are open (decide before Feb 1).
+- **Format.** 6 pages including appendices, references unlimited, CogSci's own template
+  (changing margins or font is a desk reject). Submitted as PDF through PCS; every author needs
+  a PCS account at least two weeks before the deadline. Proceedings are CC-BY and not
+  archival, with an abstract-only option, so a journal version can follow.
+- **Double-blind, strictly.** No author names, no self-identifying references: the MCSoC paper
+  is cited in the third person. File named `<first two title words>_<date>.pdf`.
+- **Other rules.** The paper must "relate to the study of the mind". AI use must be described
+  in the Methods or Acknowledgements. Bilbao, 2027-07-28 to 31, in person; one author must
+  register and attend. A student first author can apply for a travel grant, but only at
+  submission time, and is eligible for the student-paper and modelling awards.
+- **Dates.** Decisions early April 2027; camera-ready 2027-05-07.
+- **The plan** — the claim, reading lists, runs, outline and calendar — is in
+  `COGSCI_PLAN.md`.
 
 ## 3. Learning sessions
 
