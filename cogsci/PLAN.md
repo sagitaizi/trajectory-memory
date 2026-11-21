@@ -130,8 +130,12 @@ Decided:
 - **D4, how replay times a cycle:** from turnaround to turnaround (where the target reverses
   along its main direction), the moments the D3 evidence points to and where the clock is
   pulled hardest, so both models take their timing from the same moments. How sharply
-  turnarounds can be timed in noisy data is checked in the build. Open in D4: how many
-  recent cycles it uses, how long a record it keeps, spiking throughout or not.
+  turnarounds can be timed in noisy data is checked in the build.
+- **D4, how much of the past:** each new cycle is blended into replay's timing and record
+  with a weight, older cycles fading; the weight is set like the clock's learning rate,
+  under the same budget (D6), so replay is tested at its best, not as a straw man. "Last
+  cycle only" (weight 1), the pure form of the account, is reported as well.
+  Open in D4: how the record is held, spiking throughout or not.
 
 ## Phases
 
