@@ -59,9 +59,10 @@ camera → localiser (unchanged) → target position p
 - **Clock memory** (`pursuit/clock.py`, from `trajmem/snn_phasemap.py`): the same clock
   and ring of phase cells; the map now holds target velocity at each phase, learned by PES from
   the rebuilt target velocity, paired with the phase 100 ms earlier (D3).
-- **Replay memory** (`pursuit/replay.py`): a spiking LMU (`trajmem/lmu.py`, already built)
-  holds the last stretch of target velocity; the period is timed from repeated crossings;
-  the output reads the record one period back, shifted by the delay. No training.
+- **Replay memory** (`pursuit/replay.py`): a pulse at each turnaround starts spiking LMU
+  time cells (`trajmem/lmu.py`); a map from them to target velocity is learned by PES, as
+  in the clock memory. The cycle is timed between turnarounds; the output reads the map
+  ahead by the delay (D4).
 - **Surprise signal:** slip much larger than the memory expects, with the same threshold
   rule (`trajmem/metrics.py`) for both memories.
 - **Loop:** `pursuit/loop.py`, modelled on `trajmem.experiment.evaluate_clip` (which stays
@@ -135,7 +136,12 @@ Decided:
   with a weight, older cycles fading; the weight is set like the clock's learning rate,
   under the same budget (D6), so replay is tested at its best, not as a straw man. "Last
   cycle only" (weight 1), the pure form of the account, is reported as well.
-  Open in D4: how the record is held, spiking throughout or not.
+- **D4, how the record is held:** a pulse at each turnaround starts the LMU's time cells
+  (shown to match hippocampal time cells, Voelker & Eliasmith 2018), and a map from them
+  to target velocity is learned by PES; its rate is the fading blend. The two memories
+  then differ only in the map's index: oscillator phase (clock) against time since the
+  last turnaround (replay). Same rule, same stored signal, same kind of map.
+  Open in D4: spiking throughout or not.
 
 ## Phases
 
