@@ -141,7 +141,12 @@ Decided:
   to target velocity is learned by PES; its rate is the fading blend. The two memories
   then differ only in the map's index: oscillator phase (clock) against time since the
   last turnaround (replay). Same rule, same stored signal, same kind of map.
-  Open in D4: spiking throughout or not.
+- **D4, what is spiking:** the same split in both memories. Spiking: the clock's
+  oscillator and phase cells, replay's time cells, both maps. Computed directly, in both
+  alike: the main direction of motion, the clock's rate update, choosing a clock,
+  spotting turnarounds and timing the cycle, reading the cells ahead by the delay. The
+  paper lists these and notes each could be built from neurons. The eye, the delay and
+  the rebuilt velocity stand for body and early vision and are not neurons.
 
 ## Phases
 
