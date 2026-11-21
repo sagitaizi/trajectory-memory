@@ -34,8 +34,7 @@ with biology, and keep the rest of the paper.
   time. The MCSoC paper will be in IEEE proceedings by December, before the CogSci deadline,
   so the CogSci paper cannot be the MCSoC paper with one section added. It needs a
   cognitive-science question of its own, new material, and a citation of the MCSoC paper.
-  Raise this with Elishai before starting.
-- **Current plan (Sagi, not yet agreed with Elishai).** The system read as a model of how
+- **Plan (Elishai has given the go-ahead).** The system read as a model of how
   people predict repetitive motion, compared with published human findings. No new
   recordings; new runs on the existing ones where the comparison needs them. Authors as on
   MCSoC. Who attends Bilbao, and the travel grant, are open (decide before Feb 1).

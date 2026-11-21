@@ -8,7 +8,7 @@ come from the MCSoC paper.
 
 ## The claim
 
-Working question (to agree with Elishai):
+Working question (Elishai has given the go-ahead):
 
 > Can a clock that locks on to a rhythm, plus a map of position at each phase of the cycle,
 > account for the main signatures of human prediction of periodic motion: how fast it
@@ -37,16 +37,14 @@ leaving out ones that don't; a biology section bolted onto the MCSoC paper.
 
 ## Phases
 
-### 1. Question and agreement — Nov 21 – Nov 25
+### 1. Question — Nov 21 – Nov 25
 
-- [ ] Sagi and Claude draft the question and the list of signatures (above) into one page:
+- [ ] Sagi and Claude write the question and the list of signatures (above) into one page:
       `materials/05-cogsci/question.md`.
-- [ ] Send it to Elishai with the overlap rule spelled out; agree on the claim, the
-      authors (same as MCSoC), and who attends Bilbao.
 - [ ] Download the CogSci template; Sagi and Elishai create PCS accounts (by
       2026-12-28, two weeks before our submission).
 
-**Done when** Elishai has agreed the question in writing.
+**Done when** Sagi has signed off the one-page question.
 
 ### 2. Reading — Nov 22 – Dec 6
 
@@ -164,7 +162,6 @@ its sources.
 
 ## Open
 
-- Elishai's agreement on the question and the overlap risk.
 - Who attends Bilbao; the travel grant.
 - What the memory does when the target is not visible (decides how much R2 needs).
 - Whether any real recording has a clean stop (decides whether R3 is real or sim).
