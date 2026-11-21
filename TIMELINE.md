@@ -9,7 +9,7 @@ Deadlines are fixed. The camera-ready to-do list is in `PAPER_PROGRESS.md`.
 | 2026-10-01 | Draft to Dr. Ezra Tsur for review | ✅ |
 | 2026-10-10 | **MCSoC 2026 submission** (EDAS, hard), 8 pages | ✅ |
 | 2026-10-31 | Notification: accepted as a regular paper | ✅ |
-| 2026-11-08 | **Camera-ready + copyright form + author registration** (IEEE CPS, hard) | ⬜ |
+| 2026-11-08 | **Camera-ready + copyright form + author registration** (IEEE CPS, hard) | ✅ |
 | 2026-12-14…17 | Conference, Shanghai Jiao Tong University | ⬜ |
 | 2027-01-11 | CogSci draft to Dr. Ezra Tsur (`cogsci/PLAN.md`) | ⬜ |
 | 2027-02-01 | **CogSci 2027 submission** (PCS, UTC-11, hard), 6 pages; aim Jan 22 | ⬜ |
