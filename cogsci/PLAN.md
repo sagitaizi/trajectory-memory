@@ -92,9 +92,13 @@ Decided:
 - **D1, eye response:** the eye moves at the commanded speed at once. The eyeball itself is
   slow (time constants ~170 and 13 ms, Robinson 1976), but the cerebellar drive cancels it
   (Krauzlis & Lisberger 1994), so all the slowness sits in the delay. Sources to verify.
-- Open in D1: the reaction's strength. Delay and response
-  are human values, never tuned; the reaction's strength is a setting shared by both
-  memories (D6).
+- **D1, the reaction:** the delayed slip changes the eye's speed gradually (eye acceleration
+  ∝ slip), as in pursuit models; a direct "speed ∝ slip" loop is stable only below half the
+  target's speed. Its strength comes from published measurements of the eye's first ~100 ms
+  after a target starts moving, before feedback or prediction act, so all eight situations
+  stay tests. Until that number is sourced: the strongest value that does not make the eye
+  overshoot and ring at the 100 ms delay. One value, shared by both memories.
+- Delay, response and reaction strength are human values, never tuned.
 
 ## Phases
 
@@ -130,7 +134,7 @@ amplitude, speed) and the source:
 
 | Situation | Number wanted |
 |---|---|
-| Eye loop | visual delay; eye plant time constant |
+| Eye loop | visual delay; eye plant time constant; eye acceleration per unit target velocity in the first ~100 ms of pursuit (sets the reaction, D1) |
 | Start of motion | cycles until gain is near 1 and lag near 0 for a sinusoid; dependence on period |
 | Steady motion | gain and lag across periods; where prediction stops working |
 | Target hidden | how eye velocity decays through a gap, and over what time |
