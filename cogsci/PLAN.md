@@ -130,8 +130,11 @@ Decided:
   against replay. Its lock-on speed is checked in the build.
 - **D4, how replay times a cycle:** from turnaround to turnaround (where the target reverses
   along its main direction), the moments the D3 evidence points to and where the clock is
-  pulled hardest, so both models take their timing from the same moments. How sharply
-  turnarounds can be timed in noisy data is checked in the build.
+  pulled hardest, so both models take their timing from the same moments. A cycle runs from
+  one side's turnaround to the next on that side. Loops have them too (their leftmost and
+  rightmost points); a turnaround counts only after the target has crossed most of the way
+  since the last one, so small wiggles add none. How sharply turnarounds can be timed in
+  noisy data is checked in the build; the middle crossing is the fallback.
 - **D4, how much of the past:** each new cycle is blended into replay's timing and record
   with a weight, older cycles fading; the weight is set like the clock's learning rate,
   under the same budget (D6), so replay is tested at its best, not as a straw man. "Last
