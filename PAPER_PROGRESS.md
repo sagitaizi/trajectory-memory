@@ -64,7 +64,7 @@ Reviewer points:
 
 Submission:
 
-- [ ] Final PDF uploaded to the IEEE CPS author kit.
+- [x] Final PDF uploaded to the IEEE CPS author kit (tagged `mcsoc-camera-ready`).
 - [ ] IEEE copyright form.
 - [ ] Author registration (at least one author).
 
