@@ -51,7 +51,7 @@ with biology, and keep the rest of the paper.
   submission time, and is eligible for the student-paper and modelling awards.
 - **Dates.** Decisions early April 2027; camera-ready 2027-05-07.
 - **The plan** — the claim, reading lists, runs, outline and calendar — is in
-  `COGSCI_PLAN.md`.
+  `cogsci/PLAN.md`.
 
 ## 3. Learning sessions
 
@@ -75,8 +75,9 @@ session closes with the questions a listener might ask.
 
 - `paper/` stays the MCSoC paper. When the camera-ready is uploaded, the commit is tagged
   `mcsoc-camera-ready` and `paper/` is frozen from then on.
-- The CogSci paper lives in `paper-cogsci/`, started from a copy of the final MCSoC text. It
-  is a folder rather than a git branch because both papers draw on the same code and runs.
-  Like `paper/`, Claude edits it only when Sagi names the section.
+- The CogSci project lives in `cogsci/` (docs, notes, paper) and `pursuit/` (code), in this
+  repo because both papers draw on the same data, localiser and code. `pursuit/` imports
+  `trajmem/` and does not change it. Like `paper/`, Claude edits `cogsci/paper/` only when
+  Sagi names the section.
 - `runs/paper/` and `runs/paper/numbers.csv` are what the MCSoC paper quotes and are never
   overwritten. New runs for CogSci go to `runs/cogsci/`.

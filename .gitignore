@@ -19,6 +19,7 @@ corpus/real/**
 corpus/sim/*
 !corpus/sim/.gitkeep
 runs/
+recording-kit/
 *.aedat4
 *.npz
 

@@ -2,45 +2,42 @@
 
 Guidance for Claude Code when working in this repository.
 
-## Project
+## Projects
 
 SNN-based **trajectory memory** from event-camera input — Sagi Taizi, M.Sc. CS, Open University
-of Israel (supervisor: Dr. Elishai Ezra Tsur).
+of Israel (supervisor: Dr. Elishai Ezra Tsur). Two papers share this repo's data, localiser
+and code. `ROADMAP.md` ties them together.
 
-A spiking network watches a target move in a repetitive path, builds a memory of that path,
-predicts it a short time ahead, and flags when the motion stops matching. Offline only — no
-motors, no closed loop. This is paper 4c in the main thesis repo's `docs/future-directions.md`,
-targeted at **IEEE MCSoC 2026** (8 pages, submission 2026-10-10).
+| Project | State | Docs | Code |
+|---|---|---|---|
+| **MCSoC 2026**: a spiking memory that learns a repeating path, predicts it and flags deviations (8 pages, IEEE) | accepted; frozen | root `PLAN.md`, `TIMELINE.md`, `PAPER_PROGRESS.md`; `paper/` | `trajmem/` |
+| **CogSci 2027**: two spiking models of how people follow a repeating motion with their eyes (clock and replay), compared with human data (6 pages) | **active** | `cogsci/` (its own `CLAUDE.md`, plan, paper) | `pursuit/` (imports `trajmem/`) |
 
-## The funnel
+Offline only in both: no motors, no real closed loop (the CogSci eye is simulated).
 
-The SNN's input gets harder in two stages. Stage 1 is the goal; Stage 2 is dropped for the
-submission (future work).
+### The MCSoC system
 
 | Stage | SNN input | SNN does | Role |
 |---|---|---|---|
-| 1 | accumulated event frames | localise target + memorise path + predict + flag deviation | **goal** |
-| 2 | raw events, end-to-end | same, no framing step | future work, not in the submission |
-| fallback | classical centroid → memory core | memory/predict/deviation only, reported with an asterisk | ablation + safety net |
-
-Re-learning a *new* path after a break, and the attention-span mechanism, are **out of scope**
-(future work). Deviation detection is **in scope**.
+| 1 | accumulated event frames | localise target + memorise path + predict + flag deviation | **the paper** |
+| 2 | raw events, end-to-end | same, no framing step | future work |
+| fallback | classical centroid → memory core | memory/predict/deviation only | ablation + safety net |
 
 ## Where things live
 
-Read `PLAN.md` first for what's next. `TIMELINE.md` has the dated milestones.
+For CogSci work start at `cogsci/PLAN.md`; `TIMELINE.md` has the dated milestones of both.
 
 | Doc | For |
 |---|---|
-| `PLAN.md` | Phased plan + current status. Start here. |
-| `TIMELINE.md` | Dated milestones with checkmarks. |
+| `PLAN.md` | MCSoC: phased plan and status. |
+| `TIMELINE.md` | Dated milestones of both papers, with checkmarks. |
 | `ROADMAP.md` | After acceptance: camera-ready, CogSci version, learning sessions; how the two papers are kept apart. |
-| `COGSCI_PLAN.md` | CogSci 2027 paper: the claim, reading lists, runs, outline, calendar. |
-| `PAPER_PROGRESS.md` | Which paper sections are writable, blocked, drafted. The paper is written as we go. |
+| `cogsci/PLAN.md` | CogSci: the claim, design questions, reading, build, runs, outline, calendar. |
+| `PAPER_PROGRESS.md` | MCSoC paper: section status, camera-ready list. CogSci's is `cogsci/PAPER_PROGRESS.md`. |
 | `docs/implementation-plan.md` | Architecture, modules, data flow, frameworks. |
 | `RECORDING_LOG.md` | Every real clip: setup, rate, what it shows, label status. |
 | `corpus/sets.yaml` | Which real clips are development and which are held-out, with slices. |
-| `BIBLIOGRAPHY.md` | Every paper referenced, with why/where. Update in the same change that uses it. |
+| `BIBLIOGRAPHY.md` | Every paper referenced by either project, with why/where. Update in the same change that uses it. |
 
 ## Environment
 
@@ -54,7 +51,8 @@ repo on `sys.path`; `conftest.py` imports it so tests pick it up. Do not copy th
 
 ## Architecture
 
-Package `trajmem/`. One file, one job.
+Package `trajmem/` (shared, and the MCSoC system). One file, one job. The CogSci package
+`pursuit/` is described in `cogsci/CLAUDE.md`.
 
 | Module | Role |
 |---|---|

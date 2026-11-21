@@ -1,6 +1,6 @@
 # The CogSci question (draft)
 
-Working note for the CogSci 2027 paper (`COGSCI_PLAN.md`). Not paper text. Sources are
+Working note for the CogSci 2027 paper (`cogsci/PLAN.md`). Not paper text. Sources are
 from memory until checked in the reading phase.
 
 ## The question

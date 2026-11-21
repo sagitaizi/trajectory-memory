@@ -5,7 +5,7 @@ their eyes, an **inner clock** and a **replay of the last cycle**, each driving 
 simulated eye, and compared with what people's eyes do in published experiments.
 Submission rules and dates are in `ROADMAP.md` track 2. Deadline **2027-02-01** (UTC-11);
 we aim to submit by **2027-01-22**. The one-page question is
-`materials/05-cogsci/question.md`.
+`cogsci/materials/question.md`.
 
 ## The claim
 
@@ -53,19 +53,19 @@ camera → localiser (unchanged) → target position p
 
 - **Localiser:** unchanged, frozen. The paper calls its output a population code over image
   position and makes no claim about it.
-- **Simulated eye** (`trajmem/eye.py`, new): a gaze point over the image, a visual delay and
+- **Simulated eye** (`pursuit/eye.py`): a gaze point over the image, a visual delay and
   an eye plant, with values taken from the pursuit literature. Shared by both memories.
-- **Clock memory** (`trajmem/snn_pursuit.py`, new, from `snn_phasemap.py`): the same clock
+- **Clock memory** (`pursuit/clock.py`, from `trajmem/snn_phasemap.py`): the same clock
   and ring of phase cells; the map now holds eye velocity at each phase, learned by PES with
   the retinal slip as the error. The position-only parts (stretching the map, the outlier
   gate) are re-decided.
-- **Replay memory** (`trajmem/snn_replay.py`, new): a spiking LMU (`lmu.py`, already built)
+- **Replay memory** (`pursuit/replay.py`): a spiking LMU (`trajmem/lmu.py`, already built)
   holds the last stretch of target velocity; the period is timed from repeated crossings;
   the output reads the record one period back, shifted by the delay. No training.
 - **Surprise signal:** slip much larger than the memory expects, with the same threshold
-  rule (`metrics.py`) for both memories.
-- **Loop:** `evaluate_eye` in `experiment.py`, next to `evaluate_clip` (which stays as the
-  MCSoC loop). It already has what the hidden-target test needs: `blank=(t0, t1)` hides the
+  rule (`trajmem/metrics.py`) for both memories.
+- **Loop:** `pursuit/loop.py`, modelled on `trajmem.experiment.evaluate_clip` (which stays
+  the MCSoC loop). It already has what the hidden-target test needs: `blank=(t0, t1)` hides the
   position for a stretch of time.
 
 ## Design questions, decided together
@@ -86,14 +86,14 @@ SNN is built before its question is settled.
 
 ### 1. Question and first design — Nov 21 – Nov 26
 
-- [ ] Sagi signs off `materials/05-cogsci/question.md`.
+- [ ] Sagi signs off `cogsci/materials/question.md`.
 - [ ] D1 and D2 settled.
 - [ ] Download the CogSci template; Sagi and Elishai create PCS accounts (by 2027-01-08,
       two weeks before our submission).
 
 ### 2. Reading — Nov 22 – Dec 6
 
-Notes in `materials/05-cogsci/`, one file per topic; every paper used goes into
+Notes in `cogsci/materials/`, one file per topic; every paper used goes into
 `BIBLIOGRAPHY.md` in the same change. Author lists and years below are from memory and are
 **verified before citing**.
 
@@ -134,7 +134,7 @@ reason noted.
 
 In order, each one tested before the next:
 
-- [ ] `eye.py` and `evaluate_eye`, tested with a "perfect" memory that outputs the true
+- [ ] `pursuit/eye.py` and `pursuit/loop.py`, tested with a "perfect" memory that outputs the true
       target velocity (the eye should then track with only the delay's error).
 - [ ] Velocity rebuilt from the localiser (D2), checked against labelled runs.
 - [ ] Clock memory (D3); it should lock on to the steady pendulum runs.
@@ -142,12 +142,13 @@ In order, each one tested before the next:
 - [ ] Surprise signal (D5) for both.
 - [ ] Settings for both under the same budget (D6), on a few development runs only.
 
-Work goes in `trajmem/` and `scripts/` as always; nothing in `runs/paper/` changes.
+Code goes in `pursuit/`, tests in `tests/pursuit/`; `trajmem/` and `runs/paper/` stay as
+the MCSoC paper left them (`cogsci/CLAUDE.md`).
 
 ### 4. Runs — Dec 7 – Dec 23 (paused Dec 14–17 for MCSoC)
 
 Both memories, same eye, same input. Outputs to `runs/cogsci/`, one script per situation
-(`scripts/cogsci_*.py`), every quoted number in `runs/cogsci/numbers.csv`.
+(`scripts/cogsci/`), every quoted number in `runs/cogsci/numbers.csv`.
 
 | # | Situation | On | Measure |
 |---|---|---|---|
@@ -164,7 +165,7 @@ Both memories, same eye, same input. Outputs to `runs/cogsci/`, one script per s
 
 ### 5. Skeleton — Dec 18 – Dec 23
 
-`paper-cogsci/` in the CogSci LaTeX template, anonymised from the first line. Written for
+`cogsci/paper/` in the CogSci LaTeX template, anonymised from the first line. Written for
 this audience, not copied from MCSoC. Six pages, references extra:
 
 | Section | Content | Pages |
@@ -183,7 +184,7 @@ this audience, not copied from MCSoC. Six pages, references extra:
 ### 6. Writing — Dec 24 – Jan 10
 
 - Section by section; Claude writes a section only when Sagi names it, as with `paper/`.
-  Status per section at the top of `paper-cogsci/README.md`.
+  Status per section in `cogsci/PAPER_PROGRESS.md`.
 - Suggested order: 3 Models → 4 Method → 5 Results → 2 Background → 6 Discussion →
   1 Introduction → Abstract.
 - [ ] Full draft to Elishai by **2027-01-11**.
