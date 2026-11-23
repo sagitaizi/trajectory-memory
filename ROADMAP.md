@@ -34,10 +34,9 @@ with biology, and keep the rest of the paper.
   time. The MCSoC paper will be in IEEE proceedings by December, before the CogSci deadline,
   so the CogSci paper cannot be the MCSoC paper with one section added. It needs a
   cognitive-science question of its own, new material, and a citation of the MCSoC paper.
-- **Plan (Elishai has given the go-ahead).** Two spiking models of how people follow a
-  repeating motion with their eyes (clock and replay), driving one simulated eye, compared
-  with published human findings. No new
-  recordings; new runs on the existing ones where the comparison needs them. Authors as on
+- **Plan (Elishai has given the go-ahead).** A spiking clock model of how people follow a
+  repeating motion with their eyes, driving a simulated eye, compared with published human
+  findings. No new recordings; new runs on the existing ones where the comparison needs them. Authors as on
   MCSoC. Who attends Bilbao, and the travel grant, are open (decide before Feb 1).
 - **Format.** 6 pages including appendices, references unlimited, CogSci's own template
   (changing margins or font is a desk reject). Submitted as PDF through PCS; every author needs

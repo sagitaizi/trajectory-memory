@@ -9,7 +9,7 @@ Statuses as in the root `PAPER_PROGRESS.md`: **blocked** → **writable** → **
 | — | Abstract | blocked | results |
 | 1 | Introduction | blocked | question sign-off |
 | 2 | Background | blocked | reading |
-| 3 | Models | blocked | D1–D5 |
+| 3 | Model | blocked | build |
 | 4 | Method | blocked | situations fixed (S1–S8) |
 | 5 | Results | blocked | runs |
 | 6 | Discussion | blocked | results |

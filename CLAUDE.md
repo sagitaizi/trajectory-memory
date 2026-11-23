@@ -11,7 +11,7 @@ and code. `ROADMAP.md` ties them together.
 | Project | State | Docs | Code |
 |---|---|---|---|
 | **MCSoC 2026**: a spiking memory that learns a repeating path, predicts it and flags deviations (8 pages, IEEE) | accepted; frozen | root `PLAN.md`, `TIMELINE.md`, `PAPER_PROGRESS.md`; `paper/` | `trajmem/` |
-| **CogSci 2027**: two spiking models of how people follow a repeating motion with their eyes (clock and replay), compared with human data (6 pages) | **active** | `cogsci/` (its own `CLAUDE.md`, plan, paper) | `pursuit/` (imports `trajmem/`) |
+| **CogSci 2027**: a spiking clock model of how people follow a repeating motion with their eyes, compared with human data (6 pages) | **active** | `cogsci/` (its own `CLAUDE.md`, plan, paper) | `pursuit/` (imports `trajmem/`) |
 
 Offline only in both: no motors, no real closed loop (the CogSci eye is simulated).
 
