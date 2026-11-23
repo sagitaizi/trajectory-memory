@@ -197,8 +197,13 @@ between one mixed-τ recurrent layer and a fast→slow layer split for the memor
 ### Barnes & Asselman, 1991 — "The mechanism of prediction in human smooth pursuit eye movements"
 - *Journal of Physiology* 439:439–461.
 - **Why:** humans tracking a periodic target lock on within a few cycles and then anticipate
-  it from a stored velocity/timing memory. The behavioural version of our task.
-- **Where:** introduction / motivation.
+  it from a stored velocity/timing memory. The behavioural version of our task. Abstract
+  (read): peak eye velocity builds over 2–4 cycles; after a period change the old timing is
+  kept; after an amplitude change the next movement follows the preceding sequence; the
+  prediction is a volley of fixed duration and stored magnitude, timed by a periodicity
+  estimator. Full text not yet read (PMC1180117).
+- **Where:** MCSoC introduction; CogSci: Barnes's account (rival), S1, S5, S6
+  (`cogsci/materials/reading-pursuit.md`).
 
 ### Kettner et al., 1997 — "Prediction of complex two-dimensional trajectories by a cerebellar model of smooth pursuit eye movement"
 - *Journal of Neurophysiology* 77(4):2115–2130.
@@ -527,3 +532,126 @@ work can say why, and so the framing is not mistaken for ours.
 - **Why:** the chip the pipeline would move onto: 128 cores of 1,024 neurons, on-chip learning;
   the pipeline's ~40,000 LIF neurons fit on one.
 - **Where:** paper §VI (`Davies2018Loihi`).
+
+## Smooth pursuit and visual rhythm — CogSci 2027
+
+Notes and how far each was read: `cogsci/materials/reading-pursuit.md`. Entries marked
+"via review" are cited from Fukushima et al. 2013 and still need the primary paper.
+
+### Fukushima, Fukushima, Warabi & Barnes, 2013 — "Cognitive processes involved in smooth pursuit eye movements: behavioral evidence, neural substrate and clinical correlation"
+- *Frontiers in Systems Neuroscience* 7:4. doi:10.3389/fnsys.2013.00004. Partly read.
+- **Why:** human latency 100–130 ms; open-loop first 100 ms; sustained but reduced velocity
+  when the target is hidden; ~100 ms decay after an unexpected stop; Barnes's model (S/H,
+  MEM, timing from direction changes, expectation gain).
+- **Where:** CogSci D1, S3, S4, rival account; route to the primary sources below.
+
+### Barnes, 2008 — "Cognitive processes involved in smooth pursuit eye movements"
+- *Brain and Cognition* 68(3):309–326. Abstract read.
+- **Why:** velocity and timing held in short-term memory; partial trajectory stored and
+  released ahead of expected motion in periodic pursuit. Barnes's account.
+- **Where:** CogSci background (rival account).
+
+### Barnes & Collins, 2011 — "The influence of cues and stimulus history on the non-linear frequency characteristics of the pursuit response to randomized target motion"
+- *Experimental Brain Research* 212:225–240. doi:10.1007/s00221-011-2725-9. Full text not read.
+- Via review (Fig. 2 of Fukushima et al. 2013).
+- **Why:** the main rival account: sampled target velocity held in MEM,
+  released on timing from direction changes, scaled by an expectation gain.
+- **Where:** CogSci background, S3.
+
+### Krauzlis & Lisberger, 1994 — "A model of visually-guided smooth pursuit eye movements based on behavioral observations"
+- *Journal of Computational Neuroscience* 1(4):265–283. Abstract read.
+- **Why:** pursuit as integrated visual motion signals in a delayed negative-feedback loop;
+  eye acceleration in the first 100 ms as the open-loop response.
+- **Where:** CogSci D1 (the reaction and the eye's response).
+
+### Becker & Fuchs, 1985 — "Prediction in the oculomotor system: smooth pursuit during transient disappearance of a visual target"
+- *Experimental Brain Research* 57:562–575. Via review and citing papers.
+- **Why:** the human numbers for a hidden target: velocity drops to a sustained residual and
+  recovers before reappearance.
+- **Where:** CogSci S3.
+
+### Tychsen & Lisberger, 1986; Carl & Gellman, 1987 — human pursuit initiation
+- Via review; titles and venues to check.
+- **Why:** human pursuit latency ~100–130 ms; the first ~100 ms is open loop.
+- **Where:** CogSci D1 (delay, reaction strength).
+
+### Barnes & Collins, 2008 — "Evidence for a link between the extra-retinal component of random-onset pursuit and the anticipatory pursuit of predictable object motion"
+- *Journal of Neurophysiology* 100(2):1135–1146. doi:10.1152/jn.00060.2008. Full text read (PMC2527048).
+- **Why:** the expectation gain, set by whether the target is expected back, not by visibility.
+- **Where:** CogSci background (rival account).
+
+### Bennett & Barnes, 2003 — "Human ocular pursuit during the transient disappearance of a visual target"
+- *Journal of Neurophysiology* 90(4):2504–2520. doi:10.1152/jn.01145.2002. Abstract read; ramp target.
+- **Why:** gaps of different lengths; recovery before the target returns.
+- **Where:** CogSci S3 (number to read).
+
+### Fukushima, Yamanobe, Shinmei & Fukushima, 2002 — "Predictive responses of periarcuate pursuit neurons to visual target motion"
+- *Experimental Brain Research* 145(1):104–120. doi:10.1007/s00221-002-1088-7. Abstract read; macaque.
+- **Why:** the only number found for a repeating target hidden about half a cycle: eye gain 0.65 ± 0.16.
+- **Where:** CogSci S3 (candidate for adjusting on).
+
+### Whittaker & Eaholtz, 1982 — "Learning patterns of eye motion for foveal pursuit"
+- *Investigative Ophthalmology & Visual Science* 23(3):393–397. Abstract read; two subjects.
+- **Why:** sinusoidal eye motion continues after the target vanishes (0.8 and 1.0 Hz).
+- **Where:** CogSci S3 (to read in full).
+
+### Kveraga, Fendrich & Hughes, 2001 — "Ocular pursuit of predicted motion trajectories"
+- *Experimental Brain Research* 138(3):393–397. doi:10.1007/s002210100701. Abstract read.
+- **Why:** slow eye movements decelerate, reverse and accelerate on a predicted trajectory.
+- **Where:** CogSci S3 (the eye reverses unseen at a turnaround).
+
+### Orban de Xivry, Coppe, Blohm & Lefèvre, 2013 — "Kalman filtering naturally accounts for visually guided and predictive smooth pursuit dynamics"
+- *Journal of Neuroscience* 33(44):17301–17313. doi:10.1523/JNEUROSCI.2321-13.2013. Partly read (PMC6618360).
+- **Why:** a modern pursuit model with a memory of target motion, including a hidden sinusoid.
+- **Where:** CogSci S3; related work.
+
+### Brostek, Eggert & Glasauer, 2017 — "Gain control in predictive smooth pursuit eye movements: evidence for an acceleration-based predictive mechanism"
+- *eNeuro* 4(3) ENEURO.0343-16.2017. doi:10.1523/ENEURO.0343-16.2017. CC BY. Text read.
+- **Why:** 12 people, sinusoid 0.25 Hz: gain 1.03 ± 0.09, no lag; onset latency 141 ± 15 ms.
+- **Where:** CogSci S2 (adjust on), D1 (delay check).
+
+### Soechting, Rao & Juveli, 2010 — "Incorporating prediction in models for two-dimensional smooth pursuit"
+- *PLoS ONE* 5(9):e12574. doi:10.1371/journal.pone.0012574. CC BY. Text read.
+- **Why:** gain and phase over frequency on sums of sines; delay ~100 ms; predictive model.
+- **Where:** CogSci S7, D1.
+
+### Dowiasch, Blanke, Knöll & Bremmer, 2023 — "Spatial localization during open-loop smooth pursuit"
+- *Frontiers in Neuroscience* 17:1058340. doi:10.3389/fnins.2023.1058340. CC BY; raw data open. Partly read.
+- **Why:** eye velocity in a 300 ms gap on a ramp.
+- **Where:** CogSci S3 (ramp reference).
+
+### Trillenberg et al., 1998 — "Target anticipation and impairment of smooth pursuit eye movements in schizophrenia"
+- *Experimental Brain Research* 120(3):316–324. doi:10.1007/s002210050405. Abstract snippet only; author list to check.
+- **Why:** a sinusoidal target stopped unpredictably: predictive pursuit goes on for 150–200 ms.
+- **Where:** CogSci S4 (to read in full).
+
+### Robinson, Gordon & Gordon, 1986 — "A model of the smooth pursuit eye movement system"
+- *Biological Cybernetics* 55:43–57. Via review; authors to check.
+- **Why:** after an unexpected stop, ~100 ms latency then a ~100 ms decay; the classic
+  pursuit model with a delayed efference copy.
+- **Where:** CogSci D1, S4.
+
+### Hove, Iversen, Zhang & Repp, 2013 — "Synchronization with competing visual and auditory rhythms: bouncing ball meets metronome"
+- *Psychological Research* 77:388–398. Abstract read.
+- **Why:** people tap to a bouncing ball; sound dominates when the two compete.
+- **Where:** CogSci D3 (turnarounds as timing marks).
+
+### Gan, Huang, Zhou, Qian & Wu, 2015 — "Synchronization to a bouncing ball with a realistic motion trajectory"
+- *Scientific Reports* 5:11974. Abstract read.
+- **Why:** with realistic gravity, tapping to the ball is as stable as to a metronome.
+- **Where:** CogSci D3.
+
+### Iversen, Patel, Nicodemus & Emmorey, 2015 — "Synchronization to auditory and visual rhythms in hearing and deaf individuals"
+- *Cognition* 134:232–244. Abstract read.
+- **Why:** visual rhythm synchronisation and its limits.
+- **Where:** CogSci D3.
+
+### Merchant, Pérez, Zarco & Gámez, 2013 — "Interval tuning in the primate medial premotor cortex as a general timing mechanism"
+- *Journal of Neuroscience* 33(21):9082–9096. Abstract read; author list and pages to check.
+- **Why:** cells tuned to particular intervals, for visual and auditory rhythms.
+- **Where:** CogSci D3 (a bank of clocks).
+
+### Bartolo, Prado & Merchant, 2014 — "Information processing in the primate basal ganglia during sensory-guided and internally driven rhythmic tapping"
+- *Journal of Neuroscience* 34(11):3910–3923. Abstract read; title and pages to check.
+- **Why:** interval-tuned beta activity in the putamen, preferring ~800 ms.
+- **Where:** CogSci D3.
