@@ -14,7 +14,6 @@ without a network.
 | `01-literature/` | Detailed notes on the papers — enough to write related-work offline. |
 | `02-methods/` | Equations and setup for every method in play: reservoir/FORCE, LMU, periodic Kalman, rhythmic DMP, event representations, metrics, v2e simulation. |
 | `03-tooling/` | Cheatsheets: reusing the thesis repo, snnTorch, Nengo/LMU, IEEE LaTeX, the Python env. |
-| `04-checklists/` | Weekly cadence, paper submission. |
 
 Suggested reading order on day one: `00-project/decisions-log.md` →
 `01-literature/closest-prior-art.md` → `02-methods/reservoir-computing.md` →

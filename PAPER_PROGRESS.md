@@ -1,7 +1,7 @@
 # Paper progress
 
-Which sections of `paper/main.tex` can be written now, which are blocked, and on what.
-`PLAN.md` tracks the code; this tracks the manuscript. Deadlines are in `TIMELINE.md`.
+The MCSoC manuscript, accepted and frozen (tag `mcsoc-camera-ready`): what each section
+rests on, and what is known about it. `PLAN.md` tracks the code.
 
 ## How this works
 
@@ -11,9 +11,6 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 - *Drafted* means the prose is there. *In review* means Sagi is reviewing it (notes may sit
   in `%` comments). *Reviewed* means he has signed it off. *Final* means its "revisit"
   column is cleared.
-- The trigger: when a phase's **Done when** in `PLAN.md` is met, this file is updated and
-  the newly writable sections are named. Writing then keeps pace with the code instead of
-  landing all at once in the last week.
 
 ## Section status
 
@@ -26,7 +23,7 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 | III-A  | Problem Definition         | reviewed    | —                   | —                        |
 | III-B  | Event Input                | reviewed    | —                   | —                        |
 | III-C  | Spiking Localiser          | reviewed    | —                   | —                        |
-| III-D  | Trajectory-Memory Network  | reviewed    | —                   | half-period fix          |
+| III-D  | Trajectory-Memory Network  | reviewed    | —                   | —                        |
 | IV-B   | Event-Camera Simulator     | reviewed    | —                   | —                        |
 | IV-A   | Live Runs                  | reviewed    | —                   | —                        |
 | IV-C   | Baselines                  | reviewed    | —                   | —                        |
@@ -42,33 +39,13 @@ Which sections of `paper/main.tex` can be written now, which are blocked, and on
 | Fig. 1 | System overview            | reviewed    | —                   | —                        |
 | Fig. 2 | Recording setups           | dropped     | —                   | —                        |
 
-## Camera-ready (due 2026-11-08, hard)
+## Accepted
 
-Accepted as a regular paper (MCSoC paper ID 1571362916). The reviewers scored it accept,
-borderline and accept. The final PDF and the IEEE copyright form go through the IEEE CPS
-author kit (the link is in the acceptance email), not EDAS. The limit is 8 pages, plus up to
-2 more at US$50 each. The paper is at 8 now, so anything added needs a cut or a paid page.
+A regular paper (MCSoC paper ID 1571362916), scored accept, borderline and accept. The
+camera-ready, copyright form and registration are in. It answers the reviewers in the text: §VI
+(Loihi fit and energy, `scripts/energy.py` → `runs/paper/energy.csv`) and §III-D (why six clocks).
 
-Reviewer points:
-
-- [x] **R1**: running on a laptop CPU (i7-12650H) sits oddly with the venue's hardware scope.
-      §VI: the ~40,000 LIF neurons fit on one Loihi chip, Nengo compiles such populations to
-      Loihi with on-chip PES, events enter as input spikes (Davies 2018).
-- [x] **R2**: why six clocks started at different periods? §III-D: a clock locks on only
-      within a factor of ~1.4 of its starting period (outside it, to two or three cycles or
-      to half of one), so six spaced by 1.5 cover 0.8–7 s.
-- [x] **R2**: compare compute cost and energy, spiking against non-spiking. §VI: per 5 ms
-      step, spiking pipeline 0.9–1.5 µJ, the same networks run conventionally 35 µJ, centroid
-      + Kalman 0.05 µJ (Horowitz 45 nm energies; `scripts/energy.py` → `runs/paper/energy.csv`).
-- R3 asks for nothing.
-
-Submission:
-
-- [x] Final PDF uploaded to the IEEE CPS author kit (tagged `mcsoc-camera-ready`).
-- [x] IEEE copyright form.
-- [x] Author registration (at least one author).
-
-### Where each section's material lives
+## Where each section's material lives
 
 - **I, II** — `materials/01-literature/` (six notes); `PLAN.md`'s novelty framing.
 - **III-A** — `docs/implementation-plan.md`; `trajmem/trajectories.py`.
@@ -118,9 +95,6 @@ both localisers move onto its string (centroid to mid-string, flickering; spikin
 the string's top). The 5.5 s detection is a single brief crossing of the threshold. Decided:
 keep 6 of 6 and name the cause in §V-C. §IV-A gives no size for the arm.
 
-**Review:** every section is reviewed, and the paper is submitted and accepted. What's left
-is the camera-ready list above.
-
 ## The 4a encoder ground truth was abandoned (2026-09-12)
 
 Setup 4a was recorded on the premise that the encoders give exact ground truth for free,
@@ -149,42 +123,11 @@ The encoder path still exists in `trajmem/data.py` (`ego_gt`, reached by passing
 and `scan_pan_slow_01` still carries an anchor side-car, but hand-labels take precedence.
 Nothing in the calibration was changed.
 
-## Must revisit before camera-ready
+## Known in the published paper
 
-Writing early buys speed and costs staleness. Nothing is *final* until these are cleared:
-
-- [x] §I contribution claims match the results: the bullets carry no numbers; "stays quiet
-      on steady motion" holds on all 13 runs without a deviation.
-- [x] Abstract reviewed by Sagi. Its numbers match §V: 19 runs, 50 ms as accurate as the
-      periodic filters, 6 of 6 deviations (median latency 0.32 s), no false alarms (scored with
-      a 0.5 s tolerance before each hand mark), Kalman 3 of 6 at 35 false alarms/min.
-- [ ] `refs.bib` fixes still open (swept 2026-09-30; months, URLs, capitals, formatting slips,
-      published versions and the Harvey book are done):
-      - `Hu2021V2e` prints "Thecvf.com": make it `@inproceedings`, booktitle CVPRW 2021;
-      - `Alberico2025Egocentric` pages 5025–5034 vs 5064–5073 on the CVF copy: check;
-      - missing fields: Xu 16:2121–2129; Kalman pp. 35–45; Bekolay article 48; Eliasmith's
-        full title ("…: Computation, Representation, and Dynamics in Neurobiological Systems").
-      Re-exporting from the reference manager brings back `month`, `day` and `url` unless the
-      export drops them.
-- [x] 8 pages, with no room to spare: venue names are IEEE-abbreviated, Neftci's subtitle is
-      dropped, and fixing v2e's venue will add a line.
-- [x] Real-time claim: `scripts/time_live.py`, mains power, held-out pendulum runs. With
-      localiser and memory overlapped (separate processes, identical outputs) a 5 ms frame
-      costs 4.0–4.4 ms (1.15–1.26×); one after the other it is 5.2–5.5 ms (0.91–0.96×).
-      §VI ("What is spiking") quotes the overlapped number. Re-run it if either network changes.
-- [x] §III-B, §IV-A, §IV-C holes filled with real values.
-- [x] Ground truth described as hand-labelled and interpolated (§IV-A).
-- [x] Abstract written last, matching the results.
-- [x] `\nocite{*}` removed from `main.tex`; every bib entry is cited.
-
-## Online-only tasks
-
-Things that need a connection, so they can't be done on the plane:
-
-- [x] Paper registered and submitted on **EDAS** (`edas.info/N34632`).
-- [x] One clean LaTeX build (`latexmk -C && latexmk -pdf`) so MiKTeX fetches nothing lazily.
-- [x] Paper PDFs pulled into `materials/pdfs/` (gitignored) — 14 of 18. Missing: Sussillo
-      2009, Ijspeert 2002 and Itti 2001 (paywalled), Vacuum Spiker 2025 (no identifier on
-      record). All four are already summarised in `materials/`.
-
-The rest of `materials/04-checklists/paper-submission.md` still applies at the end.
+- Reference slips in the repo's `refs.bib`, noted 2026-09-30 (the published copy is not checked
+  against them): `Hu2021V2e` prints "Thecvf.com" (it is CVPRW 2021);
+  `Alberico2025Egocentric` pages 5025–5034 or 5064–5073; missing fields for Xu, Kalman and
+  Bekolay, and Eliasmith's full title.
+- Real-time claim: overlapped localiser and memory, 4.0–4.4 ms per 5 ms frame (1.15–1.26×);
+  one after the other 5.2–5.5 ms (`scripts/time_live.py`).

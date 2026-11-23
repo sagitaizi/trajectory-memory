@@ -24,10 +24,10 @@ target); offset-removed numbers are a secondary column.
 |---|---|
 | A — Data | ✅ Real corpus recorded; sim corpus generated. The paper uses 19 real runs of its three setups: 9 with hand-labelled positions (`development`, `held_out`), 3 with only a marked deviation onset (`held_out_breaks`), 10 unlabelled scored against their tracked position (`tracks`; the 3 onset-only runs are among them). Results pool them all; settings are frozen. |
 | B — Frontend + baselines | ✅ |
-| C — Trajectory memory, Stage 1 | 🟨 **In progress.** Memory (clock and map, `snn_phasemap`) built: at the Kalman bar on prediction, better on path and deviation (development). Pendulum localiser `pend_ft.pt` beats the centroid on the pendulum. **Open: the half-period lock.** |
+| C — Trajectory memory, Stage 1 | ✅ Memory (clock and map, `snn_phasemap`) built: at the Kalman bar on prediction, better on path and deviation (development). Pendulum localiser `pend_ft.pt` beats the centroid on the pendulum. Known weakness: the half-period lock. |
 | D — Deviation detection | ✅ Label-free ratcheting alarm, k calibrated per position input on development (centroid 25, `pend_ft` 30). Scored with a 0.5 s tolerance before each hand mark (`metrics.DEVIATION_TOLERANCE_S`; `scripts/rescore_deviation.py` re-scores the saved traces). Over all 19 real runs: 6/6 deviations detected, median AUC 0.98, median 0.32 s, no false alarms (`loop_break_02` is caught 0.27 s before the hand mark). Kalman: 3/6, 35 false alarms/min. |
 | E — Raw events, Stage 2 | Dropped for the submission; future work. |
-| F — Paper | 🟨 Accepted at MCSoC 2026; camera-ready due 2026-11-08 (`PAPER_PROGRESS.md`). What follows is in `ROADMAP.md`. |
+| F — Paper | ✅ Accepted at MCSoC 2026, camera-ready uploaded, paper frozen. What follows is in `ROADMAP.md`. |
 
 ## A — Data
 
@@ -144,8 +144,7 @@ target); offset-removed numbers are a secondary column.
 
   Prediction ties the Kalman; path and deviation are better. Known weak cases: the
   diagonal sweep locks at half the period; a 3:2 Lissajous has nothing at the fundamental
-  to lock to. **Open: the half-period lock (Sagi checks it in the replay first); a fast
-  layer for the 25–50 ms horizons.**
+  to lock to. Not addressed: the half-period lock; a fast layer for the 25–50 ms horizons.
 - **Ablations** (the learned memories that could not hold the cycle; full record in
   `docs/snn-experiments-log.md`, short version `docs/snn-experiments-summary.md`):
   the two-timescale network (`snn.py`, `runs/memory/snn_anchor20.pt`) predicts 10.2 px at

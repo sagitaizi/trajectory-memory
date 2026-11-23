@@ -31,9 +31,9 @@ For CogSci work start at `cogsci/PLAN.md`; `TIMELINE.md` has the dated milestone
 |---|---|
 | `PLAN.md` | MCSoC: phased plan and status. |
 | `TIMELINE.md` | Dated milestones of both papers, with checkmarks. |
-| `ROADMAP.md` | After acceptance: camera-ready, CogSci version, learning sessions; how the two papers are kept apart. |
+| `ROADMAP.md` | After acceptance: CogSci version, learning sessions; how the two papers are kept apart. |
 | `cogsci/PLAN.md` | CogSci: the claim, design questions, reading, build, runs, outline, calendar. |
-| `PAPER_PROGRESS.md` | MCSoC paper: section status, camera-ready list. CogSci's is `cogsci/PAPER_PROGRESS.md`. |
+| `PAPER_PROGRESS.md` | MCSoC paper (frozen): section status, sources. CogSci's is `cogsci/PAPER_PROGRESS.md`. |
 | `docs/implementation-plan.md` | Architecture, modules, data flow, frameworks. |
 | `RECORDING_LOG.md` | Every real clip: setup, rate, what it shows, label status. |
 | `corpus/sets.yaml` | Which real clips are development and which are held-out, with slices. |

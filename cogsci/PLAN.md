@@ -220,7 +220,7 @@ amplitude, speed) and the source:
 
 | Situation | Number wanted |
 |---|---|
-| Eye loop | visual delay; eye plant time constant; eye acceleration per unit target velocity in the first ~100 ms of pursuit (sets the reaction, D1) |
+| Eye loop | visual delay (141 ± 15 ms, Brostek et al. 2017); eye plant time constant; eye acceleration per unit target velocity in the first ~100 ms of pursuit (sets the reaction, D1) |
 | Start of motion | cycles until gain is near 1 and lag near 0 for a sinusoid; dependence on period |
 | Steady motion | gain and lag across periods; where prediction stops working |
 | Target hidden | how eye velocity decays through a gap, and over what time |

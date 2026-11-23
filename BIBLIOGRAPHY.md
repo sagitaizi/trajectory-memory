@@ -201,7 +201,7 @@ between one mixed-τ recurrent layer and a fast→slow layer split for the memor
   (read): peak eye velocity builds over 2–4 cycles; after a period change the old timing is
   kept; after an amplitude change the next movement follows the preceding sequence; the
   prediction is a volley of fixed duration and stored magnitude, timed by a periodicity
-  estimator. Full text not yet read (PMC1180117).
+  estimator. Full text not read (free: PMC1180117).
 - **Where:** MCSoC introduction; CogSci: Barnes's account (rival), S1, S5, S6
   (`cogsci/materials/reading-pursuit.md`).
 
@@ -536,7 +536,7 @@ work can say why, and so the framing is not mistaken for ours.
 ## Smooth pursuit and visual rhythm — CogSci 2027
 
 Notes and how far each was read: `cogsci/materials/reading-pursuit.md`. Entries marked
-"via review" are cited from Fukushima et al. 2013 and still need the primary paper.
+"via review" are known only through Fukushima et al. 2013; paywalled papers are not obtained.
 
 ### Fukushima, Fukushima, Warabi & Barnes, 2013 — "Cognitive processes involved in smooth pursuit eye movements: behavioral evidence, neural substrate and clinical correlation"
 - *Frontiers in Systems Neuroscience* 7:4. doi:10.3389/fnsys.2013.00004. Partly read.
@@ -583,17 +583,17 @@ Notes and how far each was read: `cogsci/materials/reading-pursuit.md`. Entries 
 ### Bennett & Barnes, 2003 — "Human ocular pursuit during the transient disappearance of a visual target"
 - *Journal of Neurophysiology* 90(4):2504–2520. doi:10.1152/jn.01145.2002. Abstract read; ramp target.
 - **Why:** gaps of different lengths; recovery before the target returns.
-- **Where:** CogSci S3 (number to read).
+- **Where:** CogSci S3 (trend only).
 
 ### Fukushima, Yamanobe, Shinmei & Fukushima, 2002 — "Predictive responses of periarcuate pursuit neurons to visual target motion"
 - *Experimental Brain Research* 145(1):104–120. doi:10.1007/s00221-002-1088-7. Abstract read; macaque.
 - **Why:** the only number found for a repeating target hidden about half a cycle: eye gain 0.65 ± 0.16.
-- **Where:** CogSci S3 (candidate for adjusting on).
+- **Where:** CogSci S3 (trend only; abstract, monkey).
 
 ### Whittaker & Eaholtz, 1982 — "Learning patterns of eye motion for foveal pursuit"
 - *Investigative Ophthalmology & Visual Science* 23(3):393–397. Abstract read; two subjects.
 - **Why:** sinusoidal eye motion continues after the target vanishes (0.8 and 1.0 Hz).
-- **Where:** CogSci S3 (to read in full).
+- **Where:** CogSci S3 (trend only).
 
 ### Kveraga, Fendrich & Hughes, 2001 — "Ocular pursuit of predicted motion trajectories"
 - *Experimental Brain Research* 138(3):393–397. doi:10.1007/s002210100701. Abstract read.
@@ -623,7 +623,7 @@ Notes and how far each was read: `cogsci/materials/reading-pursuit.md`. Entries 
 ### Trillenberg et al., 1998 — "Target anticipation and impairment of smooth pursuit eye movements in schizophrenia"
 - *Experimental Brain Research* 120(3):316–324. doi:10.1007/s002210050405. Abstract snippet only; author list to check.
 - **Why:** a sinusoidal target stopped unpredictably: predictive pursuit goes on for 150–200 ms.
-- **Where:** CogSci S4 (to read in full).
+- **Where:** CogSci S4 (trend only).
 
 ### Robinson, Gordon & Gordon, 1986 — "A model of the smooth pursuit eye movement system"
 - *Biological Cybernetics* 55:43–57. Via review; authors to check.

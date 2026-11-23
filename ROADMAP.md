@@ -1,28 +1,13 @@
 # Roadmap
 
-What comes after the MCSoC acceptance: three tracks, in this order. Dates are in `TIMELINE.md`.
+What comes after the MCSoC acceptance. Dates are in `TIMELINE.md`.
 
 | Track | Goal | By |
 |---|---|---|
-| 1 | MCSoC camera-ready that answers every review | 2026-11-08 (hard) |
 | 3 | Learning sessions: relearn the paper section by section, then the talk | 2026-12-14 (conference) |
-| 2 | A CogSci 2027 version: the same system compared with how the brain predicts motion | 2027-02-01 (UTC-11) |
+| 2 | A CogSci 2027 version: the clock model compared with how people's eyes predict motion | 2027-02-01 (UTC-11) |
 
-Track 3 starts alongside track 1, since knowing each section well is what lets us answer
-the reviews properly.
-
-## 1. MCSoC camera-ready
-
-The checklist (reviewer points, upload, copyright, registration) is in `PAPER_PROGRESS.md`.
-
-**Open: new experiments in the camera-ready.** The camera-ready is meant to fix what the
-reviewers raised. Clarifications and small analyses that answer them are normal (the
-six-clocks explanation, an energy estimate from the operation counts). New results that
-change what the paper claims are not fraud, but then the published paper is not the one
-that was reviewed. Training on real recordings also breaks the paper's own protocol ("none
-are ever trained on"): every result on those runs would have to move to new, unseen
-recordings. Recommendation: the camera-ready answers the reviews only, and new recordings
-or training go into the CogSci version or a later journal version.
+Track 1, the MCSoC camera-ready, is done (uploaded, copyright form and registration in).
 
 ## 2. CogSci version
 

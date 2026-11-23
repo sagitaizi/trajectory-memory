@@ -1,6 +1,6 @@
 # Timeline
 
-Deadlines are fixed. The camera-ready to-do list is in `PAPER_PROGRESS.md`.
+Deadlines are fixed.
 
 ## Deadlines
 
@@ -21,8 +21,8 @@ Deadlines are fixed. The camera-ready to-do list is in `PAPER_PROGRESS.md`.
 | Sep 9–16 | Recording; simulator matched to real; sim corpus; frontend, baselines, metrics, evaluation loop | ✅ |
 | Sep 17–20 | Framework decision (G-F); SNN localiser + memory core; pretrain on sim; Stage 1 numbers on development clips | ✅ |
 | Sep 21–27 | Deviation thresholds on development clips; label and score the held-out pendulum clips; Stage 1 result frozen | ✅ |
-| Sep 28–Oct 1 | Held-out run, results table, draft to supervisor | ⬜ |
-| Oct 2–9 | Supervisor comments, final 8 pages | ⬜ |
+| Sep 28–Oct 1 | Held-out run, results table, draft to supervisor | ✅ |
+| Oct 2–9 | Supervisor comments, final 8 pages | ✅ |
 | Oct 10 | Submit | ✅ |
 | Oct 25–Nov 8 | Answer the reviewers, camera-ready, copyright, registration | ✅ |
 

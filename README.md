@@ -2,9 +2,10 @@
 
 SNN-based trajectory memory from event-camera input: a spiking network watches a target move
 in a repetitive path, memorises it, predicts it a short time ahead, and flags when the motion
-stops matching. Offline. M.Sc. thesis work (paper 4c), targeted at IEEE MCSoC 2026.
+stops matching. Offline. M.Sc. thesis work (paper 4c), accepted at IEEE MCSoC 2026; a second
+paper, for CogSci 2027, compares a clock model with how people's eyes follow a repeating motion.
 
-- **Start:** `PLAN.md`, then `TIMELINE.md`.
+- **Start:** `cogsci/PLAN.md` (active) or `PLAN.md` (MCSoC), then `TIMELINE.md`.
 - **Architecture:** `docs/implementation-plan.md`.
 - **Context for Claude Code:** `CLAUDE.md`.
 

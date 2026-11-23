@@ -1,8 +1,9 @@
 # Reading: pursuit, prediction, gaps and stops
 
 Notes for `cogsci/PLAN.md` phase 2. "Read" says how far each source was read: **full**,
-**abstract**, or **via review** (the claim as a review reports it; the primary paper is still
-to be checked). Nothing here is quotable in the paper until it is read in full.
+**text** (no figures or tables), **abstract**, or **via review** (the claim as a review reports
+it). Paywalled papers are not obtained, so a number is quotable only from a free paper read
+here; abstract-only and via-review entries support trends at most.
 
 ## The eye loop (D1)
 
@@ -45,8 +46,8 @@ Barnes's account, a velocity per direction released on time, is the rival the pa
 
 - Eye velocity does not stop; it is sustained at a reduced level, and often recovers before
   the target is expected back. Becker & Fuchs 1985; Bennett & Barnes 2003; via review.
-- Reported elsewhere (to check in Becker & Fuchs): the drop starts ~190 ms after
-  disappearance and levels off by ~280 ms at a residual of ~60% of pursuit velocity.
+- Reported elsewhere, unverified and not quotable: the drop starts ~190 ms after disappearance
+  and levels off by ~280 ms at ~60% of pursuit velocity (attributed to Becker & Fuchs).
 - Without an expectation that the target comes back, velocity falls towards zero
   (Mitrani & Dimitrov 1978; Bennett & Barnes 2004; via review).
 - The residual level rises with target velocity (Barnes & Collins 2008, via review).
@@ -75,9 +76,8 @@ No human number found yet for a half-cycle gap.
 Kveraga and Whittaker bear on the clock: it goes on through a turnaround unseen, as eyes seem
 to, and fades while it does.
 
-Paywalled papers are not obtained. Free but not opened automatically (a browser can):
-Barnes & Asselman 1991 (PMC1180117), Barnes et al. 1987 (PMC1192073), Ackerley & Barnes
-(PMC3099020).
+Free but not opened automatically (a browser can): Barnes & Asselman 1991 (PMC1180117),
+Barnes et al. 1987 (PMC1192073), Ackerley & Barnes (PMC3099020).
 
 ### A gap in a ramp, free source
 
