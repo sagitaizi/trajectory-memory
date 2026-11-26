@@ -40,10 +40,34 @@ def test_it_says_nothing_before_it_has_seen_the_target():
     assert np.isnan(m.velocity(0.1)).all()
 
 
-def test_it_speaks_from_the_start_but_judges_nothing_until_it_has_settled():
+def test_it_chooses_a_clock_from_the_start_but_judges_nothing_until_it_has_settled():
     m = a_clock()
     follow(m, swing_txy(duration_s=0.5), DT)
-    assert np.isfinite(m.velocity(0.1)).all() and np.isfinite(m.period()) and np.isnan(m.surprise())
+    assert np.isfinite(m.period()) and np.isnan(m.surprise())
+
+
+def test_after_a_gap_its_check_waits_until_both_sides_were_made_on_a_seen_target():
+    m = a_clock()
+    follow(m, swing_txy(duration_s=5.0), DT)
+    for _ in range(50):
+        m.observe(np.full(2, np.nan), np.full(2, np.nan))
+    before = m.predicted.copy()
+    for _ in range(m.check_steps - 1):
+        m.observe(np.array([320.0, 240.0]), np.array([100.0, 0.0]))
+    assert np.array_equal(m.predicted, before)
+
+
+def test_it_never_moves_the_eye_when_keeping_the_current_speed_predicts_as_well():
+    t = np.arange(0, 4.0, DT) + DT / 2
+    tr = follow(a_clock(), np.column_stack([t, 100 + 50 * t, np.full_like(t, 240.0)]), DT)
+    assert (tr.memory_velocity == 0).all()
+
+
+def test_it_does_not_overshoot_while_its_clock_falls_into_step():
+    tr = follow(ClockMemory(DT), swing_txy(duration_s=6.0), DT)
+    for k in range(4):
+        cycle = (tr.t >= k * 1.2) & (tr.t < (k + 1) * 1.2)
+        assert gain_lag(tr.t[cycle], tr.eye_velocity[cycle], tr.target_velocity[cycle], 1.2)[0] < 1.15
 
 
 def test_it_locks_on_and_drives_the_eye_at_the_target_velocity(steady):

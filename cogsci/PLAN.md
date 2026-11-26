@@ -267,8 +267,12 @@ In order, each one tested before the next:
       cancel, so nothing is added to the read-ahead.
 - [x] Surprise signal (D5), NaN until the slow copy is saved (3-4 s on these runs).
 - [x] Settings (D6).
-- [x] No start-up wait: the best-predicting clock drives the eye from the first step (the
-      MCSoC memory waited 3 s, which would have set S1's answer).
+- [x] No start-up wait (the MCSoC memory waited 3 s, which would have set S1's answer).
+      Instead the memory moves the eye only while its clock's read-ahead one visual delay
+      earlier beats assuming the target kept its speed (decided with Sagi). Steady runs: on
+      99-100% of the time, gain and lag unchanged. Clean sinusoids, first cycles: eye gain at
+      most 1.24 (1.36 without the check), but the memory drops out for part of cycles 3-6 and
+      the eye falls to 0.45-0.8 then (Open).
 - [ ] Sagi checks D6.
 
 Code goes in `pursuit/`, tests in `tests/pursuit/`; `trajmem/` and `runs/paper/` stay as
@@ -342,6 +346,13 @@ this audience, not copied from MCSoC. Six pages, references extra:
 | Jan 11–22 | revision, submission | PCS accounts by Jan 8 |
 
 ## Open
+
+- The memory switching in and out in cycles 3-6 of a clean sinusoid (see Build). Two causes:
+  the clock is fixed when the slow copy is saved, three cycles after the *first* choice (as in
+  MCSoC, which chose only after its 3 s wait), so now at 3-4 s, before it has settled; and the
+  keep-speed error swings within a cycle (0.2 s smoothing). Counting from the latest switch
+  instead never saves the slow copy on real runs (two clocks of nearly the same period trade
+  places). Both are D3 choices for Sagi.
 
 - S3: with the target hidden there is no slip, so the reaction keeps the speed it had. Beside a
   memory 10% too slow that is 1-11% of peak speed; the reaction alone glides on at 16-68%.

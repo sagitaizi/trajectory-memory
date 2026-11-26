@@ -2,10 +2,14 @@
 a clock's phase to the target's velocity, scaled by the clock's swing.
 
 Everything it is shown is one visual delay old, so it pairs late velocity with late phase, and
-`velocity(ahead_s)` reads the map that far ahead. Adapted from the MCSoC memory
+`velocity(ahead_s)` reads the map that far ahead. It moves the eye only while its clock's
+read-ahead one delay earlier matches what then arrives better than assuming the target kept its
+speed would have; until a clock has fallen into step, the reaction alone moves the eye. Adapted from the MCSoC memory
 (`trajmem.snn_phasemap`).
 """
 from __future__ import annotations
+
+from collections import deque
 
 import numpy as np
 import torch
@@ -14,6 +18,7 @@ from trajmem.lmu import SpikingLmu, build_dynamics
 from trajmem.phasemap import _Axis
 from trajmem.snn_phasemap import lif_rates
 
+from .eye import VISUAL_DELAY_S
 from .oscillator import PERIODS_S, TWO_PI, OscillatorBank
 
 
@@ -24,11 +29,13 @@ class ClockMemory:
     def __init__(self, dt_s: float, periods_s=PERIODS_S, damping_cycles: float | None = 1.0, n_clock: int = 3000,
                  n_ring: int = 400, eta: float = 0.02, eta_start: float = 0.3, eta_tau_s: float = 2.0,
                  score_tau_s: float = 0.2, slow_tau_s: float = 30.0,
-                 time_limit_s: float = 12.0, lag_s: float = 0.0, seed: int = 1):
+                 time_limit_s: float = 12.0, lag_s: float = 0.0, check_ahead_s: float = VISUAL_DELAY_S,
+                 seed: int = 1):
         self.dt_s, self.time_limit_s = dt_s, time_limit_s
         self.eta, self.eta_start, self.eta_tau_s = eta, eta_start, eta_tau_s
         self.score_alpha, self.slow_tau_s = min(1.0, dt_s / score_tau_s), slow_tau_s
         self.lag_s = lag_s                              # lags in the chain other than the visual delay
+        self.check_ahead_s, self.check_steps = check_ahead_s, max(1, int(round(check_ahead_s / dt_s)))
         self.clocks = OscillatorBank(dt_s, periods_s, damping_cycles, n=n_clock, seed=seed)
         ring = build_dynamics(n_ring, 2, 1.2, lambda s: [0.0, 0.0], in_dims=2, tau_syn=0.01, seed=seed + 1)
         self.ring, self.n_ring = SpikingLmu(ring, dt_s), n_ring
@@ -42,6 +49,8 @@ class ClockMemory:
         self.map, self.slow = torch.zeros(B, 2, self.n_ring), None
         self.err, self.score = np.full(B, np.nan), np.full(B, np.nan)
         self.best, self.t_chosen, self.err_history = None, None, []
+        self.predicted, self.held = np.full(B, np.nan), np.nan
+        self.made = deque()                             # (each clock's read-ahead, velocity seen) per step
 
     def observe(self, position, velocity) -> None:
         self.t += self.dt_s
@@ -54,7 +63,18 @@ class ClockMemory:
             if np.isfinite(velocity).all():
                 self._learn(torch.tensor(velocity, dtype=torch.float32), cells * swing[:, None],
                             power=(cells * cells).sum(1, keepdim=True) + 1e-3)
+        self._check(np.asarray(velocity, dtype=float))
         self._choose()
+
+    def _check(self, velocity) -> None:
+        """How well each clock read one delay ahead, and how well keeping the speed then seen did."""
+        if len(self.made) == self.check_steps:
+            ahead, seen = self.made.popleft()
+            if np.isfinite(velocity).all() and np.isfinite(seen).all():
+                self.predicted = self._smoothed(self.predicted, torch.tensor(velocity - ahead, dtype=torch.float32))
+                self.held = self._smoothed(np.array([self.held]), torch.tensor(velocity - seen,
+                                                                               dtype=torch.float32)[None])[0]
+        self.made.append((self._ahead(self.check_ahead_s), velocity))
 
     def _learn(self, target, cells, power) -> None:
         err = target - torch.einsum("bcn,bn->bc", self.map, cells)
@@ -91,13 +111,19 @@ class ClockMemory:
         return len(self.err_history) > 1 and self.err_history[-1][1] > 0.9 * self.err_history[0][1]
 
     def velocity(self, ahead_s: float) -> np.ndarray:
-        if self.best is None:
+        if self.best is None or not self.predicted[self.best] < self.held:
             return np.full(2, np.nan)
-        i, w = self.best, self.ring.w
-        xy = self.clocks.ahead(ahead_s + self.lag_s)[i]
-        swing = float(np.hypot(*xy))
-        tuning = lif_rates(w.scaled_encoders @ torch.tensor(xy / max(swing, 1e-6), dtype=torch.float32) + w.bias)
-        return swing * (self.map[i] @ (tuning / 100.0)).numpy()
+        return self._ahead(ahead_s)[self.best]
+
+    def _ahead(self, ahead_s: float) -> np.ndarray:
+        """(clocks, 2): each clock's map read where the clock will be `ahead_s` from now."""
+        w = self.ring.w
+        xy = self.clocks.ahead(ahead_s + self.lag_s)
+        swing = np.hypot(*xy.T)
+        unit = torch.tensor(xy / np.maximum(swing, 1e-6)[:, None], dtype=torch.float32)
+        with torch.no_grad():
+            tuning = lif_rates(unit @ w.scaled_encoders.T + w.bias)
+            return swing[:, None] * torch.einsum("bcn,bn->bc", self.map, tuning / 100.0).numpy()
 
     def surprise(self) -> float:
         """How far the velocity is from what the slow copy expected, smoothed; NaN until it is saved."""
