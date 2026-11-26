@@ -64,7 +64,7 @@ def test_there_is_no_alarm_before_the_score_has_filled_the_window():
 
 
 def test_the_chosen_alarm_constant_is_the_default():
-    assert alarms(*a_score(jump_at=15.0), 0.005) == alarms(*a_score(jump_at=15.0), 0.005, k=8.0, floor=0.0)
+    assert alarms(*a_score(jump_at=15.0), 0.005) == alarms(*a_score(jump_at=15.0), 0.005, k=10.0, floor=0.0)
 
 
 def test_below_the_floor_nothing_is_an_alarm():

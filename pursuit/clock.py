@@ -2,9 +2,10 @@
 a clock's phase to the target's velocity, scaled by the clock's swing.
 
 Everything it is shown is one visual delay old, so it pairs late velocity with late phase, and
-`velocity(ahead_s)` reads the map that far ahead. It moves the eye only while its clock's
-read-ahead one delay earlier matches what then arrives better than assuming the target kept its
-speed would have; until a clock has fallen into step, the reaction alone moves the eye. Adapted from the MCSoC memory
+`velocity(ahead_s)` reads the map that far ahead. Each clock is judged by how well its read-ahead
+one delay earlier matches what then arrives; the best is chosen, and it moves the eye only while
+it does better than assuming the target kept its speed. Until then the reaction alone moves the
+eye. Adapted from the MCSoC memory
 (`trajmem.snn_phasemap`).
 """
 from __future__ import annotations
@@ -30,12 +31,13 @@ class ClockMemory:
                  n_ring: int = 400, eta: float = 0.02, eta_start: float = 0.3, eta_tau_s: float = 2.0,
                  score_tau_s: float = 0.2, slow_tau_s: float = 30.0,
                  time_limit_s: float = 12.0, lag_s: float = 0.0, check_ahead_s: float = VISUAL_DELAY_S,
-                 seed: int = 1):
+                 check_tau_s: float = 1.0, seed: int = 1):
         self.dt_s, self.time_limit_s = dt_s, time_limit_s
         self.eta, self.eta_start, self.eta_tau_s = eta, eta_start, eta_tau_s
         self.score_alpha, self.slow_tau_s = min(1.0, dt_s / score_tau_s), slow_tau_s
         self.lag_s = lag_s                              # lags in the chain other than the visual delay
         self.check_ahead_s, self.check_steps = check_ahead_s, max(1, int(round(check_ahead_s / dt_s)))
+        self.check_alpha = min(1.0, dt_s / check_tau_s)
         self.clocks = OscillatorBank(dt_s, periods_s, damping_cycles, n=n_clock, seed=seed)
         ring = build_dynamics(n_ring, 2, 1.2, lambda s: [0.0, 0.0], in_dims=2, tau_syn=0.01, seed=seed + 1)
         self.ring, self.n_ring = SpikingLmu(ring, dt_s), n_ring
@@ -47,7 +49,7 @@ class ClockMemory:
         self.clocks.reset()
         self.axis, self.ring_state = _Axis(self.dt_s), self.ring.init_state(B)
         self.map, self.slow = torch.zeros(B, 2, self.n_ring), None
-        self.err, self.score = np.full(B, np.nan), np.full(B, np.nan)
+        self.score = np.full(B, np.nan)
         self.best, self.t_chosen, self.err_history = None, None, []
         self.predicted, self.held = np.full(B, np.nan), np.nan
         self.made = deque()                             # (each clock's read-ahead, velocity seen) per step
@@ -71,9 +73,10 @@ class ClockMemory:
         if len(self.made) == self.check_steps:
             ahead, seen = self.made.popleft()
             if np.isfinite(velocity).all() and np.isfinite(seen).all():
-                self.predicted = self._smoothed(self.predicted, torch.tensor(velocity - ahead, dtype=torch.float32))
-                self.held = self._smoothed(np.array([self.held]), torch.tensor(velocity - seen,
-                                                                               dtype=torch.float32)[None])[0]
+                a = self.check_alpha
+                self.predicted = self._smoothed(self.predicted, torch.tensor(velocity - ahead, dtype=torch.float32), a)
+                self.held = float(self._smoothed(np.array([self.held]),
+                                                 torch.tensor(velocity - seen, dtype=torch.float32)[None], a)[0])
         self.made.append((self._ahead(self.check_ahead_s), velocity))
 
     def _learn(self, target, cells, power) -> None:
@@ -81,39 +84,46 @@ class ClockMemory:
         eta = max(self.eta, self.eta_start * np.exp(-self.learned_s / self.eta_tau_s))
         self.map += eta * (err / power)[:, :, None] * cells[:, None, :]
         self.learned_s += self.dt_s
-        self.err = self._smoothed(self.err, err)
         if self.slow is not None:
             self.slow_age_s += self.dt_s
             self.slow += self.dt_s / min(self.slow_tau_s, max(1.0, self.slow_age_s)) * (self.map - self.slow)
             self.score = self._smoothed(self.score, target - torch.einsum("bcn,bn->bc", self.slow, cells))
 
-    def _smoothed(self, level, err) -> np.ndarray:
+    def _smoothed(self, level, err, alpha=None) -> np.ndarray:
         e = err.norm(dim=1).numpy()
-        return np.where(np.isnan(level), e, level + self.score_alpha * (e - level))
+        return np.where(np.isnan(level), e, level + (self.score_alpha if alpha is None else alpha) * (e - level))
 
     def _choose(self) -> None:
-        """The clock whose map predicts best, until the slow copy is saved."""
-        if not np.isfinite(self.err).any() or self.slow is not None:
+        """The clock that reads ahead best; the slow copy of every map is saved once it has settled."""
+        if not np.isfinite(self.predicted).any():
             return
-        self.best = int(np.nanargmin(self.err))
-        self.t_chosen = self.t if self.t_chosen is None else self.t_chosen
-        if self._settled():
+        self.best = int(np.nanargmin(self.predicted))
+        if self.slow is not None:
+            return
+        if self.t_chosen is None and self._predicts():
+            self.t_chosen = self.t
+        if self.t_chosen is not None and self._settled():
             self.slow = self.map.clone()
 
     def _settled(self) -> bool:
-        """At least three cycles on a chosen clock and its error no longer falling, or the time limit."""
+        """At least three cycles since the memory first moved the eye and its error no longer falling,
+        or the time limit."""
         lap, since = self.period(), self.t - self.t_chosen
         if since < 3.0 * lap:
             return False
         if since >= min(6.0 * lap, self.time_limit_s):
             return True
-        self.err_history = [(t, e) for t, e in self.err_history + [(self.t, self.err[self.best])] if t >= self.t - lap]
+        self.err_history = [(t, e) for t, e in self.err_history + [(self.t, self.predicted[self.best])] if t >= self.t - lap]
         return len(self.err_history) > 1 and self.err_history[-1][1] > 0.9 * self.err_history[0][1]
 
     def velocity(self, ahead_s: float) -> np.ndarray:
-        if self.best is None or not self.predicted[self.best] < self.held:
+        if not self._predicts():
             return np.full(2, np.nan)
         return self._ahead(ahead_s)[self.best]
+
+    def _predicts(self) -> bool:
+        """The chosen clock reads ahead better than keeping the speed would."""
+        return self.best is not None and bool(self.predicted[self.best] < self.held)
 
     def _ahead(self, ahead_s: float) -> np.ndarray:
         """(clocks, 2): each clock's map read where the clock will be `ahead_s` from now."""

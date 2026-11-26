@@ -46,6 +46,24 @@ def test_it_chooses_a_clock_from_the_start_but_judges_nothing_until_it_has_settl
     assert np.isfinite(m.period()) and np.isnan(m.surprise())
 
 
+def test_it_saves_the_slow_copy_three_cycles_after_it_first_moves_the_eye():
+    tr = follow(ClockMemory(DT), swing_txy(duration_s=10.0), DT)
+    first = np.flatnonzero(np.any(tr.memory_velocity != 0, axis=1))[0]
+    saved = np.flatnonzero(np.isfinite(tr.surprise))[0]
+    assert tr.t[saved] - tr.t[first] >= 3 * tr.period[saved] - DT
+
+
+def test_once_it_moves_the_eye_on_a_steady_swing_it_keeps_doing_so():
+    tr = follow(ClockMemory(DT), swing_txy(duration_s=10.0), DT)
+    on = np.any(tr.memory_velocity != 0, axis=1)
+    assert on[np.flatnonzero(on)[0]:].mean() > 0.95
+
+
+def test_on_a_slow_swing_it_starts_moving_the_eye_within_four_cycles():
+    tr = follow(ClockMemory(DT), swing_txy(period_s=4.0, duration_s=16.0), DT)
+    assert np.any(tr.memory_velocity[tr.t < 16.0] != 0)
+
+
 def test_after_a_gap_its_check_waits_until_both_sides_were_made_on_a_seen_target():
     m = a_clock()
     follow(m, swing_txy(duration_s=5.0), DT)

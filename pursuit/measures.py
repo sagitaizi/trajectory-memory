@@ -5,7 +5,7 @@ import numpy as np
 
 from trajmem.metrics import RatchetAlarm
 
-ALARM_K = 8.0          # the smallest with no false alarm on the steady development runs (scripts/cogsci/tune.py)
+ALARM_K = 10.0         # the smallest with no false alarm on the steady development runs (scripts/cogsci/tune.py)
 
 
 def _fundamental(t, v, period_s: float) -> complex:

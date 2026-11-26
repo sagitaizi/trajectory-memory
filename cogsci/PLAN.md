@@ -193,10 +193,12 @@ Decided:
   - Result (`scripts/cogsci/tune.py`; to check): all 27 learning-rate schedules tried give an
     eye gain within the human spread at 4 s, and a lag under about 10 ms once the localiser's
     own lag (21-29 ms on slow swings, ~3 ms on real runs) is taken out. The data cannot tell
-    them apart, so the published schedule stays. k = 8 and no floor: the smallest k with no
-    false alarm on the steady development runs, over three neuron builds (unchanged with the
-    start-up wait removed). One 4 s simulated
-    swing is never quiet: the localiser loses the target at its slow turnarounds.
+    them apart, so the published schedule stays (rechecked with the start-up rules below: eye
+    gain 1.00-1.01, lag 2-4 ms). k = 10 and no floor: the smallest k with no false alarm on the
+    steady development runs, over three neuron builds. It is set by one alarm on one build at
+    the last instant of the pushed run's steady part (cut 0.5 s before the marked push), where
+    the swing already grows; with that one, k = 6. One 4 s simulated swing is never quiet: the
+    localiser loses the target at its slow turnarounds.
   - Set on the MCSoC development pendulum runs and a few simulated clips; frozen before any
     test-on run. Grids and chosen values go in the paper or its supplement, and the results
     table marks which situations were adjusted on.
@@ -265,14 +267,18 @@ In order, each one tested before the next:
       0.98-0.99x the period; memory gain 0.97-1.01, lag 2-8 ms; eye gain 1.01-1.03
       (`scripts/cogsci/check_clock.py`). The velocity smoothing (+17 ms) and the map's own lead
       cancel, so nothing is added to the read-ahead.
-- [x] Surprise signal (D5), NaN until the slow copy is saved (3-4 s on these runs).
+- [x] Surprise signal (D5), NaN until the slow copy is saved (3.4-4.2 s on these runs).
 - [x] Settings (D6).
-- [x] No start-up wait (the MCSoC memory waited 3 s, which would have set S1's answer).
-      Instead the memory moves the eye only while its clock's read-ahead one visual delay
-      earlier beats assuming the target kept its speed (decided with Sagi). Steady runs: on
-      99-100% of the time, gain and lag unchanged. Clean sinusoids, first cycles: eye gain at
-      most 1.24 (1.36 without the check), but the memory drops out for part of cycles 3-6 and
-      the eye falls to 0.45-0.8 then (Open).
+- [x] Start-up, decided with Sagi (D3). No 3 s wait (it would have set S1's answer). Each clock
+      is judged by how well its read-ahead one visual delay earlier matches what then arrives,
+      averaged over 1 s; the best is chosen, also after the slow copy is saved, and it moves the
+      eye only while it beats assuming the target kept its speed. The slow copy is saved three
+      cycles after the memory first moves the eye (with the settle rule's other conditions).
+      Steady runs: on 100% of the time, gain and lag unchanged. Clean sinusoids: the memory
+      comes in at cycle 1.5 (0.8 s), 1.9 (1.2 s), 2.3 (2 s), 3.3 (4 s) and is then on 75-100%
+      of the time; eye gain at most 1.24 in the first cycles. In cycles 4-6 of the 0.8 and 1.2 s
+      swings the eye falls to 0.43-0.73: the clock is still a few percent fast, the memory
+      leads by ~70 ms and the reaction pulls against it (Open).
 - [ ] Sagi checks D6.
 
 Code goes in `pursuit/`, tests in `tests/pursuit/`; `trajmem/` and `runs/paper/` stay as
@@ -347,12 +353,7 @@ this audience, not copied from MCSoC. Six pages, references extra:
 
 ## Open
 
-- The memory switching in and out in cycles 3-6 of a clean sinusoid (see Build). Two causes:
-  the clock is fixed when the slow copy is saved, three cycles after the *first* choice (as in
-  MCSoC, which chose only after its 3 s wait), so now at 3-4 s, before it has settled; and the
-  keep-speed error swings within a cycle (0.2 s smoothing). Counting from the latest switch
-  instead never saves the slow copy on real runs (two clocks of nearly the same period trade
-  places). Both are D3 choices for Sagi.
+- The handover dip in cycles 4-6 of fast clean sinusoids (see Build, start-up).
 
 - S3: with the target hidden there is no slip, so the reaction keeps the speed it had. Beside a
   memory 10% too slow that is 1-11% of peak speed; the reaction alone glides on at 16-68%.
