@@ -56,9 +56,10 @@ camera → localiser (unchanged) → target position p
   position and makes no claim about it.
 - **Simulated eye** (`pursuit/eye.py`): a gaze point over the image, a visual delay and
   an eye plant, with values taken from the pursuit literature.
-- **Clock memory** (`pursuit/clock.py`, from `trajmem/snn_phasemap.py`): the same clock
-  and ring of phase cells; the map now holds target velocity at each phase, learned by PES from
-  the rebuilt target velocity, paired with the clock's present phase (D3). The oscillator is
+- **Clock memory** (`pursuit/oscillator.py`, `pursuit/clock.py`, from
+  `trajmem/snn_phasemap.py`): the clocks and a ring of phase cells; the map now holds target
+  velocity at each phase, learned by PES from the rebuilt target velocity, paired with the
+  clock's present phase (D3). The oscillator is
   damped, and the output is scaled by its swing (D3, gaps).
 - **Surprise signal:** the rebuilt target velocity far from what a slow copy of the map
   expects, with the MCSoC threshold rule (`trajmem/metrics.py`) (D5).
@@ -142,6 +143,15 @@ Decided:
   best-fit clocks, dropping it changes nothing on six of seven development runs; on the
   seventh (a loop) the slow copy is saved at 8 s instead of at the 20 s limit. Rechecked in
   the eye loop.
+- **D3, the damped clock in spiking cells:** the target's drive pushes the oscillator along one
+  axis and the swing decays by itself (a forced damped oscillator, as in Large's models), so
+  the push (its strength is set by the damping) also sets how strongly the phase follows. At
+  the published 1500 cells and 20 ms synapse the firing noise hides the damping; 3000 cells and
+  a 50 ms synapse fade to 0.29-0.42 after one damping time (0.37 wanted). The undamped setting
+  is the MCSoC clock itself.
+- **D3, reading ahead follows the clock's own dynamics** over the delay (pushed as expected, or
+  fading if the target is unseen). Turning the phase alone made the velocity 10-20% too fast,
+  since the push makes the swing ripple within a cycle.
 - **D4, what is spiking:** the clock's oscillator and phase cells, and the map. Computed
   directly: the main direction of motion, the clock's rate update, choosing a clock, reading
   the cells ahead by the delay. The paper lists these and notes each could be built from
@@ -172,14 +182,21 @@ Decided:
   up.
 - **D6, settings** (Claude's call, checked by Sagi):
   - Fixed: the eye's delay, response and reaction strength (D1), the 20 ms velocity smoothing
-    (D2), the score smoothing (D5), the clock's damping (one cycle; D3, gaps), its oscillator
-    constants, cell counts and period range as published in MCSoC.
+    (D2), the score smoothing (D5), the clock's damping (one cycle; D3, gaps) and cells (D3),
+    its rate constant and period range as published in MCSoC.
   - Adjusted: the map's learning-rate schedule (start rate, end rate, how fast it falls), the
     alarm's k and floor.
   - Human data in two parts, split before any run. *Adjust on:* steady following (S2, gain
     and lag at one period, 4 s, in simulation; Brostek et al. 2017). *Test on:* S1, S2's other
     periods, S3-S8.
   - The score: closeness to the adjust-on human values, with no false alarms on steady runs.
+  - Result (`scripts/cogsci/tune.py`; to check): all 27 learning-rate schedules tried give an
+    eye gain within the human spread at 4 s, and a lag under about 10 ms once the localiser's
+    own lag (21-29 ms on slow swings, ~3 ms on real runs) is taken out. The data cannot tell
+    them apart, so the published schedule stays. k = 8 and no floor: the smallest k with no
+    false alarm on the steady development runs, over three neuron builds (unchanged with the
+    start-up wait removed). One 4 s simulated
+    swing is never quiet: the localiser loses the target at its slow turnarounds.
   - Set on the MCSoC development pendulum runs and a few simulated clips; frozen before any
     test-on run. Grids and chosen values go in the paper or its supplement, and the results
     table marks which situations were adjusted on.
@@ -238,14 +255,21 @@ reason noted, and the adjust-on values (D6) are sourced from free papers.
 
 In order, each one tested before the next:
 
-- [ ] `pursuit/eye.py` and `pursuit/loop.py`, tested with a "perfect" memory that outputs the true
-      target velocity (the eye should then track with only the delay's error).
-- [ ] Velocity rebuilt from the localiser (D2), and the check that the memory's learned
-      velocity is clean enough (else the positions-in fallback).
-- [ ] Clock memory (D3); it should lock on to the steady pendulum runs. Other lags in the
-      chain (velocity smoothing, the localiser) are measured and added to the read-ahead.
-- [ ] Surprise signal (D5).
-- [ ] Settings (D6), on a few development runs only.
+- [x] `pursuit/eye.py` and `pursuit/loop.py`, tested with a "perfect" memory that outputs the true
+      target velocity. On the development pendulum runs (`scripts/cogsci/check_eye.py`, 100 ms
+      delay): perfect memory gain 0.99, lag within 5 ms; reaction alone gain 0.80, lag ~260 ms.
+- [x] Velocity rebuilt from the localiser (D2; `pursuit/velocity.py`). The learned velocity is
+      clean (error 0.14-0.18x the speed on the development pendulum runs, against ~1x going in),
+      so the positions-in fallback is not needed.
+- [x] Clock memory (D3). On the three steady development pendulum runs the clock sits at
+      0.98-0.99x the period; memory gain 0.97-1.01, lag 2-8 ms; eye gain 1.01-1.03
+      (`scripts/cogsci/check_clock.py`). The velocity smoothing (+17 ms) and the map's own lead
+      cancel, so nothing is added to the read-ahead.
+- [x] Surprise signal (D5), NaN until the slow copy is saved (3-4 s on these runs).
+- [x] Settings (D6).
+- [x] No start-up wait: the best-predicting clock drives the eye from the first step (the
+      MCSoC memory waited 3 s, which would have set S1's answer).
+- [ ] Sagi checks D6.
 
 Code goes in `pursuit/`, tests in `tests/pursuit/`; `trajmem/` and `runs/paper/` stay as
 the MCSoC paper left them (`cogsci/CLAUDE.md`).
@@ -319,5 +343,8 @@ this audience, not copied from MCSoC. Six pages, references extra:
 
 ## Open
 
+- S3: with the target hidden there is no slip, so the reaction keeps the speed it had. Beside a
+  memory 10% too slow that is 1-11% of peak speed; the reaction alone glides on at 16-68%.
+  Looked at again once the clock runs in the loop.
 - Who attends Bilbao; the travel grant.
 - Whether any real recording has a clean stop (decides whether S4 is real or sim).

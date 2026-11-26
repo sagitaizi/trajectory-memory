@@ -17,7 +17,7 @@ The question and the match-or-miss rule: `cogsci/materials/question.md`.
 | `cogsci/PAPER_PROGRESS.md` | Section status of the CogSci paper. |
 | `cogsci/materials/` | The question, reading notes, the table of human numbers. |
 | `cogsci/paper/` | The manuscript, in the CogSci template. |
-| `pursuit/` | The code: eye, velocity, clock, loop, measures. One file, one job. |
+| `pursuit/` | The code: eye, velocity, oscillator, clock, loop, measures. One file, one job. |
 | `tests/pursuit/` | Its tests. |
 | `scripts/cogsci/` | One run script per situation. |
 | `runs/cogsci/` | Outputs; `runs/cogsci/numbers.csv` holds every number the paper quotes. |
